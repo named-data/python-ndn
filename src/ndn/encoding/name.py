@@ -30,9 +30,17 @@ class Component:
         return ret
 
     @staticmethod
+    def from_hex(val: str, typ: int = TYPE_GENERIC) -> bytearray:
+        return Component.from_bytes(bytearray.fromhex(val), typ)
+
+    @staticmethod
     def from_str(val: str) -> bytearray:
         def raise_except():
             raise ValueError(f'{val} is not a legal Name.')
+
+        # Check empty string
+        if not val:
+            return bytearray(b'\x08\x00')
 
         percent_cnt = 0
         type_offset = None
@@ -43,13 +51,13 @@ class Component:
             if ch == '%':
                 percent_cnt += 1
             if ch == "=":
-                if type_offset:
+                if type_offset is not None:
                     raise_except()
                 else:
                     type_offset = i
         # Get Type
         typ = Component.TYPE_GENERIC
-        if type_offset:
+        if type_offset is not None:
             try:
                 typ_str = val[:type_offset]
                 # Check special case
@@ -71,7 +79,7 @@ class Component:
             type_offset = -1
         # Alloc buf
         length = len(val) - type_offset - 1 - 2 * percent_cnt
-        if length <= 2:
+        if length < 0:
             raise_except()
         size_typ = 1 if typ < 253 else 3
         size_len = 1 if length < 253 else 3
@@ -96,36 +104,46 @@ class Component:
             try:
                 i += encode()
                 pos += 1
-            except ValueError:
+            except IndexError:
                 raise_except()
         return ret
 
     @staticmethod
-    def from_segment(segment: int) -> bytearray:
-        return Component.from_bytes(pack_uint_bytes(segment), Component.TYPE_SEGMENT)
+    def from_number(val: int, typ: int) -> bytearray:
+        return Component.from_bytes(pack_uint_bytes(val), typ)
 
     @staticmethod
-    def from_byte_offset(segment: int) -> bytearray:
-        return Component.from_bytes(pack_uint_bytes(segment), Component.TYPE_BYTE_OFFSET)
+    def from_segment(segment: int) -> bytearray:
+        return Component.from_number(segment, Component.TYPE_SEGMENT)
+
+    @staticmethod
+    def from_byte_offset(offset: int) -> bytearray:
+        return Component.from_number(offset, Component.TYPE_BYTE_OFFSET)
 
     @staticmethod
     def from_sequence_num(seq_num: int) -> bytearray:
-        return Component.from_bytes(pack_uint_bytes(seq_num), Component.TYPE_SEQUENCE_NUM)
+        return Component.from_number(seq_num, Component.TYPE_SEQUENCE_NUM)
 
     @staticmethod
     def from_version(version: int) -> bytearray:
-        return Component.from_bytes(pack_uint_bytes(version), Component.TYPE_VERSION)
+        return Component.from_number(version, Component.TYPE_VERSION)
 
     @staticmethod
     def from_timestamp(timestamp: int) -> bytearray:
-        return Component.from_bytes(pack_uint_bytes(timestamp), Component.TYPE_TIMESTAMP)
+        return Component.from_number(timestamp, Component.TYPE_TIMESTAMP)
 
     @staticmethod
     def get_type(component: BinaryStr) -> int:
         return parse_tl_num(component)[0]
 
     @staticmethod
-    def to_uri(component: BinaryStr) -> str:
+    def get_value(component: BinaryStr) -> memoryview:
+        _, size_typ = parse_tl_num(component)
+        _, size_len = parse_tl_num(component)
+        return memoryview(component)[size_typ + size_len:]
+
+    @staticmethod
+    def to_str(component: BinaryStr) -> str:
         offset = 0
         typ, sz = parse_tl_num(component, offset)
         offset += sz
@@ -145,7 +163,7 @@ class Component:
 
             def decode(val: int) -> str:
                 ret = chr(val)
-                if ret in Component.CHARSET:
+                if ret in Component.CHARSET and ret not in {'%', '='}:
                     return ret
                 else:
                     return f"%{hex(val)[2:]}"
@@ -154,13 +172,9 @@ class Component:
 
     @staticmethod
     def to_number(component: BinaryStr) -> int:
-        _, sz = parse_tl_num(component)
-        return int.from_bytes(component[sz:], 'big')
-
-    @staticmethod
-    def to_bytes(component: BinaryStr) -> memoryview:
-        _, sz = parse_tl_num(component)
-        return memoryview(component)[sz:]
+        _, size_typ = parse_tl_num(component)
+        _, size_len = parse_tl_num(component)
+        return int.from_bytes(component[size_typ + size_len:], 'big')
 
 
 class Name:
