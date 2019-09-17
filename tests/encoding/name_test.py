@@ -69,6 +69,7 @@ class TestComponent:
 
     @staticmethod
     def test_invalid_type():
+        # 0-typed component is not checked in ndn-python
         assert Component.from_str("0=A") == b'\x00\x01A'
         with pytest.raises(struct.error):
             Component.from_str("-1=A")
@@ -129,3 +130,102 @@ class TestComponent:
         assert Component.get_type(comp) == 36
         assert Component.get_value(comp) == b'\x00\x37\xbb\x0d\x76\xed\x4c\x60'
         assert Component.to_number(comp) == timeval
+
+
+class TestName:
+    @staticmethod
+    def test_basic_encode():
+        uri = ('/Emid/25042=P3//./%1C%9F'
+               '/sha256digest=0415e3624a151850ac686c84f155f29808c0dd73819aa4a4c20be73a4d8a874c')
+        name = Name.from_str(uri)
+        assert len(name) == 6
+        assert name[0] == Component.from_bytes(b'Emid')
+        assert name[1] == b'\xfd\x61\xd2\x02\x50\x33'
+        assert name[2] == Component.from_bytes(b'')
+        assert name[3] == Component.from_bytes(b'.')
+        assert name[4] == Component.from_bytes(b'\x1C\x9F')
+        assert Component.get_type(name[5]) == Component.TYPE_IMPLICIT_SHA256
+
+    @staticmethod
+    def test_encode_parse():
+        assert Name.to_str(Name.from_str('/hello/world')) == '/hello/world'
+        assert Name.to_str(Name.from_str('hello/world')) == '/hello/world'
+        assert Name.to_str(Name.from_str('hello/world/')) == '/hello/world'
+
+        assert Name.to_str(Name.from_str('hello/world/  ')) == '/hello/world/%20%20'
+        assert Name.to_str(Name.from_str('/:?#[]@')) == '/%3a%3f%23%5b%5d%40'
+        assert Name.to_str(Name.from_str(' hello\t/\tworld \r\n')) == '/%20hello%09/%09world%20%0d%0a'
+
+        assert Name.to_str(Name.from_str('')) == '/'
+        assert Name.to_str(Name.from_str(' ')) == '/%20'
+        assert Name.to_str(Name.from_str('/hello//world')) == '/hello//world'
+        assert Name.to_str(Name.from_str('/hello/./world')) == '/hello/./world'
+        assert Name.to_str(Name.from_str('/hello/../world')) == '/hello/../world'
+
+    @staticmethod
+    def test_compare():
+        strs = [
+            "/",
+            "/sha256digest=0000000000000000000000000000000000000000000000000000000000000000",
+            "/sha256digest=0000000000000000000000000000000000000000000000000000000000000001",
+            "/sha256digest=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            "/params-sha256=0000000000000000000000000000000000000000000000000000000000000000",
+            "/params-sha256=0000000000000000000000000000000000000000000000000000000000000001",
+            "/params-sha256=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            "/3=",
+            "/3=D",
+            "/3=F",
+            "/3=AA",
+            "//",
+            "/D",
+            "/D/sha256digest=0000000000000000000000000000000000000000000000000000000000000000",
+            "/D/sha256digest=0000000000000000000000000000000000000000000000000000000000000001",
+            "/D/sha256digest=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            "/D/params-sha256=0000000000000000000000000000000000000000000000000000000000000000",
+            "/D/params-sha256=0000000000000000000000000000000000000000000000000000000000000001",
+            "/D/params-sha256=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            "/D/3=",
+            "/D/3=D",
+            "/D/3=F",
+            "/D/3=AA",
+            "/D//",
+            "/D/D",
+            "/D/F",
+            "/D/AA",
+            "/D/21426=/",
+            "/D/21426=D",
+            "/D/21426=F",
+            "/D/21426=AA",
+            "/F",
+            "/AA",
+            "/21426=",
+            "/21426=D",
+            "/21426=F",
+            "/21426=AA",
+        ]
+        names = [Name.from_str(s) for s in strs]
+        for i, lhs in enumerate(names):
+            for j, rhs in enumerate(names):
+                assert (lhs == rhs) == (i == j)
+                assert (lhs != rhs) == (i != j)
+                assert (lhs <  rhs) == (i <  j)
+                assert (lhs <= rhs) == (i <= j)
+                assert (lhs >  rhs) == (i >  j)
+                assert (lhs >= rhs) == (i >= j)
+
+    @staticmethod
+    def test_is_prefix():
+        assert Name.is_prefix(Name.from_str('/'), Name.from_str('/'))
+        assert Name.is_prefix(Name.from_str('/'), Name.from_str('/3=D'))
+        assert Name.is_prefix(Name.from_str('/'), Name.from_str('/F'))
+        assert Name.is_prefix(Name.from_str('/'), Name.from_str('/21426=AA'))
+
+        assert Name.is_prefix(Name.from_str('/B'), Name.from_str('/B'))
+        assert Name.is_prefix(Name.from_str('/B'), Name.from_str('/B/3=D'))
+        assert Name.is_prefix(Name.from_str('/B'), Name.from_str('/B/F'))
+        assert Name.is_prefix(Name.from_str('/B'), Name.from_str('/B/21426=AA'))
+
+        assert not Name.is_prefix(Name.from_str('/C'), Name.from_str('/'))
+        assert not Name.is_prefix(Name.from_str('/C'), Name.from_str('/3=D'))
+        assert not Name.is_prefix(Name.from_str('/C'), Name.from_str('/F'))
+        assert not Name.is_prefix(Name.from_str('/C'), Name.from_str('/21426=AA'))

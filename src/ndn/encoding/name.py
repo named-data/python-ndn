@@ -1,3 +1,4 @@
+from typing import List
 from .tlv_var import *
 import string
 
@@ -166,7 +167,7 @@ class Component:
                 if ret in Component.CHARSET and ret not in {'%', '='}:
                     return ret
                 else:
-                    return f"%{hex(val)[2:]}"
+                    return f"%{val:02x}"
 
             return ret + "".join(decode(val) for val in component[offset:])
 
@@ -176,6 +177,43 @@ class Component:
         _, size_len = parse_tl_num(component)
         return int.from_bytes(component[size_typ + size_len:], 'big')
 
+    @staticmethod
+    def escape_str(val: str) -> str:
+        def escape_chr(ch):
+            if ch in Component.CHARSET:
+                return ch
+            else:
+                return f'%{ord(ch):02x}'
+
+        return ''.join(escape_chr(ch) for ch in val)
+
 
 class Name:
-    pass
+    @staticmethod
+    def from_str(val: str) -> List[bytearray]:
+        # TODO: declare the differences: ":" and "."
+        # Remove leading and tailing '/'
+        cnt_slash = 0
+        if val.startswith('/'):
+            val = val[1:]
+            cnt_slash += 1
+        if val.endswith('/'):
+            val = val[:-1]
+            cnt_slash += 1
+        if not val and cnt_slash <= 1:
+            return []
+        compstrs = val.split('/')
+        return [Component.from_str(Component.escape_str(comp)) for comp in compstrs]
+
+    @staticmethod
+    def to_str(name: List[BinaryStr]) -> str:
+        return '/' + '/'.join(Component.to_str(comp) for comp in name)
+
+    @staticmethod
+    def is_prefix(lhs: List[BinaryStr], rhs: List[BinaryStr]) -> bool:
+        left_len = len(lhs)
+        return left_len <= len(rhs) and lhs == rhs[:left_len]
+
+    @staticmethod
+    def encode(name: List[BinaryStr], buf: VarBinaryStr = None, offset: int = 0) -> VarBinaryStr:
+        pass
