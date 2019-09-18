@@ -146,8 +146,14 @@ class TestName:
         assert name[4] == Component.from_bytes(b'\x1C\x9F')
         assert Component.get_type(name[5]) == Component.TYPE_IMPLICIT_SHA256
 
+        assert Name.encoded_length(name) == 57
+        assert (Name.encode(name) ==
+                b'\x07\x37\x08\x04Emid\xfda\xd2\x02P3\x08\x00\x08\x01.\x08\x02\x1c\x9f'
+                b'\x01 \x04\x15\xe3bJ\x15\x18P\xachl\x84\xf1U\xf2\x98\x08\xc0\xdds\x81'
+                b'\x9a\xa4\xa4\xc2\x0b\xe7:M\x8a\x87L')
+
     @staticmethod
-    def test_encode_parse():
+    def test_string_parse():
         assert Name.to_str(Name.from_str('/hello/world')) == '/hello/world'
         assert Name.to_str(Name.from_str('hello/world')) == '/hello/world'
         assert Name.to_str(Name.from_str('hello/world/')) == '/hello/world'
@@ -229,3 +235,33 @@ class TestName:
         assert not Name.is_prefix(Name.from_str('/C'), Name.from_str('/3=D'))
         assert not Name.is_prefix(Name.from_str('/C'), Name.from_str('/F'))
         assert not Name.is_prefix(Name.from_str('/C'), Name.from_str('/21426=AA'))
+
+    @staticmethod
+    def test_encode_func():
+        name = Name.from_str('/a/b/c/d')
+        buf = bytearray(20)
+
+        with pytest.raises(IndexError):
+            Name.encode(name, buf, 10)
+        assert Name.encode(name, buf, 6) == b'\x00\x00\x00\x00\x00\x00\x07\x0c\x08\x01a\x08\x01b\x08\x01c\x08\x01d'
+        assert Name.encode(name, buf) == b'\x07\x0c\x08\x01a\x08\x01b\x08\x01c\x08\x01d\x08\x01c\x08\x01d'
+        assert Name.encode([]) == b'\x07\x00'
+
+    @staticmethod
+    def test_decode_func():
+        buf = b'\x00\x00\x00\x00\x00\x00\x07\x0c\x08\x01a\x08\x01b\x08\x01c\x08\x01d'
+
+        with pytest.raises(ValueError):
+            Name.decode(buf, 10)
+        with pytest.raises(IndexError):
+            Name.decode(buf[:-1], 6)
+
+        name, size_name = Name.decode(buf, 6)
+        assert size_name == 14
+        assert len(name) == 4
+        assert name[0] == b'\x08\x01a'
+        assert name[1] == b'\x08\x01b'
+        assert name[2] == b'\x08\x01c'
+        assert name[3] == b'\x08\x01d'
+
+        assert Name.decode(b'\x07\x00') == ([], 2)

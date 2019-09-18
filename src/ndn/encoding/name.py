@@ -1,5 +1,6 @@
-from typing import List
+from typing import List, Optional
 from .tlv_var import *
+from functools import reduce
 import string
 
 
@@ -189,6 +190,8 @@ class Component:
 
 
 class Name:
+    TYPE_NAME = 7
+
     @staticmethod
     def from_str(val: str) -> List[bytearray]:
         # TODO: declare the differences: ":" and "."
@@ -215,5 +218,54 @@ class Name:
         return left_len <= len(rhs) and lhs == rhs[:left_len]
 
     @staticmethod
-    def encode(name: List[BinaryStr], buf: VarBinaryStr = None, offset: int = 0) -> VarBinaryStr:
-        pass
+    def encoded_length(name: List[BinaryStr]) -> int:
+        size_val = reduce(lambda x, y: x + len(y), name, 0)
+        size_typ = 1
+        size_len = 1 if size_val < 253 else 3
+        return size_val + size_typ + size_len
+
+    @staticmethod
+    def encode(name: List[BinaryStr], buf: Optional[VarBinaryStr] = None, offset: int = 0) -> VarBinaryStr:
+        size_val = reduce(lambda x, y: x + len(y), name, 0)
+        size_typ = 1
+        size_len = 1 if size_val < 253 else 3
+
+        if not buf:
+            buf = bytearray(size_val + size_typ + size_len)
+        else:
+            if len(buf) < size_val + size_typ + size_len + offset:
+                raise IndexError('buffer overflow')
+
+        offset += write_tl_num(Name.TYPE_NAME, buf, offset)
+        offset += write_tl_num(size_val, buf, offset)
+        for comp in name:
+            buf[offset:offset+len(comp)] = comp
+            offset += len(comp)
+        return buf
+
+    @staticmethod
+    def decode(buf: BinaryStr, offset: int = 0) -> (List[memoryview], int):
+        buf = memoryview(buf)
+        origin_offset = offset
+
+        typ, size_typ = parse_tl_num(buf, offset)
+        offset += size_typ
+        if typ != Name.TYPE_NAME:
+            raise ValueError(f'the Type of {buf} is not Name')
+
+        length, size_len = parse_tl_num(buf, offset)
+        offset += size_typ
+        if length > len(buf) - offset:
+            raise IndexError('buffer overflow')
+
+        ret = []
+        while length > 0:
+            st = offset
+            _, size_typ_comp = parse_tl_num(buf, offset)
+            offset += size_typ_comp
+            len_comp, size_len_comp = parse_tl_num(buf, offset)
+            offset += size_len_comp + len_comp
+            ret.append(buf[st:offset])
+            length -= (offset - st)
+
+        return ret, offset - origin_offset
