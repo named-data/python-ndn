@@ -5,6 +5,17 @@ BinaryStr = Union[bytes, bytearray, memoryview]
 VarBinaryStr = Union[bytearray, memoryview]
 
 
+def get_tl_num_size(val: int) -> int:
+    if val <= 0xFC:
+        return 1
+    elif val <= 0xFFFF:
+        return 3
+    elif val <= 0xFFFFFFFF:
+        return 5
+    else:
+        return 9
+
+
 def write_tl_num(val: int, buf: VarBinaryStr, offset: int = 0) -> int:
     if val <= 0xFC:
         struct.pack_into('!B', buf, offset, val)
@@ -41,3 +52,7 @@ def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
         return struct.unpack('!I', buf[offset+1:offset+5])[0], 5
     else:
         return struct.unpack('!Q', buf[offset+1:offset+9])[0], 9
+
+
+def is_binary_str(var):
+    return isinstance(var, bytes) or isinstance(var, bytearray) or isinstance(var, memoryview)

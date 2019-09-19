@@ -1,5 +1,5 @@
 from typing import List, Optional
-from .tlv_var import *
+from .tlv_var import BinaryStr, VarBinaryStr, write_tl_num, pack_uint_bytes, parse_tl_num, get_tl_num_size
 from functools import reduce
 import string
 
@@ -22,9 +22,8 @@ class Component:
 
     @staticmethod
     def from_bytes(val: BinaryStr, typ: int = TYPE_GENERIC) -> bytearray:
-        # Currently it's impossible for TL to be >65535
-        size_typ = 1 if typ < 253 else 3
-        size_len = 1 if len(val) < 253 else 3
+        size_typ = get_tl_num_size(typ)
+        size_len = get_tl_num_size(len(val))
         ret = bytearray(size_typ + size_len + len(val))
         write_tl_num(typ, ret, 0)
         write_tl_num(len(val), ret, size_typ)
@@ -83,8 +82,8 @@ class Component:
         length = len(val) - type_offset - 1 - 2 * percent_cnt
         if length < 0:
             raise_except()
-        size_typ = 1 if typ < 253 else 3
-        size_len = 1 if length < 253 else 3
+        size_typ = get_tl_num_size(typ)
+        size_len = get_tl_num_size(length)
         ret = bytearray(size_typ + size_len + length)
         view = memoryview(ret)
         write_tl_num(typ, ret, 0)
@@ -219,25 +218,25 @@ class Name:
 
     @staticmethod
     def encoded_length(name: List[BinaryStr]) -> int:
-        size_val = reduce(lambda x, y: x + len(y), name, 0)
+        length = reduce(lambda x, y: x + len(y), name, 0)
         size_typ = 1
-        size_len = 1 if size_val < 253 else 3
-        return size_val + size_typ + size_len
+        size_len = get_tl_num_size(length)
+        return length + size_typ + size_len
 
     @staticmethod
     def encode(name: List[BinaryStr], buf: Optional[VarBinaryStr] = None, offset: int = 0) -> VarBinaryStr:
-        size_val = reduce(lambda x, y: x + len(y), name, 0)
+        length = reduce(lambda x, y: x + len(y), name, 0)
         size_typ = 1
-        size_len = 1 if size_val < 253 else 3
+        size_len = get_tl_num_size(length)
 
         if not buf:
-            buf = bytearray(size_val + size_typ + size_len)
+            buf = bytearray(length + size_typ + size_len)
         else:
-            if len(buf) < size_val + size_typ + size_len + offset:
+            if len(buf) < length + size_typ + size_len + offset:
                 raise IndexError('buffer overflow')
 
         offset += write_tl_num(Name.TYPE_NAME, buf, offset)
-        offset += write_tl_num(size_val, buf, offset)
+        offset += write_tl_num(length, buf, offset)
         for comp in name:
             buf[offset:offset+len(comp)] = comp
             offset += len(comp)
