@@ -1,3 +1,4 @@
+import struct
 from typing import List, Optional, Union
 from functools import reduce
 from random import randint
@@ -45,9 +46,11 @@ class Interest:
         def check_name():
             nonlocal name, need_digest, digest_pos
             if is_binary_str(name):
-                name = Name.decode(name)
-            if isinstance(name, str):
+                name = Name.decode(name)[0]
+            elif isinstance(name, str):
                 name = Name.from_str(name)
+            else:
+                name = name.copy()
             if not isinstance(name, list):
                 raise TypeError('invalid type for name')
             for i, comp in enumerate(name):
@@ -96,7 +99,6 @@ class Interest:
             digest_buf = None
             sig_covered_part = []
             sig_value_buf = None
-            cover_start = None
 
             offset = 0
             offset += write_tl_num(Interest.TYPE_INTEREST, wire, offset)
@@ -132,7 +134,7 @@ class Interest:
             if interest_param.nonce is not None:
                 offset += write_tl_num(Interest.TYPE_NONCE, wire, offset)
                 offset += write_tl_num(4, wire, offset)
-                wire[offset:offset+4] = pack_uint_bytes(interest_param.nonce)
+                struct.pack_into('!I', wire, offset, interest_param.nonce)
                 offset += 4
             if interest_param.lifetime is not None:
                 offset += write_tl_num(Interest.TYPE_INTEREST_LIFETIME, wire, offset)
@@ -180,7 +182,6 @@ class Interest:
             return sig_covered_part, sig_value_buf, digest_covered_part, digest_buf
 
         # process input arguments
-        name = name.copy()
         signer = (Signer.get_signer(interest_param.signature_type)
                   if interest_param.signature_type is not None
                   else None)

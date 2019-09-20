@@ -1,4 +1,5 @@
 import pytest
+import struct
 from ndn.encoding.name import *
 
 
