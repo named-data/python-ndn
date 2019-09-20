@@ -43,41 +43,66 @@ class Interest:
         :param app_param: Application parameters
         :return: Encoded wire
         """
-        def check_name():
-            nonlocal name, need_digest, digest_pos
+        def check_name(need_digest: bool) -> Optional[int]:
+            """
+            Check the legality of name. Convert name into Name.
+            :return: The index of ParametersSha256DigestComponent
+            """
+            nonlocal name
+            digest_pos = None
             if is_binary_str(name):
+                # Decode it if it's binary name
+                # This makes appending the digest component easier
                 name = Name.decode(name)[0]
             elif isinstance(name, str):
                 name = Name.from_str(name)
             else:
+                # clone to prevent the list being modified
                 name = name.copy()
+            # From here on, name must be in List[Component, str]
             if not isinstance(name, list):
                 raise TypeError('invalid type for name')
+            # Check every component
             for i, comp in enumerate(name):
+                # If it's string, encode it first
                 if isinstance(comp, str):
                     name[i] = Component.from_str(comp)
                     comp = name[i]
+                # And then check the type
                 if is_binary_str(comp):
                     typ = Component.get_type(comp)
                     if typ == Component.TYPE_INVALID:
                         raise TypeError('invalid type for name component')
                     elif typ == Component.TYPE_PARAMETERS_SHA256:
+                        # Params Sha256 can occur at most once
                         if need_digest and digest_pos is None:
                             digest_pos = i
                         else:
                             raise ValueError('unnecessary ParametersSha256DigestComponent in name')
                 else:
                     raise TypeError('invalid type for name component')
+            return digest_pos
 
-        def get_name_len():
-            nonlocal name, need_digest, digest_pos
+        def get_name_len(need_digest: bool, digest_pos: Optional[int]) -> int:
+            """
+            Get the length of the name
+            :return: the length of the name finally, TL not included
+            """
+            nonlocal name
             length = reduce(lambda x, y: x + len(y), name, 0)
             if need_digest and digest_pos is None:
                 length += 34
             return length
 
-        def get_value_len(name_len):
-            nonlocal sig_info_len, sig_value_len
+        def get_value_len(name_len: int) -> (int, int, int):
+            """
+            Get the length of Interest.
+            :param name_len: the length of the name, TL not included
+            :return: A tuple (Interest length, SignatureInfo length, SignatureValue length).
+                TLs are not included.
+            """
+            sig_info_len = 0
+            sig_value_len = 0
             length = 1 + get_tl_num_size(name_len) + name_len
             length += 2 if interest_param.can_be_prefix else 0
             length += 2 if interest_param.must_be_fresh else 0
@@ -91,14 +116,21 @@ class Interest:
                 length += 1 + get_tl_num_size(sig_info_len) + sig_info_len
                 sig_value_len = signer.get_signature_value_size(**kwargs)
                 length += 1 + get_tl_num_size(sig_value_len) + sig_value_len
-            return length
+            return length, sig_info_len, sig_value_len
 
-        def encode_packet():
+        def encode_packet() -> (List[memoryview], Optional[memoryview], List[memoryview], Optional[memoryview]):
+            """
+            Encode the Interest packet. Reserve space for signature and digest.
+            :return: A tuple (Signature-covered bytes list,
+                              SignatureValue buf,
+                              ParametersSha256DigestComponent-covered bytes list,
+                              ParametersSha256DigestComponent buf)
+            """
             nonlocal wire, name_len, value_len, sig_info_len, sig_value_len, wire_len
-            digest_covered_part = []
-            digest_buf = None
             sig_covered_part = []
             sig_value_buf = None
+            digest_covered_part = []
+            digest_buf = None
 
             offset = 0
             offset += write_tl_num(Interest.TYPE_INTEREST, wire, offset)
@@ -107,10 +139,11 @@ class Interest:
             # Name
             offset += write_tl_num(Name.TYPE_NAME, wire, offset)
             offset += write_tl_num(name_len, wire, offset)
-            cover_start = offset
+            cover_start = offset # Signature covers the name
             for i, comp in enumerate(name):
                 wire[offset:offset + len(comp)] = comp
                 if i == digest_pos:
+                    # except the Digest component
                     if offset > cover_start:
                         sig_covered_part.append(wire[cover_start:offset])
                     digest_buf = wire[offset+2:offset+34]
@@ -119,6 +152,7 @@ class Interest:
             if offset > cover_start:
                 sig_covered_part.append(wire[cover_start:offset])
             if need_digest and digest_pos is None:
+                # If digest component does not exist, append one
                 offset += write_tl_num(Component.TYPE_PARAMETERS_SHA256, wire, offset)
                 offset += write_tl_num(32, wire, offset)
                 digest_buf = wire[offset:offset+32]
@@ -148,6 +182,8 @@ class Interest:
                 wire[offset] = interest_param.hop_limit
                 offset += 1
 
+            # Signature covers whatever starting from application parameters except SignatureValue
+            # Digest covers whatever left
             cover_start = offset
             if app_param is not None:
                 offset += write_tl_num(Interest.TYPE_APPLICATION_PARAMETERS, wire, offset)
@@ -185,20 +221,19 @@ class Interest:
         signer = (Signer.get_signer(interest_param.signature_type)
                   if interest_param.signature_type is not None
                   else None)
-        need_digest = (signer is not None) or (app_param is not None)
-        digest_pos = None
-        check_name()
+        if (signer is not None) and (app_param is None):
+            app_param = b''
+        need_digest = app_param is not None
+        digest_pos = check_name(need_digest)
 
         # calculate length and allocate memory
-        name_len = get_name_len()
-        sig_info_len = 0
-        sig_value_len = 0
-        value_len = get_value_len(name_len)
+        name_len = get_name_len(need_digest, digest_pos)
+        value_len, sig_info_len, sig_value_len = get_value_len(name_len)
         wire_len = 1 + get_tl_num_size(value_len) + value_len
         ret = bytearray(wire_len)
         wire = memoryview(ret)
 
-        # encode
+        # encode and sign
         sig_covered_part, sig_value_buf, digest_covered_part, digest_buf = encode_packet()
         if signer is not None:
             signer.write_signature_value(sig_value_buf, sig_covered_part, **kwargs)
@@ -210,5 +245,5 @@ class Interest:
 
     @staticmethod
     def parse(wire: BinaryStr):
-        # -> name, interest_param, app_param, sig_info, sig_covered_part, sig_value, digest_covered_part, digest_buf
+        # -> name, interest_param, app_param, sig_info, sig_covered_part, sig_value, digest_covered_part, digest
         pass
