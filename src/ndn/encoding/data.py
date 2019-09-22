@@ -34,15 +34,17 @@ class Data:
             elif isinstance(name, list):
                 name = name.copy()
                 for i, comp in enumerate(name):
-                    name[i] = Component.from_str(comp)
+                    if isinstance(comp, str):
+                        name[i] = Component.from_str(comp)
+                    elif not is_binary_str(comp):
+                        raise TypeError('invalid type for name component')
             elif not is_binary_str(name):
                 raise TypeError('invalid type for name')
 
         def get_name_len_with_tl() -> int:
             nonlocal name
             if isinstance(name, list):
-                value_len = Name.encoded_length(name)
-                return 1 + get_tl_num_size(value_len) + value_len
+                return Name.encoded_length(name)
             else:
                 return len(name)
 
@@ -92,7 +94,7 @@ class Data:
             # MetaInfo
             if metainfo_len > 0:
                 offset += write_tl_num(Data.TYPE_METAINFO, wire, offset)
-                offset += write_tl_num(value_len, wire, offset)
+                offset += write_tl_num(metainfo_len, wire, offset)
                 if param.content_type is not None:
                     offset += write_tl_num(Data.TYPE_CONTENT_TYPE, wire, offset)
                     content_type_buf = pack_uint_bytes(param.content_type)
@@ -109,6 +111,7 @@ class Data:
                     offset += write_tl_num(Data.TYPE_FINAL_BLOCK_ID, wire, offset)
                     offset += write_tl_num(len(param.final_block_id), wire, offset)
                     wire[offset:offset+len(param.final_block_id)] = param.final_block_id
+                    offset += len(param.final_block_id)
 
             # Signature Info
             if signer is not None:
@@ -140,6 +143,7 @@ class Data:
         signer = (Signer.get_signer(param.signature_type)
                   if param.signature_type is not None
                   else None)
+        preprocess_name()
         name_len_with_tl = get_name_len_with_tl()
         metainfo_len = get_metainfo_len()
         value_len, sig_info_len, sig_value_len = get_value_len(name_len_with_tl, metainfo_len)
