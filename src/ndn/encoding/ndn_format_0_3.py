@@ -6,7 +6,7 @@ from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
 
 
 class InterestContent(TlvModel):
-    name = InterestNameField(0x07, "/")
+    name = InterestNameField("/")
     can_be_prefix = BoolField(0x21, False)
     must_be_fresh = BoolField(0x12, False)
     nonce = UintField(0x0a, fixed_len=4)
@@ -50,16 +50,11 @@ class InterestContent(TlvModel):
         if markers is None:
             markers = {}
         ret = super().encode(wire, offset, markers)
-        offset += markers[f'{self._model_name}__encoded_length']
+        offset += markers[f'{self._model_name}##encoded_length']
         wire_view = memoryview(ret)
 
-        signer = markers['signer']
-        need_digest = markers['need_digest']
-        if signer is not None:
-            signer.write_signature_value(markers['sig_value_buf'],
-                                         markers['sig_cover_part'],
-                                         **markers['signer_args'])
-        if need_digest:
+        self._fill_in_signature(markers)
+        if markers['need_digest']:
             digest_covered_part = [wire_view[markers['_digest_cover_start']:offset]]
             sha256 = DigestSha256()
             sha256.write_signature_value(markers['digest_buf'], digest_covered_part)
@@ -79,7 +74,7 @@ class MetaInfo(TlvModel):
 
 class DataContent(TlvModel):
     _sig_cover_start = OffsetMarker()
-    name = NameField(0x07, "/")
+    name = NameField("/")
     meta_info = ModelField(0x14, MetaInfo)
     content = BytesField(0x15)
     signature_type = SignatureField(info_typ=0x16, value_typ=0x17, interest_sig=False)
@@ -111,11 +106,7 @@ class DataContent(TlvModel):
         if markers is None:
             markers = {}
         ret = super().encode(wire, offset, markers)
-        signer = markers['signer']
-        if signer is not None:
-            signer.write_signature_value(markers['sig_value_buf'],
-                                         markers['sig_cover_part'],
-                                         **markers['signer_args'])
+        self._fill_in_signature(markers)
         return ret
 
 
