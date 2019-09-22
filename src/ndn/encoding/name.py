@@ -139,8 +139,8 @@ class Component:
 
     @staticmethod
     def get_value(component: BinaryStr) -> memoryview:
-        _, size_typ = parse_tl_num(component)
-        _, size_len = parse_tl_num(component)
+        _, size_typ = parse_tl_num(component, 0)
+        _, size_len = parse_tl_num(component, size_typ)
         return memoryview(component)[size_typ + size_len:]
 
     @staticmethod
@@ -173,8 +173,8 @@ class Component:
 
     @staticmethod
     def to_number(component: BinaryStr) -> int:
-        _, size_typ = parse_tl_num(component)
-        _, size_len = parse_tl_num(component)
+        _, size_typ = parse_tl_num(component, 0)
+        _, size_len = parse_tl_num(component, size_typ)
         return int.from_bytes(component[size_typ + size_len:], 'big')
 
     @staticmethod

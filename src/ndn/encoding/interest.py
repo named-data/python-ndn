@@ -12,7 +12,7 @@ class InterestParam:
     can_be_prefix: bool = False
     must_be_fresh: bool = False
     nonce: Optional[int] = None
-    lifetime: int = 4000
+    lifetime: Optional[int] = 4000
     hop_limit: Optional[int] = None
     signature_type: Optional[int] = None
 
@@ -43,7 +43,7 @@ class Interest:
         :param app_param: Application parameters
         :return: Encoded wire
         """
-        def check_name(need_digest: bool) -> Optional[int]:
+        def preprocess_name(need_digest: bool) -> Optional[int]:
             """
             Check the legality of name. Convert name into Name.
             :return: The index of ParametersSha256DigestComponent
@@ -224,7 +224,7 @@ class Interest:
         if (signer is not None) and (app_param is None):
             app_param = b''
         need_digest = app_param is not None
-        digest_pos = check_name(need_digest)
+        digest_pos = preprocess_name(need_digest)
 
         # calculate length and allocate memory
         name_len = get_name_len(need_digest, digest_pos)
