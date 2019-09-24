@@ -8,11 +8,7 @@ class Signer(metaclass=abc.ABCMeta):
     __signers = {}
 
     @abc.abstractmethod
-    def get_signature_info_size(self, **kwargs):
-        pass
-
-    @abc.abstractmethod
-    def write_signature_info(self, wire: memoryview, **kwargs):
+    def write_signature_info(self, signature_info, **kwargs):
         pass
 
     @abc.abstractmethod
@@ -44,10 +40,7 @@ class Signer(metaclass=abc.ABCMeta):
 class DigestSha256(Signer):
     TYPE_DIGEST_SHA256 = 0
 
-    def get_signature_info_size(self, **kwargs):
-        return 0
-
-    def write_signature_info(self, wire: memoryview, **kwargs):
+    def write_signature_info(self, signature_info, **kwargs):
         return
 
     def get_signature_value_size(self, **kwargs):

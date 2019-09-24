@@ -189,7 +189,7 @@ class Component:
 
 
 class Name:
-    TYPE_NAME = 7
+    TYPE_NAME = 0x07
 
     @staticmethod
     def from_str(val: str) -> List[bytearray]:

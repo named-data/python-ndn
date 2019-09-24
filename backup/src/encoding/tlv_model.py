@@ -185,6 +185,79 @@ class BoolField(Field):
         self.__set__(instance, True)
 
 
+class SignatureInfoField(Field):
+    def __init__(self,
+                 type_num: int,
+                 interest_sig: bool,
+                 signer: ProcedureArguments,
+                 sign_args: ProcedureArguments):
+        super().__init__(type_num)
+        self.interest_sig = interest_sig
+        self.signer = signer
+        self.sign_args = sign_args
+
+    def encoded_length(self, val, markers: dict) -> int:
+        signer = self.signer.get_arg(markers)
+        if signer is None:
+            return 0
+        else:
+            sign_args = self.sign_args.get_arg(markers)
+            length = 0
+            sig_info_len = signer.get_signature_info_size(**sign_args) + 3
+            length += 1 + get_tl_num_size(sig_info_len) + sig_info_len
+            markers[f'{self.name}##encoded_length'] = sig_info_len
+            return length
+
+    def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
+        signer = self.signer.get_arg(markers)
+        if signer is None:
+            return 0
+        else:
+            origin_offset = offset
+            sign_args = self.sign_args.get_arg(markers)
+            sig_typ = val
+            sig_info_len = markers[f'{self.name}##encoded_length']
+
+            # SignatureInfo
+            offset += write_tl_num(self.type_num, wire, offset)
+            offset += write_tl_num(sig_info_len, wire, offset)
+
+            # SignatureType
+            offset += write_tl_num(Signer.TYPE_SIGNATURE_TYPE, wire, offset)
+            offset += write_tl_num(1, wire, offset)
+            wire[offset] = sig_typ
+            offset += 1
+
+            signer.write_signature_info(wire[offset:offset + sig_info_len - 3], **sign_args)
+            offset += sig_info_len - 3
+
+            return offset - origin_offset
+
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
+        # SignatureType
+        sig_type_typ, tl_len = parse_tl_num(wire, offset)
+        offset += tl_len  # tl_len == 1
+        sig_type_len, tl_len = parse_tl_num(wire, offset)
+        offset += tl_len  # tl_len == 1
+        if sig_type_typ != Signer.TYPE_SIGNATURE_TYPE or sig_type_len != 1:
+            raise ValueError('unsupported signature')
+        sig_type = wire[offset]
+        offset += 1
+        self.__set__(instance, sig_type)
+
+        # Other SignatureInfo
+        markers['sig_info_buf'] = memoryview(wire)[offset:offset+length-3]
+        offset += length - 3
+
+        # SignatureValue
+        sig_value_typ, tl_len = parse_tl_num(wire, offset)
+        offset += tl_len  # tl_len == 1
+        sig_value_len, tl_len = parse_tl_num(wire, offset)
+        offset += tl_len
+        markers['sig_value_buf'] = memoryview(wire)[offset:offset+sig_value_len]
+        markers['$offset_after_parse'] = offset
+
+
 class SignatureValueField(Field):
     def __init__(self,
                  type_num: int,
@@ -338,8 +411,6 @@ class NameField(Field):
         super().__init__(Name.TYPE_NAME, default)
 
     def encoded_length(self, val, markers: dict) -> int:
-        if val is None:
-            return 0
         name = val
         if isinstance(name, str):
             name = Name.from_str(name)
@@ -362,8 +433,6 @@ class NameField(Field):
         return ret
 
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
-        if val is None:
-            return 0
         name = markers[f'{self.name}##preprocessed_name']
         name_len_with_tl = markers[f'{self.name}##encoded_length_with_tl']
         if isinstance(name, list):

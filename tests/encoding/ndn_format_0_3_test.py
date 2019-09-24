@@ -1,43 +1,8 @@
 import pytest
 from typing import Union, List
 from ndn.encoding.tlv_var import BinaryStr
-from ndn.encoding.interest import InterestParam
-from ndn.encoding.data import DataParam
 from ndn.encoding.ndn_format_0_3 import *
 from ndn.encoding.name import Name, Component
-
-
-def make_interest(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
-                  interest_param: InterestParam,
-                  app_param: Optional[BinaryStr] = None,
-                  **kwargs) -> bytearray:
-    interest = InterestPacket()
-    interest.interest = InterestContent()
-    interest.interest.name = name
-    interest.interest.can_be_prefix = interest_param.can_be_prefix
-    interest.interest.must_be_fresh = interest_param.must_be_fresh
-    interest.interest.nonce = interest_param.nonce
-    interest.interest.lifetime = interest_param.lifetime
-    interest.interest.hop_limit = interest_param.hop_limit
-    interest.interest.application_paramaters = app_param
-    interest.interest.signature_type = interest_param.signature_type
-    return interest.encode(markers={'signer_args': kwargs})
-
-
-def make_data(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
-              data_param: DataParam,
-              content: Optional[BinaryStr] = None,
-              **kwargs) -> bytearray:
-    data = DataPacket()
-    data.data = DataContent()
-    data.data.meta_info = MetaInfo()
-    data.data.name = name
-    data.data.meta_info.content_type = data_param.content_type
-    data.data.meta_info.freshness_period = data_param.freshness_period
-    data.data.meta_info.final_block_id = data_param.final_block_id
-    data.data.content = content
-    data.data.signature_type = data_param.signature_type
-    return data.encode(markers={'signer_args': kwargs})
 
 
 class TestInterestMake:
