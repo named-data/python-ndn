@@ -37,8 +37,6 @@ class Signer(metaclass=abc.ABCMeta):
 
 
 class DigestSha256(Signer):
-    TYPE_DIGEST_SHA256 = 0
-
     def write_signature_info(self, signature_info, **kwargs):
         print("wrt info", kwargs)
         return
@@ -53,6 +51,3 @@ class DigestSha256(Signer):
         for blk in contents:
             algo.update(blk)
         wire[0:32] = algo.digest()
-
-
-Signer.register(DigestSha256.TYPE_DIGEST_SHA256, DigestSha256())

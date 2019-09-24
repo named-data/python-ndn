@@ -45,6 +45,24 @@ class TypeNumber:
     PREFERENCE = 0x1e
 
 
+class ContentType:
+    BLOB = 0
+    LINK = 1
+    KEY = 2
+    NACK = 3
+
+
+class SignatureType:
+    NOT_SIGNED = None
+    DIGEST_SHA256 = 0
+    SHA256_WITH_RSA = 1
+    SHA256_WITH_ECDSA = 2
+    HMAC_WITH_SHA256 = 3
+
+
+Signer.register(SignatureType.DIGEST_SHA256, DigestSha256())
+
+
 class KeyLocator(TlvModel):
     name = NameField()
     key_digest = BytesField(TypeNumber.KEY_DIGEST)
@@ -251,3 +269,18 @@ def make_data(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
     markers = {}
     data._sign_args.set_arg(markers, kwargs)
     return data.encode(markers=markers)
+
+
+def parse_interest(wire: BinaryStr):
+    ret = InterestPacket.parse(wire, {})
+    params = InterestParam()
+    params.can_be_prefix = ret.interest.can_be_prefix
+    params.must_be_fresh = ret.interest.must_be_fresh
+    params.nonce = ret.interest.nonce
+    params.lifetime = ret.interest.lifetime
+    params.hop_limit = ret.interest.hop_limit
+    if ret.interest.signature_info:
+        params.signature_type = ret.interest.signature_info.signature_type
+    else:
+        params.signature_type = None
+    return ret.interest.name, params, ret.interest.application_parameters

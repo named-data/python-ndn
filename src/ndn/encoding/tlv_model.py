@@ -7,6 +7,10 @@ from .tlv_var import BinaryStr, VarBinaryStr, write_tl_num, pack_uint_bytes,\
 from .name import Name, Component
 
 
+class DecodeError(Exception):
+    pass
+
+
 class TlvModelMeta(abc.ABCMeta):
     def __new__(mcs, name, bases, attrs, **kwargs):
         cls = super().__new__(mcs, name, bases, attrs)
@@ -73,8 +77,11 @@ class Field(metaclass=abc.ABCMeta):
         """
         pass
 
-    # @abc.abstractmethod
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+    @abc.abstractmethod
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        pass
+
+    def skipping_process(self, markers: dict, wire: BinaryStr, offset: int):
         pass
 
 
@@ -88,10 +95,7 @@ class ProcedureArgument(Field):
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         return 0
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
-        pass
-
-    def parse_process(self, instance, markers: dict, wire: VarBinaryStr, offset: int):
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         pass
 
     def __get__(self, instance, owner):
@@ -114,7 +118,7 @@ class OffsetMarker(ProcedureArgument):
         self.set_arg(markers, offset)
         return 0
 
-    def parse_process(self, instance, markers: dict, wire: VarBinaryStr, offset: int):
+    def skipping_process(self, markers: dict, wire: BinaryStr, offset: int):
         self.set_arg(markers, offset)
 
 
@@ -162,15 +166,15 @@ class UintField(Field):
             struct.pack_into('!BQ', wire, offset, 8, val)
         return length + tl_size
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         if length == 1:
-            self.__set__(instance, struct.unpack_from('!B', wire, offset)[0])
+            return struct.unpack_from('!B', wire, offset)[0]
         elif length == 2:
-            self.__set__(instance, struct.unpack_from('!H', wire, offset)[0])
+            return struct.unpack_from('!H', wire, offset)[0]
         elif length == 4:
-            self.__set__(instance, struct.unpack_from('!I', wire, offset)[0])
+            return struct.unpack_from('!I', wire, offset)[0]
         elif length == 8:
-            self.__set__(instance, struct.unpack_from('!Q', wire, offset)[0])
+            return struct.unpack_from('!Q', wire, offset)[0]
         else:
             raise ValueError("Uint's length should be 1, 2, 4 or 8")
 
@@ -189,8 +193,8 @@ class BoolField(Field):
         else:
             return 0
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
-        self.__set__(instance, True)
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        return True
 
 
 class SignatureValueField(Field):
@@ -246,9 +250,8 @@ class SignatureValueField(Field):
                                          self.covered_part.get_arg(markers),
                                          **self.sign_args.get_arg(markers))
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         sig_buffer = memoryview(wire)[offset:offset+length]
-        instance._field_values[self.name] = sig_buffer
         self.value_buffer.set_arg(markers, sig_buffer)
 
         sig_cover_start = self.starting_point.get_arg(markers)
@@ -256,8 +259,7 @@ class SignatureValueField(Field):
             sig_cover_part = self.covered_part.get_arg(markers)
             sig_cover_part.append(wire[sig_cover_start:offset_btl])
 
-    def __set__(self, instance, value):
-        raise TypeError('SignatureValue is read-only')
+        return sig_buffer
 
 
 class InterestNameField(Field):
@@ -349,10 +351,8 @@ class InterestNameField(Field):
             self.digest_buffer.set_arg(markers, digest_buf)
         return offset - origin_offset
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         name = Name.decode(wire, offset_btl)[0]
-        self.__set__(instance, name)
-
         sig_cover_part = self.sig_covered_part.get_arg(markers)
         for ele in name:
             typ = Component.get_type(ele)
@@ -360,6 +360,7 @@ class InterestNameField(Field):
                 self.digest_buffer.set_arg(markers, Component.get_value(ele))
             else:
                 sig_cover_part.append(ele)
+        return name
 
 
 class NameField(Field):
@@ -401,8 +402,8 @@ class NameField(Field):
             wire[offset:offset + name_len_with_tl] = name
         return name_len_with_tl
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
-        self.__set__(instance, Name.decode(wire, offset_btl)[0])
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        return Name.decode(wire, offset_btl)[0]
 
 
 class BytesField(Field):
@@ -423,8 +424,8 @@ class BytesField(Field):
             offset += len(val)
             return offset - origin_offset
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
-        self.__set__(instance, memoryview(wire)[offset:offset+length])
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        return memoryview(wire)[offset:offset+length]
 
 
 class TlvModel(metaclass=TlvModelMeta):
@@ -458,24 +459,65 @@ class TlvModel(metaclass=TlvModelMeta):
             offset += field.encode_into(field.get_value(self), markers, wire_view, offset)
         return wire
 
-    @staticmethod
-    def parse(buf: BinaryStr, markers: Optional[dict] = None):
-        pass
+    @classmethod
+    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None):
+        if markers is None:
+            markers = {}
+        offset = 0
+        field_pos = 0
+        ret = cls()
+        while offset < len(wire):
+            # Read TL
+            offset_btl = offset
+            typ, size_typ = parse_tl_num(wire, offset)
+            offset += size_typ
+            length, size_len = parse_tl_num(wire, offset)
+            offset += size_len
+            # Search for field
+            i = field_pos
+            while i < len(ret._encoded_fields):
+                if ret._encoded_fields[i].type_num == typ:
+                    break
+                i += 1
+            if i < len(ret._encoded_fields):
+                # If found
+                # First process skipped fields
+                for j in range(field_pos, i):
+                    ret._encoded_fields[j].skipping_process(markers, wire, offset_btl)
+                # Parse that field
+                val = ret._encoded_fields[i].parse_from(ret, markers, wire, offset, length, offset_btl)
+                ret._encoded_fields[i].__set__(ret, val)
+                # Set next field
+                if isinstance(ret._encoded_fields[i], RepeatedField):
+                    field_pos = i
+                else:
+                    field_pos = i + 1
+            else:
+                # If not found
+                if (typ & 1) == 1:
+                    raise DecodeError(f'a critical field of type {typ} is unrecognized, redundant or out-of-order')
+            offset += length
+
 
 
 class ModelField(Field):
-    def __init__(self, type_num: int, model_type: Type[TlvModel], copy_fields: List[ProcedureArgument] = None):
+    def __init__(self,
+                 type_num: int,
+                 model_type: Type[TlvModel],
+                 copy_in_fields: List[ProcedureArgument] = None,
+                 copy_out_fields: List[ProcedureArgument] = None):
         # default should be None here to prevent unintended modification
         super().__init__(type_num, None)
         self.model_type = model_type
-        self.copy_fields = copy_fields if copy_fields else {}
+        self.copy_in_fields = copy_in_fields if copy_in_fields else {}
+        self.copy_out_fields = copy_out_fields if copy_out_fields else {}
 
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
             return 0
         if not isinstance(val, self.model_type):
             raise TypeError(f'{self.name}=f{val} is of type {self.model_type}')
-        copy_fields = {f.name for f in self.copy_fields}
+        copy_fields = {f.name for f in self.copy_in_fields}
         inner_markers = {k: v
                          for k, v in markers.items()
                          if k.split('##')[0] in copy_fields}
@@ -497,6 +539,15 @@ class ModelField(Field):
             val.encode(wire, offset, inner_markers)
             offset += length
             return offset - origin_offset
+
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        inner_markers = {}
+        val = self.model_type.parse(memoryview(wire)[offset:offset+length], inner_markers)
+        copy_fields = {f.name for f in self.copy_out_fields}
+        for k, v in inner_markers:
+            if k.split('##')[0] in copy_fields:
+                markers[k] = v
+        return val
 
 
 class RepeatedField(Field):
@@ -535,3 +586,10 @@ class RepeatedField(Field):
                 self.element_type.name = f'{self.name}[{i}]'
                 offset += self.element_type.encode_into(ele, markers, wire, offset)
             return offset - origin_offset
+
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        lst = self.get_value(instance)
+        self.element_type.name = f'{self.name}[{len(lst)}]'
+        new_ele = self.element_type.parse_from(instance, markers, wire, offset, length, offset_btl)
+        lst.append(new_ele)
+        return lst
