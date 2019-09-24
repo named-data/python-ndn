@@ -1,10 +1,9 @@
 import abc
 import struct
-from typing import Tuple, Any, Optional, Type, List
+from typing import Tuple, Any, Optional, Type, Set, List
 from functools import reduce
 from .tlv_var import BinaryStr, VarBinaryStr, write_tl_num, pack_uint_bytes,\
     parse_tl_num, is_binary_str, get_tl_num_size
-from .signer import Signer
 from .name import Name, Component
 
 
@@ -75,11 +74,11 @@ class Field(metaclass=abc.ABCMeta):
         pass
 
     # @abc.abstractmethod
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
         pass
 
 
-class ProcedureArguments(Field):
+class ProcedureArgument(Field):
     def __init__(self):
         super().__init__(-1)
 
@@ -89,11 +88,17 @@ class ProcedureArguments(Field):
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         return 0
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+        pass
+
+    def parse_process(self, instance, markers: dict, wire: VarBinaryStr, offset: int):
         pass
 
     def __get__(self, instance, owner):
         return self
+
+    def __set__(self, instance, value):
+        raise TypeError('ProcedureArgument can only be set via set_arg()')
 
     def get_arg(self, markers: dict):
         if f'{self.name}##args' not in markers:
@@ -104,10 +109,13 @@ class ProcedureArguments(Field):
         markers[f'{self.name}##args'] = val
 
 
-class OffsetMarker(ProcedureArguments):
+class OffsetMarker(ProcedureArgument):
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         self.set_arg(markers, offset)
         return 0
+
+    def parse_process(self, instance, markers: dict, wire: VarBinaryStr, offset: int):
+        self.set_arg(markers, offset)
 
 
 class UintField(Field):
@@ -154,7 +162,7 @@ class UintField(Field):
             struct.pack_into('!BQ', wire, offset, 8, val)
         return length + tl_size
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
         if length == 1:
             self.__set__(instance, struct.unpack_from('!B', wire, offset)[0])
         elif length == 2:
@@ -181,7 +189,7 @@ class BoolField(Field):
         else:
             return 0
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
         self.__set__(instance, True)
 
 
@@ -189,11 +197,11 @@ class SignatureValueField(Field):
     def __init__(self,
                  type_num: int,
                  interest_sig: bool,
-                 signer: ProcedureArguments,
-                 sign_args: ProcedureArguments,
-                 covered_part: ProcedureArguments,
+                 signer: ProcedureArgument,
+                 sign_args: ProcedureArgument,
+                 covered_part: ProcedureArgument,
                  starting_point: OffsetMarker,
-                 value_buffer: ProcedureArguments):
+                 value_buffer: ProcedureArgument):
         super().__init__(type_num)
         self.interest_sig = interest_sig
         self.signer = signer
@@ -220,7 +228,6 @@ class SignatureValueField(Field):
         else:
             sig_cover_start = self.starting_point.get_arg(markers)
             if sig_cover_start:
-                sig_cover_start = self.starting_point.get_arg(markers)
                 sig_cover_part = self.covered_part.get_arg(markers)
                 sig_cover_part.append(wire[sig_cover_start:offset])
 
@@ -239,12 +246,25 @@ class SignatureValueField(Field):
                                          self.covered_part.get_arg(markers),
                                          **self.sign_args.get_arg(markers))
 
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+        sig_buffer = memoryview(wire)[offset:offset+length]
+        instance._field_values[self.name] = sig_buffer
+        self.value_buffer.set_arg(markers, sig_buffer)
+
+        sig_cover_start = self.starting_point.get_arg(markers)
+        if sig_cover_start:
+            sig_cover_part = self.covered_part.get_arg(markers)
+            sig_cover_part.append(wire[sig_cover_start:offset_btl])
+
+    def __set__(self, instance, value):
+        raise TypeError('SignatureValue is read-only')
+
 
 class InterestNameField(Field):
     def __init__(self,
-                 need_digest: ProcedureArguments,
-                 signature_covered_part: ProcedureArguments,
-                 digest_buffer: ProcedureArguments,
+                 need_digest: ProcedureArgument,
+                 signature_covered_part: ProcedureArgument,
+                 digest_buffer: ProcedureArgument,
                  default=None):
         super().__init__(Name.TYPE_NAME, default)
         self.need_digest = need_digest
@@ -329,8 +349,17 @@ class InterestNameField(Field):
             self.digest_buffer.set_arg(markers, digest_buf)
         return offset - origin_offset
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
-        self.__set__(instance, Name.decode(wire, markers['$offset_before_tl'])[0])
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+        name = Name.decode(wire, offset_btl)[0]
+        self.__set__(instance, name)
+
+        sig_cover_part = self.sig_covered_part.get_arg(markers)
+        for ele in name:
+            typ = Component.get_type(ele)
+            if typ == Component.TYPE_PARAMETERS_SHA256:
+                self.digest_buffer.set_arg(markers, Component.get_value(ele))
+            else:
+                sig_cover_part.append(ele)
 
 
 class NameField(Field):
@@ -372,8 +401,8 @@ class NameField(Field):
             wire[offset:offset + name_len_with_tl] = name
         return name_len_with_tl
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
-        self.__set__(instance, Name.decode(wire, markers['$offset_before_tl'])[0])
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
+        self.__set__(instance, Name.decode(wire, offset_btl)[0])
 
 
 class BytesField(Field):
@@ -394,7 +423,7 @@ class BytesField(Field):
             offset += len(val)
             return offset - origin_offset
 
-    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int):
+    def parse_from(self, instance, markers: dict, wire: VarBinaryStr, offset: int, length: int, offset_btl: int):
         self.__set__(instance, memoryview(wire)[offset:offset+length])
 
 
@@ -435,17 +464,21 @@ class TlvModel(metaclass=TlvModelMeta):
 
 
 class ModelField(Field):
-    def __init__(self, type_num: int, model_type: Type[TlvModel]):
+    def __init__(self, type_num: int, model_type: Type[TlvModel], copy_fields: List[ProcedureArgument] = None):
         # default should be None here to prevent unintended modification
         super().__init__(type_num, None)
         self.model_type = model_type
+        self.copy_fields = copy_fields if copy_fields else {}
 
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
             return 0
         if not isinstance(val, self.model_type):
             raise TypeError(f'{self.name}=f{val} is of type {self.model_type}')
-        inner_markers = {k: v for k, v in markers.items() if k.startswith('signer')}
+        copy_fields = {f.name for f in self.copy_fields}
+        inner_markers = {k: v
+                         for k, v in markers.items()
+                         if k.split('##')[0] in copy_fields}
         length = val.encoded_length(inner_markers)
         markers[f'{self.name}##inner_markers'] = inner_markers
         markers[f'{self.name}##encoded_length'] = length

@@ -1,8 +1,8 @@
 test:
-	venv/bin/pytest
+	venv/bin/pytest tests
 
 test-cov:
-	venv/bin/pytest --cov=src --cov-report term-missing
+	venv/bin/pytest tests --cov=src --cov-report term-missing
 
 install-edit:
 	venv/bin/pip3 install -e .
