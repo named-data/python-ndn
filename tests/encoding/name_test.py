@@ -88,6 +88,8 @@ class TestComponent:
             Component.from_str("ABCD%GH")
         with pytest.raises(ValueError):
             Component.to_str(b'\x00\x01ABC')
+        with pytest.raises(ValueError):
+            Component.from_str('sha256digest=a04z')
 
     @staticmethod
     def test_compare():

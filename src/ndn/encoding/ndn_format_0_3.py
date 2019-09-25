@@ -1,10 +1,10 @@
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 from .name import Name, Component
 from .signer import Signer, DigestSha256
 from .tlv_var import VarBinaryStr, BinaryStr
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
-    ProcedureArgument
+    ProcedureArgument, RepeatedField, ValidNameFormat
 
 
 class TypeNumber:
@@ -76,6 +76,15 @@ class SignatureInfo(TlvModel):
     signature_seq_num = UintField(TypeNumber.SIGNATURE_SEQ_NUM)
 
 
+class Delegation(TlvModel):
+    preference = UintField(TypeNumber.PREFERENCE)
+    delegation = NameField()
+
+
+class Links(TlvModel):
+    delegations = RepeatedField(ModelField(TypeNumber.DELEGATION, Delegation))
+
+
 class InterestContent(TlvModel):
     _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
@@ -91,6 +100,7 @@ class InterestContent(TlvModel):
                              default="/")
     can_be_prefix = BoolField(TypeNumber.CAN_BE_PREFIX, default=False)
     must_be_fresh = BoolField(TypeNumber.MUST_BE_FRESH, default=False)
+    forwarding_hint = ModelField(TypeNumber.FORWARDING_HINT, Links)
     nonce = UintField(TypeNumber.NONCE, fixed_len=4)
     lifetime = UintField(TypeNumber.INTEREST_LIFETIME)
     hop_limit = UintField(TypeNumber.HOP_LIMIT, fixed_len=1)
@@ -250,6 +260,7 @@ class InterestParam:
     lifetime: Optional[int] = 4000
     hop_limit: Optional[int] = None
     signature_type: Optional[int] = None
+    forwarding_hint: Optional[List[Tuple[int, ValidNameFormat]]] = None
 
 
 class DataParam:
@@ -259,7 +270,7 @@ class DataParam:
     signature_type: Optional[int] = SignatureType.DIGEST_SHA256
 
 
-def make_interest(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
+def make_interest(name: ValidNameFormat,
                   interest_param: InterestParam,
                   app_param: Optional[BinaryStr] = None,
                   **kwargs) -> bytearray:
@@ -271,6 +282,15 @@ def make_interest(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
     interest.interest.nonce = interest_param.nonce
     interest.interest.lifetime = interest_param.lifetime
     interest.interest.hop_limit = interest_param.hop_limit
+
+    if interest_param.forwarding_hint:
+        interest.interest.forwarding_hint = Links()
+        for preference, delegation in interest_param.forwarding_hint:
+            cur = Delegation()
+            cur.preference = preference
+            cur.delegation = delegation
+            interest.interest.forwarding_hint.delegations.append(cur)
+
     interest.interest.application_parameters = app_param
     if interest_param.signature_type is not None:
         interest.interest.signature_info = SignatureInfo()
@@ -280,7 +300,7 @@ def make_interest(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
     return interest.encode(markers=markers)
 
 
-def make_data(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
+def make_data(name: ValidNameFormat,
               data_param: DataParam,
               content: Optional[BinaryStr] = None,
               **kwargs) -> bytearray:

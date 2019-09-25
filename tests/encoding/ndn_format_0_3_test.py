@@ -89,6 +89,25 @@ class TestInterestMake:
                 b'\x2e \x09\x4e\x00\x9d\x74\x59\x82\x5c\xa0\x2d\xaa\xb7\xad\x60\x48\x30'
                 b'\x39\x19\xd8\x99\x80\x25\xbe\xff\xa6\xf9\x96\x79\xd6\x5e\x9f\x62')
 
+    @staticmethod
+    def test_forwarding_hint():
+        name = '/local/ndn/prefix'
+        int_param = InterestParam()
+        int_param.nonce = 0x01020304
+        int_param.forwarding_hint = [
+            (0x87, '/name/A'),
+            (0x02, Name.from_str('/ndn/B')),
+            (0x12, b'\x07\x0d\x08\x0bshekkuenseu')
+        ]
+        interest = make_interest(name, int_param)
+        assert (interest ==
+                b'\x05\x55\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix'
+                b'\x1e\x33'
+                b'\x1f\x0e\x1e\x01\x87\x07\x09\x08\x04name\x08\x01A'
+                b'\x1f\x0d\x1e\x01\x02\x07\x08\x08\x03ndn\x08\x01B'
+                b'\x1f\x12\x1e\x01\x12\x07\r\x08\x0bshekkuenseu'
+                b'\x0a\x04\x01\x02\x03\x04\x0c\x02\x0f\xa0')
+
 
 class TestDataMake:
     @staticmethod

@@ -2,7 +2,7 @@ import pytest
 from ndn.encoding.tlv_var import *
 
 
-class Test_write_tl_num:
+class TestWriteTlNum:
     @staticmethod
     def test_1():
         buf = bytearray(10)
@@ -39,7 +39,7 @@ class Test_write_tl_num:
         assert siz == 9
 
 
-class Test_pack_uint_bytes:
+class TestPackUintBytes:
     @staticmethod
     def test_1():
         assert pack_uint_bytes(1) == b'\x01'
@@ -66,7 +66,7 @@ class Test_pack_uint_bytes:
             pack_uint_bytes(-1)
 
 
-class Test_parse_tl_num:
+class TestParseTlNum:
     @staticmethod
     def test_1():
         assert parse_tl_num(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00') == (0, 1)
@@ -82,3 +82,13 @@ class Test_parse_tl_num:
     @staticmethod
     def test_4():
         assert parse_tl_num(b'\xff\x00\x00\x00\x01*\x05\xf2\x00') == (5000000000, 9)
+
+
+class TestGetTlNumSize:
+    @staticmethod
+    def test_1():
+        assert get_tl_num_size(0) == 1
+        assert get_tl_num_size(253) == 3
+        assert get_tl_num_size(65535) == 3
+        assert get_tl_num_size(65536) == 5
+        assert get_tl_num_size(10000000000) == 9
