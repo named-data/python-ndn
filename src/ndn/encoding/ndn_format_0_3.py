@@ -82,6 +82,7 @@ class InterestContent(TlvModel):
     _sig_cover_part = ProcedureArgument()
     _sig_value_buf = ProcedureArgument()
     _need_digest = ProcedureArgument()
+    _digest_cover_part = ProcedureArgument()
     _digest_buf = ProcedureArgument()
 
     name = InterestNameField(need_digest=_need_digest,
@@ -104,6 +105,7 @@ class InterestContent(TlvModel):
                                           covered_part=_sig_cover_part,
                                           starting_point=_sig_cover_start,
                                           value_buffer=_sig_value_buf)
+    _digest_cover_end = OffsetMarker()
 
     def encoded_length(self, markers: Optional[dict] = None) -> int:
         if markers is None:
@@ -136,23 +138,42 @@ class InterestContent(TlvModel):
         if markers is None:
             markers = {}
         ret = super().encode(wire, offset, markers)
-        offset += markers[f'{self._model_name}##encoded_length']
         wire_view = memoryview(ret)
 
         InterestContent.signature_value.calculate_signature(markers)
         if self._need_digest.get_arg(markers):
             digest_cover_start = self._digest_cover_start.get_arg(markers)
-            digest_covered_part = [wire_view[digest_cover_start:offset]]
+            digest_cover_end = self._digest_cover_end.get_arg(markers)
+            digest_covered_part = [wire_view[digest_cover_start:digest_cover_end]]
+            self._digest_cover_part.set_arg(markers, digest_covered_part)
             sha256 = DigestSha256()
             digest_buf = self._digest_buf.get_arg(markers)
             sha256.write_signature_value(digest_buf, digest_covered_part)
 
         return ret
 
+    @classmethod
+    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None):
+        if markers is None:
+            markers = {}
+        cls._sig_cover_part.set_arg(markers, [])
+        ret = super().parse(wire, markers)
+        digest_cover_start = cls._digest_cover_start.get_arg(markers)
+        digest_cover_end = cls._digest_cover_end.get_arg(markers)
+        digest_cover_part = [memoryview(wire)[digest_cover_start:digest_cover_end]]
+        cls._digest_cover_part.set_arg(markers, digest_cover_part)
+        return ret
+
 
 class InterestPacket(TlvModel):
     _sign_args = ProcedureArgument()
-    interest = ModelField(TypeNumber.INTEREST, InterestContent, [_sign_args])
+    _sig_cover_part = ProcedureArgument()
+    _digest_cover_part = ProcedureArgument()
+    _digest_buf = ProcedureArgument()
+    interest = ModelField(TypeNumber.INTEREST,
+                          InterestContent,
+                          [_sign_args],
+                          [_sig_cover_part, _digest_cover_part, _digest_buf])
 
 
 class MetaInfo(TlvModel):
@@ -208,10 +229,18 @@ class DataContent(TlvModel):
         DataContent.signature_value.calculate_signature(markers)
         return ret
 
+    @classmethod
+    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None):
+        if markers is None:
+            markers = {}
+        cls._sig_cover_part.set_arg(markers, [])
+        return super().parse(wire, markers)
+
 
 class DataPacket(TlvModel):
     _sign_args = ProcedureArgument()
-    data = ModelField(TypeNumber.DATA, DataContent, [_sign_args])
+    _sig_cover_part = ProcedureArgument()
+    data = ModelField(TypeNumber.DATA, DataContent, [_sign_args], [_sig_cover_part])
 
 
 class InterestParam:
@@ -224,10 +253,10 @@ class InterestParam:
 
 
 class DataParam:
-    content_type: Optional[int] = 0
+    content_type: Optional[int] = ContentType.BLOB
     freshness_period: Optional[int] = None
     final_block_id: Optional[BinaryStr] = None
-    signature_type: Optional[int] = 0
+    signature_type: Optional[int] = SignatureType.DIGEST_SHA256
 
 
 def make_interest(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
@@ -272,7 +301,8 @@ def make_data(name: Union[List[Union[BinaryStr, str]], str, BinaryStr],
 
 
 def parse_interest(wire: BinaryStr):
-    ret = InterestPacket.parse(wire, {})
+    markers = {}
+    ret = InterestPacket.parse(wire, markers)
     params = InterestParam()
     params.can_be_prefix = ret.interest.can_be_prefix
     params.must_be_fresh = ret.interest.must_be_fresh
@@ -283,4 +313,28 @@ def parse_interest(wire: BinaryStr):
         params.signature_type = ret.interest.signature_info.signature_type
     else:
         params.signature_type = None
-    return ret.interest.name, params, ret.interest.application_parameters
+    signature_related = {
+        'signature_covered_part': ret._sig_cover_part.get_arg(markers),
+        'signature_value_buf': ret.interest.signature_value,
+        'digest_covered_part': ret._digest_cover_part.get_arg(markers),
+        'digest_value_buf': ret._digest_buf.get_arg(markers)
+    }
+    return ret.interest.name, params, ret.interest.application_parameters, signature_related
+
+
+def parse_data(wire: BinaryStr):
+    markers = {}
+    ret = DataPacket.parse(wire, markers)
+    params = DataParam()
+    params.content_type = ret.data.meta_info.content_type
+    params.final_block_id = ret.data.meta_info.final_block_id
+    params.freshness_period = ret.data.meta_info.freshness_period
+    if ret.data.signature_info:
+        params.signature_type = ret.data.signature_info.signature_type
+    else:
+        params.signature_type = None
+    signature_related = {
+        'signature_covered_part': ret._sig_cover_part.get_arg(markers),
+        'signature_value_buf': ret.data.signature_value,
+    }
+    return ret.data.name, params, ret.data.content, signature_related

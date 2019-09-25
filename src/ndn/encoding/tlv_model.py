@@ -255,7 +255,7 @@ class SignatureValueField(Field):
         self.value_buffer.set_arg(markers, sig_buffer)
 
         sig_cover_start = self.starting_point.get_arg(markers)
-        if sig_cover_start:
+        if sig_cover_start is not None:
             sig_cover_part = self.covered_part.get_arg(markers)
             sig_cover_part.append(wire[sig_cover_start:offset_btl])
 
@@ -497,7 +497,7 @@ class TlvModel(metaclass=TlvModelMeta):
                 if (typ & 1) == 1:
                     raise DecodeError(f'a critical field of type {typ} is unrecognized, redundant or out-of-order')
             offset += length
-
+        return ret
 
 
 class ModelField(Field):
@@ -544,7 +544,7 @@ class ModelField(Field):
         inner_markers = {}
         val = self.model_type.parse(memoryview(wire)[offset:offset+length], inner_markers)
         copy_fields = {f.name for f in self.copy_out_fields}
-        for k, v in inner_markers:
+        for k, v in inner_markers.items():
             if k.split('##')[0] in copy_fields:
                 markers[k] = v
         return val
