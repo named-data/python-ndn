@@ -3,9 +3,9 @@
 from setuptools import setup, find_packages  # Always prefer setuptools over distutils
 from src.ndn import __version__
 
-requirements = ['cryptography >= 2.7', 'pycryptodomex >= 3.8.2']
+requirements = ['pycryptodomex >= 3.8.2']
 setup(
-    name='ndn-python',
+    name='python-ndn',
     version=__version__,
     description='An NDN client library with AsyncIO support in Python 3',
     url='https://github.com/zjkmxy/python-ndn',
