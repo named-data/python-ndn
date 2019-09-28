@@ -1,5 +1,6 @@
 import pytest
-from ndn.encoding.tlv_var import *
+import struct
+from ndn.encoding import write_tl_num, pack_uint_bytes, parse_tl_num, get_tl_num_size
 
 
 class TestWriteTlNum:

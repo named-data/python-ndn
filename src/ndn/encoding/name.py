@@ -5,11 +5,14 @@ from functools import reduce
 import string
 
 
+__all__ = ['Component', 'Name']
+
+
 class Component:
     CHARSET = (
-        set(string.ascii_letters) |
-        set(string.digits) |
-        {'-', '.', '_', '~', '=', '%'})
+        set(string.ascii_letters)
+        | set(string.digits)
+        | {'-', '.', '_', '~', '=', '%'})
     TYPE_INVALID = 0x00
     TYPE_GENERIC = 0x08
     TYPE_IMPLICIT_SHA256 = 0x01
@@ -28,7 +31,7 @@ class Component:
         ret = bytearray(size_typ + size_len + len(val))
         write_tl_num(typ, ret, 0)
         write_tl_num(len(val), ret, size_typ)
-        ret[size_typ + size_len:] = val
+        ret[size_typ+size_len:] = val
         return ret
 
     @staticmethod

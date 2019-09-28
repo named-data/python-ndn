@@ -1,6 +1,5 @@
 from typing import List
-from ..encoding.signer import Signer
-from ..encoding.ndn_format_0_3 import SignatureType
+from ..encoding import Signer, SignatureType
 from Cryptodome.Hash import SHA256
 
 

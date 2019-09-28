@@ -2,6 +2,9 @@ import abc
 from typing import List
 
 
+__all__ = ['Signer']
+
+
 class Signer(metaclass=abc.ABCMeta):
     __signers = {}
 

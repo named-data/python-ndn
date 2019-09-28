@@ -1,6 +1,6 @@
 import pytest
 import struct
-from ndn.encoding.name import *
+from ndn.encoding import Name, Component
 
 
 class TestComponent:

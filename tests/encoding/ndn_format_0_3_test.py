@@ -1,7 +1,8 @@
 import hashlib
-from ndn.encoding.ndn_format_0_3 import *
-from ndn.encoding.name import Name, Component
+from ndn.encoding import Name, Component
 from ndn.security.sha256_digest_signer import DigestSha256Signer
+from ndn.encoding import InterestParam, DataParam, ContentType, SignatureType, \
+    make_interest, make_data, parse_interest, parse_data
 
 
 class TestInterestMake:

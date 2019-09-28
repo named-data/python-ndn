@@ -2,10 +2,16 @@ from typing import Optional, List, Tuple
 from .name import Name, Component
 from .signer import Signer
 from .tlv_type import VarBinaryStr, BinaryStr, NonStrictName
+from .tlv_var import parse_and_check_tl
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
     ProcedureArgument, RepeatedField
 from hashlib import sha256
+
+
+__all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'SignatureInfo', 'Delegation',
+           'Links', 'InterestPacketValue', 'InterestPacket', 'MetaInfo', 'DataPacketValue', 'DataPacket',
+           'InterestParam', 'DataParam', 'make_interest', 'make_data', 'parse_interest', 'parse_data']
 
 
 class TypeNumber:
@@ -83,7 +89,7 @@ class Links(TlvModel):
     delegations = RepeatedField(ModelField(TypeNumber.DELEGATION, Delegation))
 
 
-class InterestContent(TlvModel):
+class InterestPacketValue(TlvModel):
     _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
@@ -144,7 +150,7 @@ class InterestContent(TlvModel):
         ret = super().encode(wire, offset, markers)
         wire_view = memoryview(ret)
 
-        InterestContent.signature_value.calculate_signature(markers)
+        InterestPacketValue.signature_value.calculate_signature(markers)
         if self._need_digest.get_arg(markers):
             digest_cover_start = self._digest_cover_start.get_arg(markers)
             digest_cover_end = self._digest_cover_end.get_arg(markers)
@@ -178,7 +184,7 @@ class InterestPacket(TlvModel):
     _digest_cover_part = ProcedureArgument()
     _digest_buf = ProcedureArgument()
     interest = ModelField(TypeNumber.INTEREST,
-                          InterestContent,
+                          InterestPacketValue,
                           [_signer, _sign_args],
                           [_sig_cover_part, _digest_cover_part, _digest_buf])
 
@@ -189,7 +195,7 @@ class MetaInfo(TlvModel):
     final_block_id = BytesField(TypeNumber.FINAL_BLOCK_ID)
 
 
-class DataContent(TlvModel):
+class DataPacketValue(TlvModel):
     _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
@@ -229,7 +235,7 @@ class DataContent(TlvModel):
         if markers is None:
             markers = {}
         ret = super().encode(wire, offset, markers)
-        DataContent.signature_value.calculate_signature(markers)
+        DataPacketValue.signature_value.calculate_signature(markers)
         return ret
 
     @classmethod
@@ -244,7 +250,7 @@ class DataPacket(TlvModel):
     _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
-    data = ModelField(TypeNumber.DATA, DataContent, [_signer, _sign_args], [_sig_cover_part])
+    data = ModelField(TypeNumber.DATA, DataPacketValue, [_signer, _sign_args], [_sig_cover_part])
 
 
 class InterestParam:
@@ -268,7 +274,7 @@ def make_interest(name: NonStrictName,
                   signer: Signer = None,
                   **kwargs) -> bytearray:
     interest = InterestPacket()
-    interest.interest = InterestContent()
+    interest.interest = InterestPacketValue()
     interest.interest.name = name
     interest.interest.can_be_prefix = interest_param.can_be_prefix
     interest.interest.must_be_fresh = interest_param.must_be_fresh
@@ -299,7 +305,7 @@ def make_data(name: NonStrictName,
               signer: Signer = None,
               **kwargs) -> bytearray:
     data = DataPacket()
-    data.data = DataContent()
+    data.data = DataPacketValue()
     data.data.meta_info = MetaInfo()
     data.data.name = name
     data.data.meta_info.content_type = data_param.content_type
@@ -314,43 +320,47 @@ def make_data(name: NonStrictName,
     return data.encode(markers=markers)
 
 
-def parse_interest(wire: BinaryStr):
+def parse_interest(wire: BinaryStr, with_tl: bool = True):
+    if with_tl:
+        wire = parse_and_check_tl(wire, TypeNumber.INTEREST)
     markers = {}
-    ret = InterestPacket.parse(wire, markers)
+    ret = InterestPacketValue.parse(wire, markers)
     params = InterestParam()
-    params.can_be_prefix = ret.interest.can_be_prefix
-    params.must_be_fresh = ret.interest.must_be_fresh
-    params.nonce = ret.interest.nonce
-    params.lifetime = ret.interest.lifetime
-    params.hop_limit = ret.interest.hop_limit
-    if ret.interest.signature_info is not None:
-        sig_type = ret.interest.signature_info.signature_type
+    params.can_be_prefix = ret.can_be_prefix
+    params.must_be_fresh = ret.must_be_fresh
+    params.nonce = ret.nonce
+    params.lifetime = ret.lifetime
+    params.hop_limit = ret.hop_limit
+    if ret.signature_info is not None:
+        sig_type = ret.signature_info.signature_type
     else:
         sig_type = None
     signature_related = {
         'signature_type': sig_type,
         'signature_covered_part': ret._sig_cover_part.get_arg(markers),
-        'signature_value_buf': ret.interest.signature_value,
+        'signature_value_buf': ret.signature_value,
         'digest_covered_part': ret._digest_cover_part.get_arg(markers),
         'digest_value_buf': ret._digest_buf.get_arg(markers)
     }
-    return ret.interest.name, params, ret.interest.application_parameters, signature_related
+    return ret.name, params, ret.application_parameters, signature_related
 
 
-def parse_data(wire: BinaryStr):
+def parse_data(wire: BinaryStr, with_tl: bool = True):
+    if with_tl:
+        wire = parse_and_check_tl(wire, TypeNumber.DATA)
     markers = {}
-    ret = DataPacket.parse(wire, markers)
+    ret = DataPacketValue.parse(wire, markers)
     params = DataParam()
-    params.content_type = ret.data.meta_info.content_type
-    params.final_block_id = ret.data.meta_info.final_block_id
-    params.freshness_period = ret.data.meta_info.freshness_period
-    if ret.data.signature_info is not None:
-        sig_type = ret.data.signature_info.signature_type
+    params.content_type = ret.meta_info.content_type
+    params.final_block_id = ret.meta_info.final_block_id
+    params.freshness_period = ret.meta_info.freshness_period
+    if ret.signature_info is not None:
+        sig_type = ret.signature_info.signature_type
     else:
         sig_type = None
     signature_related = {
         'signature_type': sig_type,
         'signature_covered_part': ret._sig_cover_part.get_arg(markers),
-        'signature_value_buf': ret.data.signature_value,
+        'signature_value_buf': ret.signature_value,
     }
-    return ret.data.name, params, ret.data.content, signature_related
+    return ret.name, params, ret.content, signature_related

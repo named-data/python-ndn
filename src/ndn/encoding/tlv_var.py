@@ -3,6 +3,10 @@ import asyncio as aio
 from .tlv_type import BinaryStr, VarBinaryStr
 
 
+__all__ = ['get_tl_num_size', 'write_tl_num', 'pack_uint_bytes', 'parse_tl_num', 'read_tl_num_from_stream',
+           'parse_and_check_tl']
+
+
 def get_tl_num_size(val: int) -> int:
     if val <= 0xFC:
         return 1
@@ -52,10 +56,6 @@ def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
         return struct.unpack('!Q', buf[offset+1:offset+9])[0], 9
 
 
-def is_binary_str(var):
-    return isinstance(var, bytes) or isinstance(var, bytearray) or isinstance(var, memoryview)
-
-
 async def read_tl_num_from_stream(reader: aio.StreamReader) -> int:
     buf = await reader.readexactly(1)
     num = buf[0]
@@ -70,3 +70,11 @@ async def read_tl_num_from_stream(reader: aio.StreamReader) -> int:
     else:
         buf = await reader.readexactly(8)
         return struct.unpack('!Q', buf)[0]
+
+
+def parse_and_check_tl(wire: BinaryStr, expected_type: int) -> memoryview:
+    typ, typ_len = parse_tl_num(wire, 0)
+    size, siz_len = parse_tl_num(wire, typ_len)
+    if typ != expected_type:
+        raise ValueError(f'wire is of type {typ} but {expected_type} is expected')
+    return memoryview(wire)[typ_len + siz_len:typ_len + siz_len + size]

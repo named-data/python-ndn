@@ -1,6 +1,5 @@
 from typing import List
-from ..encoding.signer import Signer
-from ..encoding.ndn_format_0_3 import KeyLocator, SignatureType
+from ..encoding import Signer, SignatureType, KeyLocator
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
