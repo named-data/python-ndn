@@ -122,20 +122,16 @@ class InterestContent(TlvModel):
         if self._sign_args.get_arg(markers) is None:
             self._sign_args.set_arg(markers, {})
 
-        if self.signature_info is not None:
-            sig_type = self.signature_info.signature_type
-            signer = Signer.get_signer(sig_type)
+        signer = self._signer.get_arg(markers)
+        if signer is not None:
             sign_arg = self._sign_args.get_arg(markers)
             signer.write_signature_info(self.signature_info, **sign_arg)
-        else:
-            signer = None
         app_param = self.application_parameters
         if (signer is not None) and (app_param is None):
             app_param = b''
-            self.application_parameters = b''
+            self.application_parameters = app_param
 
         self._need_digest.set_arg(markers, app_param is not None)
-        self._signer.set_arg(markers, signer)
 
         return super().encoded_length(markers)
 
@@ -176,13 +172,14 @@ class InterestContent(TlvModel):
 
 
 class InterestPacket(TlvModel):
+    _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
     _digest_cover_part = ProcedureArgument()
     _digest_buf = ProcedureArgument()
     interest = ModelField(TypeNumber.INTEREST,
                           InterestContent,
-                          [_sign_args],
+                          [_signer, _sign_args],
                           [_sig_cover_part, _digest_cover_part, _digest_buf])
 
 
@@ -218,14 +215,10 @@ class DataContent(TlvModel):
         if self._sign_args.get_arg(markers) is None:
             self._sign_args.set_arg(markers, {})
 
-        if self.signature_info is not None:
-            sig_type = self.signature_info.signature_type
-            signer = Signer.get_signer(sig_type)
+        signer = self._signer.get_arg(markers)
+        if signer is not None:
             sign_arg = self._sign_args.get_arg(markers)
             signer.write_signature_info(self.signature_info, **sign_arg)
-        else:
-            signer = None
-        self._signer.set_arg(markers, signer)
 
         return super().encoded_length(markers)
 
@@ -248,9 +241,10 @@ class DataContent(TlvModel):
 
 
 class DataPacket(TlvModel):
+    _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
-    data = ModelField(TypeNumber.DATA, DataContent, [_sign_args], [_sig_cover_part])
+    data = ModelField(TypeNumber.DATA, DataContent, [_signer, _sign_args], [_sig_cover_part])
 
 
 class InterestParam:
@@ -259,7 +253,6 @@ class InterestParam:
     nonce: Optional[int] = None
     lifetime: Optional[int] = 4000
     hop_limit: Optional[int] = None
-    signature_type: Optional[int] = None
     forwarding_hint: Optional[List[Tuple[int, NonStrictName]]] = None
 
 
@@ -267,12 +260,12 @@ class DataParam:
     content_type: Optional[int] = ContentType.BLOB
     freshness_period: Optional[int] = None
     final_block_id: Optional[BinaryStr] = None
-    signature_type: Optional[int] = SignatureType.DIGEST_SHA256
 
 
 def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
                   app_param: Optional[BinaryStr] = None,
+                  signer: Signer = None,
                   **kwargs) -> bytearray:
     interest = InterestPacket()
     interest.interest = InterestContent()
@@ -292,10 +285,10 @@ def make_interest(name: NonStrictName,
             interest.interest.forwarding_hint.delegations.append(cur)
 
     interest.interest.application_parameters = app_param
-    if interest_param.signature_type is not None:
+    if signer is not None:
         interest.interest.signature_info = SignatureInfo()
-        interest.interest.signature_info.signature_type = interest_param.signature_type
     markers = {}
+    interest._signer.set_arg(markers, signer)
     interest._sign_args.set_arg(markers, kwargs)
     return interest.encode(markers=markers)
 
@@ -303,6 +296,7 @@ def make_interest(name: NonStrictName,
 def make_data(name: NonStrictName,
               data_param: DataParam,
               content: Optional[BinaryStr] = None,
+              signer: Signer = None,
               **kwargs) -> bytearray:
     data = DataPacket()
     data.data = DataContent()
@@ -312,10 +306,10 @@ def make_data(name: NonStrictName,
     data.data.meta_info.freshness_period = data_param.freshness_period
     data.data.meta_info.final_block_id = data_param.final_block_id
     data.data.content = content
-    if data_param.signature_type is not None:
+    if signer is not None:
         data.data.signature_info = SignatureInfo()
-        data.data.signature_info.signature_type = data_param.signature_type
     markers = {}
+    data._signer.set_arg(markers, signer)
     data._sign_args.set_arg(markers, kwargs)
     return data.encode(markers=markers)
 
@@ -329,11 +323,12 @@ def parse_interest(wire: BinaryStr):
     params.nonce = ret.interest.nonce
     params.lifetime = ret.interest.lifetime
     params.hop_limit = ret.interest.hop_limit
-    if ret.interest.signature_info:
-        params.signature_type = ret.interest.signature_info.signature_type
+    if ret.interest.signature_info is not None:
+        sig_type = ret.interest.signature_info.signature_type
     else:
-        params.signature_type = None
+        sig_type = None
     signature_related = {
+        'signature_type': sig_type,
         'signature_covered_part': ret._sig_cover_part.get_arg(markers),
         'signature_value_buf': ret.interest.signature_value,
         'digest_covered_part': ret._digest_cover_part.get_arg(markers),
@@ -349,11 +344,12 @@ def parse_data(wire: BinaryStr):
     params.content_type = ret.data.meta_info.content_type
     params.final_block_id = ret.data.meta_info.final_block_id
     params.freshness_period = ret.data.meta_info.freshness_period
-    if ret.data.signature_info:
-        params.signature_type = ret.data.signature_info.signature_type
+    if ret.data.signature_info is not None:
+        sig_type = ret.data.signature_info.signature_type
     else:
-        params.signature_type = None
+        sig_type = None
     signature_related = {
+        'signature_type': sig_type,
         'signature_covered_part': ret._sig_cover_part.get_arg(markers),
         'signature_value_buf': ret.data.signature_value,
     }

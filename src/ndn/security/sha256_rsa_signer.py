@@ -8,6 +8,7 @@ from Cryptodome.Signature import pkcs1_15
 
 class Sha256WithRsaSigner(Signer):
     def write_signature_info(self, signature_info, **kwargs):
+        signature_info.signature_type = SignatureType.SHA256_WITH_RSA
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = kwargs['key_name']
 
@@ -22,7 +23,3 @@ class Sha256WithRsaSigner(Signer):
             h.update(blk)
         signature = pkcs1_15.new(key).sign(h)
         wire[:] = signature
-
-
-def register():
-    Signer.register(SignatureType.SHA256_WITH_RSA, Sha256WithRsaSigner())

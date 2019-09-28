@@ -6,6 +6,7 @@ from Cryptodome.Hash import SHA256
 
 class DigestSha256Signer(Signer):
     def write_signature_info(self, signature_info, **kwargs):
+        signature_info.signature_type = SignatureType.DIGEST_SHA256
         signature_info.key_locator = None
 
     def get_signature_value_size(self, **kwargs):
@@ -16,7 +17,3 @@ class DigestSha256Signer(Signer):
         for blk in contents:
             h.update(blk)
         wire[:] = h.digest()
-
-
-def register():
-    Signer.register(SignatureType.DIGEST_SHA256, DigestSha256Signer())
