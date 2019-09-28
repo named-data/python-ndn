@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 
+import io
+import re
 from setuptools import setup, find_packages  # Always prefer setuptools over distutils
-from src.ndn import __version__
+
+
+with io.open("src/ndn/__init__.py", "rt", encoding="utf8") as f:
+    version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
+
 
 requirements = ['pycryptodomex >= 3.8.2']
 setup(
     name='python-ndn',
-    version=__version__,
+    version=version,
     description='An NDN client library with AsyncIO support in Python 3',
     url='https://github.com/zjkmxy/python-ndn',
-    maintainer='Xinyu Ma',
-    maintainer_email='xinyu.ma@cs.ucla.edu',
+    author='Xinyu Ma',
+    author_email='xinyu.ma@cs.ucla.edu',
     license='LGPLv3',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -31,5 +37,6 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
 
-    install_requires=requirements
+    install_requires=requirements,
+    python_requires=">=3.6"
 )
