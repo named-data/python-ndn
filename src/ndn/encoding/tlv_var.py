@@ -1,5 +1,6 @@
 from typing import Union
 import struct
+import asyncio as aio
 
 BinaryStr = Union[bytes, bytearray, memoryview]
 VarBinaryStr = Union[bytearray, memoryview]
@@ -56,3 +57,19 @@ def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
 
 def is_binary_str(var):
     return isinstance(var, bytes) or isinstance(var, bytearray) or isinstance(var, memoryview)
+
+
+async def read_tl_num_from_stream(reader: aio.StreamReader) -> int:
+    buf = await reader.readexactly(1)
+    num = buf[0]
+    if num <= 0xFC:
+        return num
+    elif num == 0xFD:
+        buf = await reader.readexactly(2)
+        return struct.unpack('!H', buf)[0]
+    elif num == 0xFE:
+        buf = await reader.readexactly(4)
+        return struct.unpack('!I', buf)[0]
+    else:
+        buf = await reader.readexactly(8)
+        return struct.unpack('!Q', buf)[0]

@@ -1,6 +1,5 @@
 import abc
 from typing import List
-import hashlib
 
 
 class Signer(metaclass=abc.ABCMeta):
@@ -34,17 +33,3 @@ class Signer(metaclass=abc.ABCMeta):
     @staticmethod
     def get_signer(typ: int):
         return Signer.__signers[typ]
-
-
-class DigestSha256(Signer):
-    def write_signature_info(self, signature_info, **kwargs):
-        return
-
-    def get_signature_value_size(self, **kwargs):
-        return 32
-
-    def write_signature_value(self, wire: memoryview, contents: List[memoryview], **kwargs):
-        algo = hashlib.sha256()
-        for blk in contents:
-            algo.update(blk)
-        wire[0:32] = algo.digest()

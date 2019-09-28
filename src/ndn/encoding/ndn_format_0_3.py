@@ -1,10 +1,11 @@
 from typing import Optional, Union, List, Tuple
 from .name import Name, Component
-from .signer import Signer, DigestSha256
+from .signer import Signer
 from .tlv_var import VarBinaryStr, BinaryStr
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
     ProcedureArgument, RepeatedField, ValidNameFormat
+from hashlib import sha256
 
 
 class TypeNumber:
@@ -58,9 +59,6 @@ class SignatureType:
     SHA256_WITH_RSA = 1
     SHA256_WITH_ECDSA = 2
     HMAC_WITH_SHA256 = 3
-
-
-Signer.register(SignatureType.DIGEST_SHA256, DigestSha256())
 
 
 class KeyLocator(TlvModel):
@@ -156,9 +154,11 @@ class InterestContent(TlvModel):
             digest_cover_end = self._digest_cover_end.get_arg(markers)
             digest_covered_part = [wire_view[digest_cover_start:digest_cover_end]]
             self._digest_cover_part.set_arg(markers, digest_covered_part)
-            sha256 = DigestSha256()
+            sha256_algo = sha256()
             digest_buf = self._digest_buf.get_arg(markers)
-            sha256.write_signature_value(digest_buf, digest_covered_part)
+            for blk in digest_covered_part:
+                sha256_algo.update(blk)
+            digest_buf[:] = sha256_algo.digest()
 
         return ret
 
