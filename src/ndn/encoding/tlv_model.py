@@ -2,15 +2,13 @@ import abc
 import struct
 from typing import Union, Optional, Type, List
 from functools import reduce
-from .tlv_var import BinaryStr, VarBinaryStr, write_tl_num, parse_tl_num, is_binary_str, get_tl_num_size
+from .tlv_type import BinaryStr, VarBinaryStr
+from .tlv_var import write_tl_num, parse_tl_num, is_binary_str, get_tl_num_size
 from .name import Name, Component
 
 
 class DecodeError(Exception):
     pass
-
-
-ValidNameFormat = Union[List[Union[BinaryStr, str]], str, BinaryStr]
 
 
 class TlvModelMeta(abc.ABCMeta):

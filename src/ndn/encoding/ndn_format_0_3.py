@@ -1,10 +1,10 @@
-from typing import Optional, Union, List, Tuple
+from typing import Optional, List, Tuple
 from .name import Name, Component
 from .signer import Signer
-from .tlv_var import VarBinaryStr, BinaryStr
+from .tlv_type import VarBinaryStr, BinaryStr, NonStrictName
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
-    ProcedureArgument, RepeatedField, ValidNameFormat
+    ProcedureArgument, RepeatedField
 from hashlib import sha256
 
 
@@ -260,7 +260,7 @@ class InterestParam:
     lifetime: Optional[int] = 4000
     hop_limit: Optional[int] = None
     signature_type: Optional[int] = None
-    forwarding_hint: Optional[List[Tuple[int, ValidNameFormat]]] = None
+    forwarding_hint: Optional[List[Tuple[int, NonStrictName]]] = None
 
 
 class DataParam:
@@ -270,7 +270,7 @@ class DataParam:
     signature_type: Optional[int] = SignatureType.DIGEST_SHA256
 
 
-def make_interest(name: ValidNameFormat,
+def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
                   app_param: Optional[BinaryStr] = None,
                   **kwargs) -> bytearray:
@@ -300,7 +300,7 @@ def make_interest(name: ValidNameFormat,
     return interest.encode(markers=markers)
 
 
-def make_data(name: ValidNameFormat,
+def make_data(name: NonStrictName,
               data_param: DataParam,
               content: Optional[BinaryStr] = None,
               **kwargs) -> bytearray:

@@ -17,10 +17,10 @@ class Sha256WithRsaSigner(Signer):
 
     def write_signature_value(self, wire: memoryview, contents: List[memoryview], **kwargs):
         key = RSA.import_key(kwargs['key_der'])
-        hash = SHA256.new()
+        h = SHA256.new()
         for blk in contents:
-            hash.update(blk)
-        signature = pkcs1_15.new(key).sign(hash)
+            h.update(blk)
+        signature = pkcs1_15.new(key).sign(h)
         wire[:] = signature
 
 

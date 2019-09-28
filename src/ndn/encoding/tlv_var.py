@@ -1,9 +1,6 @@
-from typing import Union
 import struct
 import asyncio as aio
-
-BinaryStr = Union[bytes, bytearray, memoryview]
-VarBinaryStr = Union[bytearray, memoryview]
+from .tlv_type import BinaryStr, VarBinaryStr
 
 
 def get_tl_num_size(val: int) -> int:

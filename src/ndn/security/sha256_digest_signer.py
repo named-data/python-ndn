@@ -12,10 +12,10 @@ class DigestSha256Signer(Signer):
         return 32
 
     def write_signature_value(self, wire: memoryview, contents: List[memoryview], **kwargs):
-        hash = SHA256.new()
+        h = SHA256.new()
         for blk in contents:
-            hash.update(blk)
-        wire[:] = hash.digest()
+            h.update(blk)
+        wire[:] = h.digest()
 
 
 def register():

@@ -1,5 +1,6 @@
 from typing import List, Optional
-from .tlv_var import BinaryStr, VarBinaryStr, write_tl_num, pack_uint_bytes, parse_tl_num, get_tl_num_size
+from .tlv_type import BinaryStr, VarBinaryStr, FormalName
+from .tlv_var import write_tl_num, pack_uint_bytes, parse_tl_num, get_tl_num_size
 from functools import reduce
 import string
 
@@ -208,23 +209,23 @@ class Name:
         return [Component.from_str(Component.escape_str(comp)) for comp in compstrs]
 
     @staticmethod
-    def to_str(name: List[BinaryStr]) -> str:
+    def to_str(name: FormalName) -> str:
         return '/' + '/'.join(Component.to_str(comp) for comp in name)
 
     @staticmethod
-    def is_prefix(lhs: List[BinaryStr], rhs: List[BinaryStr]) -> bool:
+    def is_prefix(lhs: FormalName, rhs: FormalName) -> bool:
         left_len = len(lhs)
         return left_len <= len(rhs) and lhs == rhs[:left_len]
 
     @staticmethod
-    def encoded_length(name: List[BinaryStr]) -> int:
+    def encoded_length(name: FormalName) -> int:
         length = reduce(lambda x, y: x + len(y), name, 0)
         size_typ = 1
         size_len = get_tl_num_size(length)
         return length + size_typ + size_len
 
     @staticmethod
-    def encode(name: List[BinaryStr], buf: Optional[VarBinaryStr] = None, offset: int = 0) -> VarBinaryStr:
+    def encode(name: FormalName, buf: Optional[VarBinaryStr] = None, offset: int = 0) -> VarBinaryStr:
         length = reduce(lambda x, y: x + len(y), name, 0)
         size_typ = 1
         size_len = get_tl_num_size(length)
