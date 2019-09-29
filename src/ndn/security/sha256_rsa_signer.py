@@ -1,8 +1,8 @@
 from typing import List
-from ..encoding import Signer, SignatureType, KeyLocator
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
+from ..encoding import Signer, SignatureType, KeyLocator
 
 
 class Sha256WithRsaSigner(Signer):

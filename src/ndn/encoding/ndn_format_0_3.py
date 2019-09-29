@@ -1,7 +1,7 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 from .name import Name, Component
 from .signer import Signer
-from .tlv_type import VarBinaryStr, BinaryStr, NonStrictName
+from .tlv_type import VarBinaryStr, BinaryStr, NonStrictName, FormalName
 from .tlv_var import parse_and_check_tl
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
@@ -261,18 +261,41 @@ class InterestParam:
     hop_limit: Optional[int] = None
     forwarding_hint: Optional[List[Tuple[int, NonStrictName]]] = None
 
+    def __init__(self,
+                 can_be_prefix: bool = False,
+                 must_be_fresh: bool = False,
+                 nonce: Optional[int] = None,
+                 lifetime: Optional[int] = 4000,
+                 hop_limit: Optional[int] = None,
+                 forwarding_hint: Optional[List[Tuple[int, NonStrictName]]] = None):
+        self.can_be_prefix = can_be_prefix
+        self.must_be_fresh = must_be_fresh
+        self.nonce = nonce
+        self.lifetime = lifetime
+        self.hop_limit = hop_limit
+        self.forwarding_hint = forwarding_hint
+
 
 class DataParam:
     content_type: Optional[int] = ContentType.BLOB
     freshness_period: Optional[int] = None
     final_block_id: Optional[BinaryStr] = None
 
+    def __init__(self,
+                 content_type: Optional[int] = ContentType.BLOB,
+                 freshness_period: Optional[int] = None,
+                 final_block_id: Optional[BinaryStr] = None):
+        self.content_type = content_type
+        self.freshness_period = freshness_period
+        self.final_block_id = final_block_id
+
 
 def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
                   app_param: Optional[BinaryStr] = None,
                   signer: Signer = None,
-                  **kwargs) -> bytearray:
+                  need_final_name: bool = False,
+                  **kwargs):
     interest = InterestPacket()
     interest.interest = InterestPacketValue()
     interest.interest.name = name
@@ -296,7 +319,11 @@ def make_interest(name: NonStrictName,
     markers = {}
     interest._signer.set_arg(markers, signer)
     interest._sign_args.set_arg(markers, kwargs)
-    return interest.encode(markers=markers)
+    ret = interest.encode(markers=markers)
+    if need_final_name:
+        return ret, InterestPacketValue.name.get_final_name(markers['interest##inner_markers'])
+    else:
+        return ret
 
 
 def make_data(name: NonStrictName,
@@ -320,7 +347,8 @@ def make_data(name: NonStrictName,
     return data.encode(markers=markers)
 
 
-def parse_interest(wire: BinaryStr, with_tl: bool = True):
+def parse_interest(wire: BinaryStr, with_tl: bool = True) -> (FormalName, InterestParam,
+                                                              Optional[BinaryStr], Dict[str, Any]):
     if with_tl:
         wire = parse_and_check_tl(wire, TypeNumber.INTEREST)
     markers = {}
@@ -345,7 +373,8 @@ def parse_interest(wire: BinaryStr, with_tl: bool = True):
     return ret.name, params, ret.application_parameters, signature_related
 
 
-def parse_data(wire: BinaryStr, with_tl: bool = True):
+def parse_data(wire: BinaryStr, with_tl: bool = True) -> (FormalName, DataParam,
+                                                          Optional[BinaryStr], Dict[str, Any]):
     if with_tl:
         wire = parse_and_check_tl(wire, TypeNumber.DATA)
     markers = {}

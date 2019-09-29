@@ -43,12 +43,16 @@ class TestInterestMake:
     def test_app_param():
         name = '/local/ndn/prefix'
         app_param = b'\x01\x02\x03\x04'
-        interest = make_interest(name, InterestParam(), app_param)
+        interest, final_name = make_interest(name, InterestParam(), app_param, need_final_name=True)
         assert (interest ==
                 b'\x05\x42\x07\x36\x08\x05local\x08\x03ndn\x08\x06prefix'
                 b'\x02 \x47\x75\x6f\x21\xfe\x0e\xe2\x65\x14\x9a\xa2\xbe\x3c\x63\xc5\x38'
                 b'\xa7\x23\x78\xe9\xb0\xa5\x8b\x39\xc5\x91\x63\x67\xd3\x5b\xda\x10'
                 b'\x0c\x02\x0f\xa0\x24\x04\x01\x02\x03\x04')
+        assert (final_name
+                == Name.decode(b'\x07\x36\x08\x05local\x08\x03ndn\x08\x06prefix'
+                               b'\x02 \x47\x75\x6f\x21\xfe\x0e\xe2\x65\x14\x9a\xa2\xbe\x3c\x63\xc5\x38'
+                               b'\xa7\x23\x78\xe9\xb0\xa5\x8b\x39\xc5\x91\x63\x67\xd3\x5b\xda\x10')[0])
 
         name = '/test/params-sha256=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF/ndn'
         interest = make_interest(name, InterestParam(), app_param)

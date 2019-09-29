@@ -1,6 +1,6 @@
 import abc
 import struct
-from typing import Optional, Type, List
+from typing import Optional, Type, List, Iterable, Dict, Any
 from functools import reduce
 from .tlv_type import BinaryStr, VarBinaryStr, is_binary_str
 from .tlv_var import write_tl_num, parse_tl_num, get_tl_num_size
@@ -16,7 +16,7 @@ class DecodeError(Exception):
 
 
 class TlvModelMeta(abc.ABCMeta):
-    def __new__(mcs, name, bases, attrs, **kwargs):
+    def __new__(mcs, name, bases, attrs):
         cls = super().__new__(mcs, name, bases, attrs)
 
         # Collect encoded fields
@@ -46,10 +46,7 @@ class Field(metaclass=abc.ABCMeta):
         instance._field_values[self.name] = value
 
     def get_value(self, instance):
-        if self.name in instance._field_values:
-            return instance._field_values[self.name]
-        else:
-            return self.default
+        return instance._field_values.get(self.name, self.default)
 
     @abc.abstractmethod
     def encoded_length(self, val, markers: dict) -> int:
@@ -90,8 +87,8 @@ class Field(metaclass=abc.ABCMeta):
 
 
 class ProcedureArgument(Field):
-    def __init__(self):
-        super().__init__(-1)
+    def __init__(self, default=None):
+        super().__init__(-1, default)
 
     def encoded_length(self, val, markers: dict) -> int:
         return 0
@@ -109,9 +106,7 @@ class ProcedureArgument(Field):
         raise TypeError('ProcedureArgument can only be set via set_arg()')
 
     def get_arg(self, markers: dict):
-        if f'{self.name}##args' not in markers:
-            markers[f'{self.name}##args'] = None
-        return markers[f'{self.name}##args']
+        return markers.get(f'{self.name}##args', self.default)
 
     def set_arg(self, markers: dict, val):
         markers[f'{self.name}##args'] = val
@@ -287,9 +282,9 @@ class InterestNameField(Field):
             name = Name.decode(name)[0]
         elif isinstance(name, str):
             name = Name.from_str(name)
-        else:
+        elif isinstance(name, Iterable):
             # clone to prevent the list being modified
-            name = name.copy()
+            name = list(name)
         # From here on, name must be in List[Component, str]
         if not isinstance(name, list):
             raise TypeError('invalid type for name')
@@ -345,6 +340,7 @@ class InterestNameField(Field):
         if offset > cover_start:
             sig_cover_part.append(wire[cover_start:offset])
         if need_digest and digest_pos is None:
+            markers[f'{self.name}##preprocessed_name'].append(wire[offset:offset+34])
             # If digest component does not exist, append one
             offset += write_tl_num(Component.TYPE_PARAMETERS_SHA256, wire, offset)
             offset += write_tl_num(32, wire, offset)
@@ -354,6 +350,9 @@ class InterestNameField(Field):
         if need_digest:
             self.digest_buffer.set_arg(markers, digest_buf)
         return offset - origin_offset
+
+    def get_final_name(self, markers):
+        return markers[f'{self.name}##preprocessed_name']
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         name = Name.decode(wire, offset_btl)[0]
@@ -377,15 +376,16 @@ class NameField(Field):
         name = val
         if isinstance(name, str):
             name = Name.from_str(name)
-        elif isinstance(name, list):
-            name = name.copy()
-            for i, comp in enumerate(name):
-                if isinstance(comp, str):
-                    name[i] = Component.from_str(comp)
-                elif not is_binary_str(comp):
-                    raise TypeError('invalid type for name component')
         elif not is_binary_str(name):
-            raise TypeError('invalid type for name')
+            if isinstance(name, Iterable):
+                name = list(name)
+                for i, comp in enumerate(name):
+                    if isinstance(comp, str):
+                        name[i] = Component.from_str(comp)
+                    elif not is_binary_str(comp):
+                        raise TypeError('invalid type for name component')
+            else:
+                raise TypeError('invalid type for name')
 
         if isinstance(name, list):
             ret = Name.encoded_length(name)
@@ -433,6 +433,9 @@ class BytesField(Field):
 
 
 class TlvModel(metaclass=TlvModelMeta):
+    _encoded_fields: List[Field]
+    _field_values: Dict[str, Any]
+
     def __init__(self, name: str = ''):
         self._field_values = {}
         self._model_name = name

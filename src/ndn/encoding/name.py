@@ -1,18 +1,16 @@
-from typing import List, Optional
-from .tlv_type import BinaryStr, VarBinaryStr, FormalName
-from .tlv_var import write_tl_num, pack_uint_bytes, parse_tl_num, get_tl_num_size
-from functools import reduce
 import string
-
+from functools import reduce
+from typing import List, Optional, Iterable
+from .tlv_type import BinaryStr, VarBinaryStr, FormalName, NonStrictName, is_binary_str
+from .tlv_var import write_tl_num, pack_uint_bytes, parse_tl_num, get_tl_num_size
 
 __all__ = ['Component', 'Name']
 
 
 class Component:
-    CHARSET = (
-        set(string.ascii_letters)
-        | set(string.digits)
-        | {'-', '.', '_', '~', '=', '%'})
+    CHARSET = (set(string.ascii_letters)
+               | set(string.digits)
+               | {'-', '.', '_', '~', '=', '%'})
     TYPE_INVALID = 0x00
     TYPE_GENERIC = 0x08
     TYPE_IMPLICIT_SHA256 = 0x01
@@ -257,7 +255,7 @@ class Name:
             raise ValueError(f'the Type of {buf} is not Name')
 
         length, size_len = parse_tl_num(buf, offset)
-        offset += size_typ
+        offset += size_len
         if length > len(buf) - offset:
             raise IndexError('buffer overflow')
 
@@ -272,3 +270,28 @@ class Name:
             length -= (offset - st)
 
         return ret, offset - origin_offset
+
+    @staticmethod
+    def formalize(name: NonStrictName) -> FormalName:
+        """
+        Convert a NonStrictName to a FormalName.
+        If name is a binary string, decode it.
+        If name is a str, encode it into FormalName.
+        If name is a list, encode all str elements into Components.
+
+        :param name: the NonStrictName
+        :return: the FormalName. It may be a swallow copy of name.
+        """
+        if is_binary_str(name):
+            return Name.decode(name)[0]
+        elif isinstance(name, str):
+            return Name.from_str(name)
+        elif not isinstance(name, Iterable):
+            raise TypeError('invalid type for name')
+        ret = list(name)
+        for i, comp in enumerate(ret):
+            if isinstance(comp, str):
+                ret[i] = Component.from_str(comp)
+            elif not is_binary_str(comp):
+                raise TypeError('invalid type for name component')
+        return ret

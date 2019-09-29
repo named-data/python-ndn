@@ -1,6 +1,6 @@
 from typing import List
-from ..encoding import Signer, SignatureType
 from Cryptodome.Hash import SHA256
+from ..encoding import Signer, SignatureType
 
 
 class DigestSha256Signer(Signer):

@@ -9,7 +9,7 @@ with io.open("src/ndn/__init__.py", "rt", encoding="utf8") as f:
     version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
 
-requirements = ['pycryptodomex >= 3.8.2']
+requirements = ['pycryptodomex >= 3.8.2', 'pygtrie >= 2.3.2']
 setup(
     name='python-ndn',
     version=version,

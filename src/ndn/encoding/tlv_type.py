@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Iterable
 
 
 __all__ = ['BinaryStr', 'VarBinaryStr', 'FormalName', 'NonStrictName', 'is_binary_str']
@@ -7,7 +7,7 @@ __all__ = ['BinaryStr', 'VarBinaryStr', 'FormalName', 'NonStrictName', 'is_binar
 BinaryStr = Union[bytes, bytearray, memoryview]
 VarBinaryStr = Union[bytearray, memoryview]
 FormalName = List[BinaryStr]
-NonStrictName = Union[List[Union[BinaryStr, str]], str, BinaryStr]
+NonStrictName = Union[Iterable[Union[BinaryStr, str]], str, BinaryStr]
 
 
 def is_binary_str(var):
