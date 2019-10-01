@@ -11,7 +11,8 @@ from hashlib import sha256
 
 __all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'SignatureInfo', 'Delegation',
            'Links', 'InterestPacketValue', 'InterestPacket', 'MetaInfo', 'DataPacketValue', 'DataPacket',
-           'InterestParam', 'DataParam', 'make_interest', 'make_data', 'parse_interest', 'parse_data']
+           'InterestParam', 'DataParam', 'make_interest', 'make_data', 'parse_interest', 'parse_data',
+           'Interest', 'Data']
 
 
 class TypeNumber:
@@ -290,6 +291,10 @@ class DataParam:
         self.final_block_id = final_block_id
 
 
+Interest = Tuple[FormalName, InterestParam, Optional[BinaryStr], Dict[str, Any]]
+Data = Tuple[FormalName, DataParam, Optional[BinaryStr], Dict[str, Any]]
+
+
 def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
                   app_param: Optional[BinaryStr] = None,
@@ -347,8 +352,7 @@ def make_data(name: NonStrictName,
     return data.encode(markers=markers)
 
 
-def parse_interest(wire: BinaryStr, with_tl: bool = True) -> (FormalName, InterestParam,
-                                                              Optional[BinaryStr], Dict[str, Any]):
+def parse_interest(wire: BinaryStr, with_tl: bool = True) -> Interest:
     if with_tl:
         wire = parse_and_check_tl(wire, TypeNumber.INTEREST)
     markers = {}
@@ -359,12 +363,15 @@ def parse_interest(wire: BinaryStr, with_tl: bool = True) -> (FormalName, Intere
     params.nonce = ret.nonce
     params.lifetime = ret.lifetime
     params.hop_limit = ret.hop_limit
-    if ret.signature_info is not None:
-        sig_type = ret.signature_info.signature_type
-    else:
-        sig_type = None
+
+    if ret.forwarding_hint:
+        params.forwarding_hint = []
+        if ret.forwarding_hint.delegations:
+            for cur in ret.forwarding_hint.delegations:
+                params.forwarding_hint.append((cur.preference, cur.delegation))
+
     signature_related = {
-        'signature_type': sig_type,
+        'signature_info': ret.signature_info,
         'signature_covered_part': ret._sig_cover_part.get_arg(markers),
         'signature_value_buf': ret.signature_value,
         'digest_covered_part': ret._digest_cover_part.get_arg(markers),
@@ -373,8 +380,7 @@ def parse_interest(wire: BinaryStr, with_tl: bool = True) -> (FormalName, Intere
     return ret.name, params, ret.application_parameters, signature_related
 
 
-def parse_data(wire: BinaryStr, with_tl: bool = True) -> (FormalName, DataParam,
-                                                          Optional[BinaryStr], Dict[str, Any]):
+def parse_data(wire: BinaryStr, with_tl: bool = True) -> Data:
     if with_tl:
         wire = parse_and_check_tl(wire, TypeNumber.DATA)
     markers = {}
@@ -383,12 +389,8 @@ def parse_data(wire: BinaryStr, with_tl: bool = True) -> (FormalName, DataParam,
     params.content_type = ret.meta_info.content_type
     params.final_block_id = ret.meta_info.final_block_id
     params.freshness_period = ret.meta_info.freshness_period
-    if ret.signature_info is not None:
-        sig_type = ret.signature_info.signature_type
-    else:
-        sig_type = None
     signature_related = {
-        'signature_type': sig_type,
+        'signature_info': ret.signature_info,
         'signature_covered_part': ret._sig_cover_part.get_arg(markers),
         'signature_value_buf': ret.signature_value,
     }
