@@ -272,7 +272,7 @@ class Name:
         return ret, offset - origin_offset
 
     @staticmethod
-    def formalize(name: NonStrictName) -> FormalName:
+    def normalize(name: NonStrictName) -> FormalName:
         """
         Convert a NonStrictName to a FormalName.
         If name is a binary string, decode it.

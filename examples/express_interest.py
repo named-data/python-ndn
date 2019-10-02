@@ -1,5 +1,5 @@
 from ndn.app import NDNApp
-from ndn.errors import InterestNack, InterestTimeout
+from ndn.types import InterestNack, InterestTimeout
 from ndn.encoding import Name
 import asyncio as aio
 import logging

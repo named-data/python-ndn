@@ -1,9 +1,6 @@
-from typing import Callable, Dict, Any
-from ..encoding import Signer
+from typing import Dict, Any
+from ..types import KeyChain
 from .sha256_digest_signer import DigestSha256Signer
-
-
-KeyChain = Callable[[Dict[str, Any]], Signer]
 
 
 def make_digest_keychain() -> KeyChain:

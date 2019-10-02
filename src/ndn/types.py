@@ -1,5 +1,10 @@
-from typing import Optional
-from .encoding import FormalName, MetaInfo, BinaryStr
+from typing import Optional, Callable, Any, Coroutine, Dict
+from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, Signer, SignaturePtrs
+
+
+Route = Callable[[FormalName, InterestParam, Optional[BinaryStr]], None]
+Validator = Callable[[FormalName, SignaturePtrs], Coroutine[Any, None, bool]]
+KeyChain = Callable[[Dict[str, Any]], Signer]
 
 
 class NetworkError(Exception):
@@ -10,6 +15,10 @@ class InterestTimeout(Exception):
     pass
 
 
+class InterestCanceled(Exception):
+    pass
+
+
 class InterestNack(Exception):
     reason: int
 
@@ -17,7 +26,7 @@ class InterestNack(Exception):
         self.reason = reason
 
 
-class InvalidDataError(Exception):
+class ValidationFailure(Exception):
     name: FormalName
     meta_info: MetaInfo
     content: Optional[BinaryStr]

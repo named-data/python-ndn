@@ -1,29 +1,34 @@
 import struct
 import logging
 import asyncio as aio
-from typing import Optional, Any, Awaitable, Coroutine, Tuple
+from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
     make_data, InterestParam, make_interest, FormalName, SignaturePtrs
-from .security.keychain import KeyChain, make_digest_keychain
-from .security.validator import Validator
-from .security.digest_validator import DigestValidator
+from .security.digest_keychain import make_digest_keychain
+from .security.digest_validator import sha256_digest_checker, params_sha256_checker
 from .transport.stream_socket import Face, UnixFace
-from .name_tree import NameTrie, NameTreeNode
-from .errors import NetworkError, InterestTimeout
+from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
+from .types import NetworkError, InterestTimeout, Validator, KeyChain, Route, InterestCanceled
 
 
 class NDNApp:
     face: Face = None
     keychain: KeyChain = None
-    name_tree: NameTrie = None
-    validator: Validator = None
+    _int_tree: NameTrie = None
+    _prefix_tree: NameTrie = None
+    int_validator: Validator = None
+    data_validator: Validator = None
+    _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator]]]
 
     def __init__(self):
         self.face = UnixFace(self._receive)
         self.keychain = make_digest_keychain()
-        self.name_tree = NameTrie()
-        self.validator = DigestValidator()
+        self._int_tree = NameTrie()
+        self._prefix_tree = NameTrie()
+        self.data_validator = sha256_digest_checker
+        self.int_validator = sha256_digest_checker
+        self._autoreg_routes = []
 
     async def _receive(self, typ: int, data: BinaryStr):
         logging.debug('Packet received %s, %s' % (typ, bytes(data)))
@@ -75,6 +80,7 @@ class NDNApp:
                          name: NonStrictName,
                          interest_param: Optional[InterestParam] = None,
                          app_param: Optional[BinaryStr] = None,
+                         validator: Optional[Validator] = None,
                          **kwargs) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
         if not self.face.running:
             raise NetworkError('cannot send packet before connected')
@@ -87,23 +93,28 @@ class NDNApp:
         interest, final_name = make_interest(name, interest_param, app_param,
                                              signer=signer, need_final_name=True, **kwargs)
         future = aio.get_event_loop().create_future()
-        node = self.name_tree.setdefault(final_name, NameTreeNode())
+        node = self._int_tree.setdefault(final_name, InterestTreeNode())
         node.append_interest(future, interest_param)
+        node.validator = validator
         self.face.send(interest)
         return self._wait_for_data(future, interest_param.lifetime, final_name, node)
 
-    async def _wait_for_data(self, future: aio.Future, lifetime: int, name: FormalName, node: NameTreeNode):
+    async def _wait_for_data(self, future: aio.Future, lifetime: int, name: FormalName, node: InterestTreeNode):
         lifetime = 100 if lifetime is None else lifetime
         try:
             data = await aio.wait_for(future, timeout=lifetime/1000.0)
         except aio.TimeoutError:
             if node.timeout(future):
-                del self.name_tree[name]
+                del self._int_tree[name]
             raise InterestTimeout()
+        except aio.CancelledError:
+            raise InterestCanceled()
         return data
 
     async def main_loop(self, after_start: Awaitable = None):
         await self.face.open()
+        for name, route, validator in self._autoreg_routes:
+            await self.register(name, route, validator)
         if after_start:
             aio.get_event_loop().create_task(after_start)
         logging.debug('Connected to NFD node, start running...')
@@ -112,6 +123,10 @@ class NDNApp:
     def shutdown(self):
         print('Manually shutdown')
         self.face.shutdown()
+        for node in self._prefix_tree.itervalues():
+            node.cancel()
+        self._prefix_tree.clear()
+        self._int_tree.clear()
 
     def run_forever(self, after_start: Awaitable = None):
         task = self.main_loop(after_start)
@@ -123,38 +138,68 @@ class NDNApp:
             self.face.shutdown()
         logging.debug('Face is down now')
 
-    def route(self):
+    def route(self, name: NonStrictName, validator: Optional[Validator] = None):
+        name = Name.normalize(name)
+
+        def decorator(func: Route):
+            self._autoreg_routes.append((name, func, validator))
+            if self.face.running:
+                aio.get_event_loop().create_task(self.register(name, func, validator))
+            return func
+        return decorator
+
+    async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None):
+        name = Name.normalize(name)
+        node = self._prefix_tree.setdefault(name, PrefixTreeNode())
+        if node.callback:
+            raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
+        node.callback = func
+        if validator:
+            node.validator = validator
         pass
 
-    def register(self):
-        pass
-
-    def unregister(self):
+    async def unregister(self, name: NonStrictName):
+        name = Name.normalize(name)
+        del self._prefix_tree[name]
         pass
 
     def _on_nack(self, name: FormalName, nack_reason: int):
-        node = self.name_tree[name]
+        node = self._int_tree[name]
         if node:
             if node.nack_interest(nack_reason):
-                del self.name_tree[name]
+                del self._int_tree[name]
 
     async def _on_data(self, name: FormalName, meta_info: MetaInfo,
                        content: Optional[BinaryStr], sig: SignaturePtrs):
-        valid = await self.validator.data_validate(name, sig)
         clean_list = []
-        for prefix, node in self.name_tree.prefixes(name):
-            if valid:
-                clean = node.satisfy(name, meta_info, content)
+        for prefix, node in self._int_tree.prefixes(name):
+            validator = node.validator if node.validator else self.data_validator
+            if await validator(name, sig):
+                clean = node.satisfy(name, meta_info, content, prefix == name)
             else:
                 clean = node.invalid(name, meta_info, content)
             if clean:
                 clean_list.append(prefix)
         for prefix in clean_list:
-            del self.name_tree[prefix]
+            del self._int_tree[prefix]
 
     async def _on_interest(self, name: FormalName, param: InterestParam,
                            app_param: Optional[BinaryStr], sig: SignaturePtrs):
-        valid = await self.validator.interest_validate(name, sig)
-        if not valid:
+        trie_step = self._prefix_tree.longest_prefix(name)
+        if not trie_step:
+            logging.warning('No route: %s' % name)
             return
-        pass
+        node = trie_step.value
+        if app_param is not None or sig.signature_info is not None:
+            if not await params_sha256_checker(name, sig):
+                logging.warning('Drop malformed Interest: %s' % name)
+                return
+        if sig.signature_info is not None:
+            validator = node.validator if node.validator else self.int_validator
+            valid = await validator(name, sig)
+        else:
+            valid = True
+        if not valid:
+            logging.warning('Drop unvalidated Interest: %s' % name)
+            return
+        node.callback(name, param, app_param)
