@@ -1,7 +1,7 @@
 import hashlib
 from ndn.encoding import Name, Component
 from ndn.security.sha256_digest_signer import DigestSha256Signer
-from ndn.encoding import InterestParam, DataParam, ContentType, SignatureType, \
+from ndn.encoding import InterestParam, MetaInfo, ContentType, SignatureType, \
     make_interest, make_data, parse_interest, parse_data
 
 
@@ -115,7 +115,7 @@ class TestDataMake:
     @staticmethod
     def test_default():
         name = Name.from_str('/local/ndn/prefix')
-        data = make_data(name, DataParam(), signer=DigestSha256Signer())
+        data = make_data(name, MetaInfo(), signer=DigestSha256Signer())
         assert (data ==
                 b"\x06\x42\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix"
                 b"\x14\x03\x18\x01\x00"
@@ -124,7 +124,7 @@ class TestDataMake:
                 b"\xd8\'S\x13[\xd7\x15\xa5\x9d%^\x80\xf2\xab\xf0\xb5")
 
         name = Name.encode(name)
-        data = make_data(name, DataParam(), b'01020304', signer=DigestSha256Signer())
+        data = make_data(name, MetaInfo(), b'01020304', signer=DigestSha256Signer())
         assert (data ==
                 b'\x06L\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix'
                 b'\x14\x03\x18\x01\x00'
@@ -134,16 +134,16 @@ class TestDataMake:
                 b'\xe0\xc7\xb6\xfd\x8f\x9cn\xc5\x93{\x93\x04\xe0\xdf\xa6S')
 
         name = '/local/ndn/prefix'
-        param = DataParam()
-        data = make_data(name, param)
+        meta_info = MetaInfo()
+        data = make_data(name, meta_info)
         assert (data ==
                 b"\x06\x1b\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix"
                 b"\x14\x03\x18\x01\x00")
 
         name = '/E'
-        param = DataParam()
-        param.content_type = None
-        data = make_data(name, param, b'', signer=DigestSha256Signer())
+        meta_info = MetaInfo()
+        meta_info.content_type = None
+        data = make_data(name, meta_info, b'', signer=DigestSha256Signer())
         assert data == bytes.fromhex("0630 0703080145"
                                      "1400 1500 16031b0100"
                                      "1720f965ee682c6973c3cbaa7b69e4c7063680f83be93a46be2ccc98686134354b66")
@@ -151,11 +151,11 @@ class TestDataMake:
     @staticmethod
     def test_meta_info():
         name = '/local/ndn/prefix/37=%00'
-        param = DataParam()
-        param.content_type = ContentType.BLOB
-        param.freshness_period = 1000
-        param.final_block_id = Component.from_sequence_num(2)
-        data = make_data(name, param, signer=DigestSha256Signer())
+        meta_info = MetaInfo()
+        meta_info.content_type = ContentType.BLOB
+        meta_info.freshness_period = 1000
+        meta_info.final_block_id = Component.from_sequence_num(2)
+        data = make_data(name, meta_info, signer=DigestSha256Signer())
         assert (data ==
                 b"\x06\x4e\x07\x17\x08\x05local\x08\x03ndn\x08\x06prefix\x25\x01\x00"
                 b"\x14\x0c\x18\x01\x00\x19\x02\x03\xe8\x1a\x03\x25\x01\x02"
@@ -175,9 +175,9 @@ class TestInterestParse:
         assert params.nonce is None
         assert params.lifetime == 4000
         assert params.hop_limit is None
-        assert sig['signature_info'] is None
-        assert sig['signature_value_buf'] is None
-        assert sig['digest_value_buf'] is None
+        assert sig.signature_info is None
+        assert sig.signature_value_buf is None
+        assert sig.digest_value_buf is None
 
     @staticmethod
     def test_params():
@@ -191,9 +191,9 @@ class TestInterestParse:
         assert params.nonce == 0
         assert params.lifetime == 10
         assert params.hop_limit == 1
-        assert sig['signature_info'] is None
-        assert sig['signature_value_buf'] is None
-        assert sig['digest_value_buf'] is None
+        assert sig.signature_info is None
+        assert sig.signature_value_buf is None
+        assert sig.digest_value_buf is None
 
     @staticmethod
     def test_app_param():
@@ -210,15 +210,15 @@ class TestInterestParse:
         assert params.nonce is None
         assert params.lifetime == 4000
         assert params.hop_limit is None
-        assert sig['signature_info'] is None
+        assert sig.signature_info is None
 
         algo = hashlib.sha256()
         algo.update(b'\x24\x04\x01\x02\x03\x04')
         assert Component.get_value(name[-1]) == algo.digest()
         algo = hashlib.sha256()
-        for part in sig['digest_covered_part']:
+        for part in sig.digest_covered_part:
             algo.update(part)
-        assert sig['digest_value_buf'] == algo.digest()
+        assert sig.digest_value_buf == algo.digest()
 
     @staticmethod
     def test_signed_interest_1():
@@ -235,17 +235,17 @@ class TestInterestParse:
                                      "/params-sha256=8e6e36d7eabcde43756140c90bda09d500d2a577f2f533b569f0441df0a7f9e2")
         assert params.nonce == 0x6c211166
         assert app_params == b'\x01\x02\x03\x04'
-        assert sig['signature_info'].signature_type == SignatureType.DIGEST_SHA256
+        assert sig.signature_info.signature_type == SignatureType.DIGEST_SHA256
 
         algo = hashlib.sha256()
-        for part in sig['digest_covered_part']:
+        for part in sig.digest_covered_part:
             algo.update(part)
-        assert sig['digest_value_buf'] == algo.digest()
+        assert sig.digest_value_buf == algo.digest()
 
         algo = hashlib.sha256()
-        for part in sig['signature_covered_part']:
+        for part in sig.signature_covered_part:
             algo.update(part)
-        assert sig['signature_value_buf'] == algo.digest()
+        assert sig.signature_value_buf == algo.digest()
 
     @staticmethod
     def test_signed_interest_2():
@@ -262,17 +262,17 @@ class TestInterestParse:
                                      "/params-sha256=4077a57049d83848b525a423ab978e6480f96d5ca38a80a5e2d6e250a617be4f")
         assert params.nonce == 0x6c211166
         assert app_params == b''
-        assert sig['signature_info'].signature_type == SignatureType.DIGEST_SHA256
+        assert sig.signature_info.signature_type == SignatureType.DIGEST_SHA256
 
         algo = hashlib.sha256()
-        for part in sig['digest_covered_part']:
+        for part in sig.digest_covered_part:
             algo.update(part)
-        assert sig['digest_value_buf'] == algo.digest()
+        assert sig.digest_value_buf == algo.digest()
 
         algo = hashlib.sha256()
-        for part in sig['signature_covered_part']:
+        for part in sig.signature_covered_part:
             algo.update(part)
-        assert sig['signature_value_buf'] == algo.digest()
+        assert sig.signature_value_buf == algo.digest()
 
 
 class TestDataParse:
@@ -283,18 +283,18 @@ class TestDataParse:
                 b"\x16\x03\x1b\x01\x00"
                 b"\x17 \x7f1\xe4\t\xc5z/\x1d\r\xdaVh8\xfd\xd9\x94"
                 b"\xd8\'S\x13[\xd7\x15\xa5\x9d%^\x80\xf2\xab\xf0\xb5")
-        name, params, content, sig = parse_data(data)
+        name, meta_info, content, sig = parse_data(data)
         assert name == Name.from_str("/local/ndn/prefix")
-        assert params.content_type == ContentType.BLOB
-        assert params.freshness_period is None
-        assert params.final_block_id is None
-        assert sig['signature_info'].signature_type == SignatureType.DIGEST_SHA256
+        assert meta_info.content_type == ContentType.BLOB
+        assert meta_info.freshness_period is None
+        assert meta_info.final_block_id is None
+        assert sig.signature_info.signature_type == SignatureType.DIGEST_SHA256
         assert content is None
 
         algo = hashlib.sha256()
-        for part in sig['signature_covered_part']:
+        for part in sig.signature_covered_part:
             algo.update(part)
-        assert sig['signature_value_buf'] == algo.digest()
+        assert sig.signature_value_buf == algo.digest()
 
     @staticmethod
     def test_default_2():
@@ -304,49 +304,49 @@ class TestDataParse:
                 b'\x16\x03\x1b\x01\x00'
                 b'\x17 \x94\xe9\xda\x91\x1a\x11\xfft\x02i:G\x0cO\xdd!'
                 b'\xe0\xc7\xb6\xfd\x8f\x9cn\xc5\x93{\x93\x04\xe0\xdf\xa6S')
-        name, params, content, sig = parse_data(data)
+        name, meta_info, content, sig = parse_data(data)
         assert name == Name.from_str("/local/ndn/prefix")
-        assert params.content_type == ContentType.BLOB
-        assert params.freshness_period is None
-        assert params.final_block_id is None
-        assert sig['signature_info'].signature_type == SignatureType.DIGEST_SHA256
+        assert meta_info.content_type == ContentType.BLOB
+        assert meta_info.freshness_period is None
+        assert meta_info.final_block_id is None
+        assert sig.signature_info.signature_type == SignatureType.DIGEST_SHA256
         assert content == b'01020304'
 
         algo = hashlib.sha256()
-        for part in sig['signature_covered_part']:
+        for part in sig.signature_covered_part:
             algo.update(part)
-        assert sig['signature_value_buf'] == algo.digest()
+        assert sig.signature_value_buf == algo.digest()
 
     @staticmethod
     def test_default_3():
         data = (b"\x06\x1b\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix"
                 b"\x14\x03\x18\x01\x00")
-        name, params, content, sig = parse_data(data)
+        name, meta_info, content, sig = parse_data(data)
         assert name == Name.from_str("/local/ndn/prefix")
-        assert params.content_type == ContentType.BLOB
-        assert params.freshness_period is None
-        assert params.final_block_id is None
-        assert sig['signature_info'] is None
+        assert meta_info.content_type == ContentType.BLOB
+        assert meta_info.freshness_period is None
+        assert meta_info.final_block_id is None
+        assert sig.signature_info is None
         assert content is None
-        assert sig['signature_value_buf'] is None
+        assert sig.signature_value_buf is None
 
     @staticmethod
     def test_default_4():
         data = bytes.fromhex("0630 0703080145"
                              "1400 1500 16031b0100"
                              "1720f965ee682c6973c3cbaa7b69e4c7063680f83be93a46be2ccc98686134354b66")
-        name, params, content, sig = parse_data(data)
+        name, meta_info, content, sig = parse_data(data)
         assert name == Name.from_str("/E")
-        assert params.content_type is None
-        assert params.freshness_period is None
-        assert params.final_block_id is None
-        assert sig['signature_info'].signature_type == SignatureType.DIGEST_SHA256
+        assert meta_info.content_type is None
+        assert meta_info.freshness_period is None
+        assert meta_info.final_block_id is None
+        assert sig.signature_info.signature_type == SignatureType.DIGEST_SHA256
         assert content == b''
 
         algo = hashlib.sha256()
-        for part in sig['signature_covered_part']:
+        for part in sig.signature_covered_part:
             algo.update(part)
-        assert sig['signature_value_buf'] == algo.digest()
+        assert sig.signature_value_buf == algo.digest()
 
     @staticmethod
     def test_meta_info():
@@ -354,15 +354,15 @@ class TestDataParse:
                 b"\x14\x0c\x18\x01\x00\x19\x02\x03\xe8\x1a\x03\x25\x01\x02"
                 b"\x16\x03\x1b\x01\x00"
                 b"\x17 \x03\xb8,\x18\xffMw\x84\x86\xa5a\x94e\xcc\xdaQ\x15\xb7\xfb\x19\xab\x9d1lw\'\xdf\xac\x03#\xcad")
-        name, params, content, sig = parse_data(data)
+        name, meta_info, content, sig = parse_data(data)
         assert name == Name.from_str("/local/ndn/prefix/37=%00")
-        assert params.content_type == ContentType.BLOB
-        assert params.freshness_period == 1000
-        assert params.final_block_id == Component.from_sequence_num(2)
-        assert sig['signature_info'].signature_type == SignatureType.DIGEST_SHA256
+        assert meta_info.content_type == ContentType.BLOB
+        assert meta_info.freshness_period == 1000
+        assert meta_info.final_block_id == Component.from_sequence_num(2)
+        assert sig.signature_info.signature_type == SignatureType.DIGEST_SHA256
         assert content is None
 
         algo = hashlib.sha256()
-        for part in sig['signature_covered_part']:
+        for part in sig.signature_covered_part:
             algo.update(part)
-        assert sig['signature_value_buf'] == algo.digest()
+        assert sig.signature_value_buf == algo.digest()

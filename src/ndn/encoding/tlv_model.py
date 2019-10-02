@@ -33,6 +33,14 @@ class TlvModelMeta(abc.ABCMeta):
 
 class Field(metaclass=abc.ABCMeta):
     def __init__(self, type_num: int, default=None):
+        """
+        Initialize a TLV field.
+
+        :param type_num: Type number.
+        :param default: Default value used for parsing and encoding.
+            If this field is absent during parsing, return default.
+            If this field is not explicitly assigned to None before encoding, use default.
+        """
         self.name = None
         self.type_num = type_num
         self.default = default
@@ -440,6 +448,16 @@ class TlvModel(metaclass=TlvModelMeta):
         self._field_values = {}
         self._model_name = name
 
+    def __repr__(self):
+        values = ', '.join(f'{field.name}={field.get_value(self).__repr__()}' for field in self._encoded_fields)
+        return f'{self.__class__.__name__}({values})'
+
+    def __eq__(self, other):
+        for field in self._encoded_fields:
+            if field.get_value(self) != field.get_value(other):
+                return False
+        return True
+
     def encoded_length(self, markers: Optional[dict] = None) -> int:
         if markers is None:
             markers = {}
@@ -467,12 +485,13 @@ class TlvModel(metaclass=TlvModelMeta):
         return wire
 
     @classmethod
-    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None):
+    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None, ignore_critical: bool = False):
         if markers is None:
             markers = {}
         offset = 0
         field_pos = 0
         ret = cls()
+        ret._field_values = {}  # Clean default values created in __init__
         while offset < len(wire):
             # Read TL
             offset_btl = offset
@@ -501,7 +520,7 @@ class TlvModel(metaclass=TlvModelMeta):
                     field_pos = i + 1
             else:
                 # If not found
-                if (typ & 1) == 1:
+                if (typ & 1) == 1 and not ignore_critical:
                     raise DecodeError(f'a critical field of type {typ} is unrecognized, redundant or out-of-order')
             offset += length
         return ret
@@ -512,12 +531,14 @@ class ModelField(Field):
                  type_num: int,
                  model_type: Type[TlvModel],
                  copy_in_fields: List[ProcedureArgument] = None,
-                 copy_out_fields: List[ProcedureArgument] = None):
+                 copy_out_fields: List[ProcedureArgument] = None,
+                 ignore_critical: bool = False):
         # default should be None here to prevent unintended modification
         super().__init__(type_num, None)
         self.model_type = model_type
         self.copy_in_fields = copy_in_fields if copy_in_fields else {}
         self.copy_out_fields = copy_out_fields if copy_out_fields else {}
+        self.ignore_critical = ignore_critical
 
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
@@ -549,7 +570,7 @@ class ModelField(Field):
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         inner_markers = {}
-        val = self.model_type.parse(memoryview(wire)[offset:offset+length], inner_markers)
+        val = self.model_type.parse(memoryview(wire)[offset:offset+length], inner_markers, self.ignore_critical)
         copy_fields = {f.name for f in self.copy_out_fields}
         for k, v in inner_markers.items():
             if k.split('##')[0] in copy_fields:

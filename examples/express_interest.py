@@ -1,6 +1,6 @@
 from ndn.app import NDNApp
 from ndn.errors import InterestNack, InterestTimeout
-from ndn.encoding import InterestParam
+from ndn.encoding import Name
 import asyncio as aio
 import logging
 
@@ -14,15 +14,17 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
 app = NDNApp()
 
 
-async def main1():
+async def main():
     while not app.face.running:
         print('sleeping...')
         await aio.sleep(0)
 
     try:
         print('expressing...')
-        await app.express_interest("/ndn/not-exist",
-                                   InterestParam(must_be_fresh=True, can_be_prefix=True, lifetime=1000))
+        name, meta_info, content = await app.express_interest(
+            "/ndn", must_be_fresh=True, can_be_prefix=True, lifetime=1000, not_nece=False)
+
+        print(Name.to_str(name), meta_info, bytes(content))
     except InterestNack as e:
         print(f'Nacked with {e.reason}')
     except InterestTimeout:
@@ -34,4 +36,4 @@ async def main1():
 
 
 if __name__ == '__main__':
-    app.run_forever(after_start=main1())
+    app.run_forever(after_start=main())

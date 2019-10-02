@@ -1,3 +1,5 @@
+from hashlib import sha256
+import dataclasses as dc
 from typing import Optional, List, Tuple, Dict, Any
 from .name import Name, Component
 from .signer import Signer
@@ -6,12 +8,11 @@ from .tlv_var import parse_and_check_tl
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
     ProcedureArgument, RepeatedField
-from hashlib import sha256
 
 
 __all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'SignatureInfo', 'Delegation',
            'Links', 'InterestPacketValue', 'InterestPacket', 'MetaInfo', 'DataPacketValue', 'DataPacket',
-           'InterestParam', 'DataParam', 'make_interest', 'make_data', 'parse_interest', 'parse_data',
+           'InterestParam', 'SignaturePtrs', 'make_interest', 'make_data', 'parse_interest', 'parse_data',
            'Interest', 'Data']
 
 
@@ -107,7 +108,7 @@ class InterestPacketValue(TlvModel):
     must_be_fresh = BoolField(TypeNumber.MUST_BE_FRESH, default=False)
     forwarding_hint = ModelField(TypeNumber.FORWARDING_HINT, Links)
     nonce = UintField(TypeNumber.NONCE, fixed_len=4)
-    lifetime = UintField(TypeNumber.INTEREST_LIFETIME)
+    lifetime = UintField(TypeNumber.INTEREST_LIFETIME)  # We can not write 4000 as a parse default
     hop_limit = UintField(TypeNumber.HOP_LIMIT, fixed_len=1)
     _sig_cover_start = OffsetMarker()
     _digest_cover_start = OffsetMarker()
@@ -166,11 +167,11 @@ class InterestPacketValue(TlvModel):
         return ret
 
     @classmethod
-    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None):
+    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None, ignore_critical: bool = False):
         if markers is None:
             markers = {}
         cls._sig_cover_part.set_arg(markers, [])
-        ret = super().parse(wire, markers)
+        ret = super().parse(wire, markers, ignore_critical)
         digest_cover_start = cls._digest_cover_start.get_arg(markers)
         digest_cover_end = cls._digest_cover_end.get_arg(markers)
         digest_cover_part = [memoryview(wire)[digest_cover_start:digest_cover_end]]
@@ -195,6 +196,21 @@ class MetaInfo(TlvModel):
     freshness_period = UintField(TypeNumber.FRESHNESS_PERIOD)
     final_block_id = BytesField(TypeNumber.FINAL_BLOCK_ID)
 
+    def __init__(self,
+                 content_type: int = ContentType.BLOB,
+                 freshness_period: Optional[int] = None,
+                 final_block_id: BinaryStr = None):
+        super().__init__()
+        self.content_type = content_type
+        self.freshness_period = freshness_period
+        self.final_block_id = final_block_id
+
+    @staticmethod
+    def from_dict(kwargs):
+        return MetaInfo(**{f.name: kwargs[f.name]
+                           for f in MetaInfo._encoded_fields
+                           if f.name in kwargs})
+
 
 class DataPacketValue(TlvModel):
     _signer = ProcedureArgument()
@@ -206,7 +222,8 @@ class DataPacketValue(TlvModel):
     name = NameField("/")
     meta_info = ModelField(TypeNumber.META_INFO, MetaInfo)
     content = BytesField(TypeNumber.CONTENT)
-    signature_info = ModelField(TypeNumber.SIGNATURE_INFO, SignatureInfo)
+    # v0.2 Data packets has critical SignatureType-specific TLVs
+    signature_info = ModelField(TypeNumber.SIGNATURE_INFO, SignatureInfo, ignore_critical=True)
     signature_value = SignatureValueField(TypeNumber.SIGNATURE_VALUE,
                                           interest_sig=True,
                                           signer=_signer,
@@ -240,11 +257,11 @@ class DataPacketValue(TlvModel):
         return ret
 
     @classmethod
-    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None):
+    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None, ignore_critical: bool = False):
         if markers is None:
             markers = {}
         cls._sig_cover_part.set_arg(markers, [])
-        return super().parse(wire, markers)
+        return super().parse(wire, markers, ignore_critical)
 
 
 class DataPacket(TlvModel):
@@ -254,45 +271,33 @@ class DataPacket(TlvModel):
     data = ModelField(TypeNumber.DATA, DataPacketValue, [_signer, _sign_args], [_sig_cover_part])
 
 
+@dc.dataclass
 class InterestParam:
     can_be_prefix: bool = False
     must_be_fresh: bool = False
     nonce: Optional[int] = None
     lifetime: Optional[int] = 4000
     hop_limit: Optional[int] = None
-    forwarding_hint: Optional[List[Tuple[int, NonStrictName]]] = None
+    forwarding_hint: List[Tuple[int, NonStrictName]] = dc.field(default_factory=list)
 
-    def __init__(self,
-                 can_be_prefix: bool = False,
-                 must_be_fresh: bool = False,
-                 nonce: Optional[int] = None,
-                 lifetime: Optional[int] = 4000,
-                 hop_limit: Optional[int] = None,
-                 forwarding_hint: Optional[List[Tuple[int, NonStrictName]]] = None):
-        self.can_be_prefix = can_be_prefix
-        self.must_be_fresh = must_be_fresh
-        self.nonce = nonce
-        self.lifetime = lifetime
-        self.hop_limit = hop_limit
-        self.forwarding_hint = forwarding_hint
+    @staticmethod
+    def from_dict(kwargs):
+        return InterestParam(**{f.name: kwargs[f.name]
+                                for f in dc.fields(InterestParam)
+                                if f.name in kwargs})
 
 
-class DataParam:
-    content_type: Optional[int] = ContentType.BLOB
-    freshness_period: Optional[int] = None
-    final_block_id: Optional[BinaryStr] = None
-
-    def __init__(self,
-                 content_type: Optional[int] = ContentType.BLOB,
-                 freshness_period: Optional[int] = None,
-                 final_block_id: Optional[BinaryStr] = None):
-        self.content_type = content_type
-        self.freshness_period = freshness_period
-        self.final_block_id = final_block_id
+@dc.dataclass
+class SignaturePtrs:
+    signature_info: Optional[SignatureInfo] = None
+    signature_covered_part: Optional[List[BinaryStr]] = dc.field(default_factory=list)
+    signature_value_buf: Optional[BinaryStr] = None
+    digest_covered_part: Optional[List[BinaryStr]] = dc.field(default_factory=list)
+    digest_value_buf: Optional[BinaryStr] = None
 
 
-Interest = Tuple[FormalName, InterestParam, Optional[BinaryStr], Dict[str, Any]]
-Data = Tuple[FormalName, DataParam, Optional[BinaryStr], Dict[str, Any]]
+Interest = Tuple[FormalName, InterestParam, Optional[BinaryStr], SignaturePtrs]
+Data = Tuple[FormalName, MetaInfo, Optional[BinaryStr], SignaturePtrs]
 
 
 def make_interest(name: NonStrictName,
@@ -332,17 +337,14 @@ def make_interest(name: NonStrictName,
 
 
 def make_data(name: NonStrictName,
-              data_param: DataParam,
+              meta_info: MetaInfo,
               content: Optional[BinaryStr] = None,
               signer: Signer = None,
               **kwargs) -> bytearray:
     data = DataPacket()
     data.data = DataPacketValue()
-    data.data.meta_info = MetaInfo()
+    data.data.meta_info = meta_info
     data.data.name = name
-    data.data.meta_info.content_type = data_param.content_type
-    data.data.meta_info.freshness_period = data_param.freshness_period
-    data.data.meta_info.final_block_id = data_param.final_block_id
     data.data.content = content
     if signer is not None:
         data.data.signature_info = SignatureInfo()
@@ -364,20 +366,18 @@ def parse_interest(wire: BinaryStr, with_tl: bool = True) -> Interest:
     params.lifetime = ret.lifetime
     params.hop_limit = ret.hop_limit
 
-    if ret.forwarding_hint:
-        params.forwarding_hint = []
-        if ret.forwarding_hint.delegations:
-            for cur in ret.forwarding_hint.delegations:
-                params.forwarding_hint.append((cur.preference, cur.delegation))
+    if ret.forwarding_hint and ret.forwarding_hint.delegations:
+        for cur in ret.forwarding_hint.delegations:
+            params.forwarding_hint.append((cur.preference, cur.delegation))
 
-    signature_related = {
-        'signature_info': ret.signature_info,
-        'signature_covered_part': ret._sig_cover_part.get_arg(markers),
-        'signature_value_buf': ret.signature_value,
-        'digest_covered_part': ret._digest_cover_part.get_arg(markers),
-        'digest_value_buf': ret._digest_buf.get_arg(markers)
-    }
-    return ret.name, params, ret.application_parameters, signature_related
+    sig_ptrs = SignaturePtrs(
+        signature_info=ret.signature_info,
+        signature_covered_part=ret._sig_cover_part.get_arg(markers),
+        signature_value_buf=ret.signature_value,
+        digest_covered_part=ret._digest_cover_part.get_arg(markers),
+        digest_value_buf=ret._digest_buf.get_arg(markers)
+    )
+    return ret.name, params, ret.application_parameters, sig_ptrs
 
 
 def parse_data(wire: BinaryStr, with_tl: bool = True) -> Data:
@@ -385,13 +385,10 @@ def parse_data(wire: BinaryStr, with_tl: bool = True) -> Data:
         wire = parse_and_check_tl(wire, TypeNumber.DATA)
     markers = {}
     ret = DataPacketValue.parse(wire, markers)
-    params = DataParam()
-    params.content_type = ret.meta_info.content_type
-    params.final_block_id = ret.meta_info.final_block_id
-    params.freshness_period = ret.meta_info.freshness_period
-    signature_related = {
-        'signature_info': ret.signature_info,
-        'signature_covered_part': ret._sig_cover_part.get_arg(markers),
-        'signature_value_buf': ret.signature_value,
-    }
-    return ret.name, params, ret.content, signature_related
+    params = ret.meta_info
+    sig_ptrs = SignaturePtrs(
+        signature_info=ret.signature_info,
+        signature_covered_part=ret._sig_cover_part.get_arg(markers),
+        signature_value_buf=ret.signature_value,
+    )
+    return ret.name, params, ret.content, sig_ptrs
