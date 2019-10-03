@@ -1,6 +1,7 @@
 import struct
 import logging
 import asyncio as aio
+from random import randint
 from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
@@ -8,8 +9,10 @@ from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
 from .security.digest_keychain import make_digest_keychain
 from .security.digest_validator import sha256_digest_checker, params_sha256_checker
 from .transport.stream_socket import Face, UnixFace
+from .app_support.nfd_mgmt import make_reg_route_cmd
 from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
-from .types import NetworkError, InterestTimeout, Validator, KeyChain, Route, InterestCanceled
+from .types import NetworkError, InterestTimeout, Validator, KeyChain, Route, InterestCanceled, \
+    InterestNack, ValidationFailure
 
 
 class NDNApp:
@@ -38,14 +41,14 @@ class NDNApp:
                     name, param, app_param, sig = parse_interest(data, with_tl=False)
                 except (DecodeError, TypeError, ValueError, struct.error):
                     raise DecodeError
-                logging.info('Interest received %s' % Name.to_str(name))
+                logging.debug('Interest received %s' % Name.to_str(name))
                 await self._on_interest(name, param, app_param, sig)
             elif typ == TypeNumber.DATA:
                 try:
                     name, meta_info, content, sig = parse_data(data, with_tl=False)
                 except (DecodeError, TypeError, ValueError, struct.error):
                     raise DecodeError
-                logging.info('Data received %s' % Name.to_str(name))
+                logging.debug('Data received %s' % Name.to_str(name))
                 await self._on_data(name, meta_info, content, sig)
             elif typ == LpTypeNumber.LP_PACKET:
                 try:
@@ -53,7 +56,7 @@ class NDNApp:
                     name, _, _, _ = parse_interest(interest, with_tl=True)
                 except (DecodeError, TypeError, ValueError, struct.error):
                     raise DecodeError
-                logging.info('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
+                logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
                 self._on_nack(name, nack_reason)
         except DecodeError:
             logging.warning('Unable to decode received packet')
@@ -65,8 +68,8 @@ class NDNApp:
 
     def put_data(self,
                  name: NonStrictName,
-                 meta_info: Optional[MetaInfo] = None,
                  content: Optional[BinaryStr] = None,
+                 meta_info: Optional[MetaInfo] = None,
                  **kwargs):
         if not self.face.running:
             raise NetworkError('cannot send packet before connected')
@@ -78,8 +81,8 @@ class NDNApp:
 
     def express_interest(self,
                          name: NonStrictName,
-                         interest_param: Optional[InterestParam] = None,
                          app_param: Optional[BinaryStr] = None,
+                         interest_param: Optional[InterestParam] = None,
                          validator: Optional[Validator] = None,
                          **kwargs) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
         if not self.face.running:
@@ -89,6 +92,8 @@ class NDNApp:
         else:
             signer = None
         if interest_param is None:
+            if 'nonce' not in kwargs:
+                kwargs['nonce'] = randint(1, 2 ** 32 - 1)
             interest_param = InterestParam.from_dict(kwargs)
         interest, final_name = make_interest(name, interest_param, app_param,
                                              signer=signer, need_final_name=True, **kwargs)
@@ -156,7 +161,12 @@ class NDNApp:
         node.callback = func
         if validator:
             node.validator = validator
-        pass
+        try:
+            _, _, reply = await self.express_interest(make_reg_route_cmd(name), lifetime=1000)
+            print(bytes(reply))  # TODO
+            return True
+        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure):
+            return False
 
     async def unregister(self, name: NonStrictName):
         name = Name.normalize(name)
@@ -175,7 +185,7 @@ class NDNApp:
         for prefix, node in self._int_tree.prefixes(name):
             validator = node.validator if node.validator else self.data_validator
             if await validator(name, sig):
-                clean = node.satisfy(name, meta_info, content, prefix == name)
+                clean = node.satisfy(name, meta_info, content, prefix != name)
             else:
                 clean = node.invalid(name, meta_info, content)
             if clean:
