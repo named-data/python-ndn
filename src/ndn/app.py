@@ -126,7 +126,7 @@ class NDNApp:
         await self.face.run()
 
     def shutdown(self):
-        print('Manually shutdown')
+        logging.info('Manually shutdown')
         self.face.shutdown()
         for node in self._prefix_tree.itervalues():
             node.cancel()
