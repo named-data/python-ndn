@@ -1,8 +1,8 @@
 import hashlib
-from ndn.encoding import Name, Component
+import pytest
 from ndn.security.sha256_digest_signer import DigestSha256Signer
-from ndn.encoding import InterestParam, MetaInfo, ContentType, SignatureType, \
-    make_interest, make_data, parse_interest, parse_data
+from ndn.encoding import Name, Component, InterestParam, MetaInfo, ContentType, SignatureType, \
+    make_interest, make_data, parse_interest, parse_data, DecodeError
 
 
 class TestInterestMake:
@@ -109,6 +109,26 @@ class TestInterestMake:
                 b'\x1f\x0d\x1e\x01\x02\x07\x08\x08\x03ndn\x08\x01B'
                 b'\x1f\x12\x1e\x01\x12\x07\r\x08\x0bshekkuenseu'
                 b'\x0a\x04\x01\x02\x03\x04\x0c\x02\x0f\xa0')
+
+    @staticmethod
+    def test_throws():
+        with pytest.raises(ValueError):
+            make_interest("/invalid%%name", InterestParam())
+
+        with pytest.raises(TypeError):
+            make_interest("/ndn", InterestParam(lifetime=0.5))
+
+        with pytest.raises(TypeError):
+            make_interest("/ndn", InterestParam(forwarding_hint=[1, 2, 3]))
+
+        with pytest.raises(ValueError):
+            make_interest("/ndn", InterestParam(hop_limit=300))
+
+        with pytest.raises(ValueError):
+            make_interest("/params-sha256=4077", InterestParam())
+
+        with pytest.raises(ValueError):
+            make_interest("/params-sha256=4077", InterestParam(), b'')
 
 
 class TestDataMake:
@@ -273,6 +293,20 @@ class TestInterestParse:
         for part in sig.signature_covered_part:
             algo.update(part)
         assert sig.signature_value_buf == algo.digest()
+
+    @staticmethod
+    def test_throws():
+        with pytest.raises(IndexError):
+            parse_interest(b'\x05\x6b\x07\x36\x08\x05local\x08\x03ndn\x08\x06prefix', True)
+
+        with pytest.raises(IndexError):
+            parse_interest(b'\x05\x6b\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix', True)
+
+        with pytest.raises(ValueError):
+            parse_interest(b'\x06\x6b\x07\x36\x08\x05local\x08\x03ndn\x08\x06prefix', True)
+
+        with pytest.raises(DecodeError):
+            parse_interest(b'\x01\x00', False)
 
 
 class TestDataParse:

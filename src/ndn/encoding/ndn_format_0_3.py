@@ -182,13 +182,7 @@ class InterestPacketValue(TlvModel):
 class InterestPacket(TlvModel):
     _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
-    _sig_cover_part = ProcedureArgument()
-    _digest_cover_part = ProcedureArgument()
-    _digest_buf = ProcedureArgument()
-    interest = ModelField(TypeNumber.INTEREST,
-                          InterestPacketValue,
-                          [_signer, _sign_args],
-                          [_sig_cover_part, _digest_cover_part, _digest_buf])
+    interest = ModelField(TypeNumber.INTEREST, InterestPacketValue, [_signer, _sign_args])
 
 
 class MetaInfo(TlvModel):
@@ -200,7 +194,6 @@ class MetaInfo(TlvModel):
                  content_type: int = ContentType.BLOB,
                  freshness_period: Optional[int] = None,
                  final_block_id: BinaryStr = None):
-        super().__init__()
         self.content_type = content_type
         self.freshness_period = freshness_period
         self.final_block_id = final_block_id
@@ -267,8 +260,7 @@ class DataPacketValue(TlvModel):
 class DataPacket(TlvModel):
     _signer = ProcedureArgument()
     _sign_args = ProcedureArgument()
-    _sig_cover_part = ProcedureArgument()
-    data = ModelField(TypeNumber.DATA, DataPacketValue, [_signer, _sign_args], [_sig_cover_part])
+    data = ModelField(TypeNumber.DATA, DataPacketValue, [_signer, _sign_args])
 
 
 @dc.dataclass

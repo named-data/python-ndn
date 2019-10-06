@@ -51,10 +51,10 @@ class Field(metaclass=abc.ABCMeta):
         return self.get_value(instance)
 
     def __set__(self, instance, value):
-        instance._field_values[self.name] = value
+        instance.__dict__[self.name] = value
 
     def get_value(self, instance):
-        return instance._field_values.get(self.name, self.default)
+        return instance.__dict__.get(self.name, self.default)
 
     @abc.abstractmethod
     def encoded_length(self, val, markers: dict) -> int:
@@ -154,6 +154,8 @@ class UintField(Field):
                     ret = 4
                 else:
                     ret = 8
+            if val >= 0x100 ** ret:
+                raise ValueError(f'{val} cannot be encoded into {ret} bytes')
             markers[f'{self.name}##encoded_length'] = ret
             return ret + tl_size
 
@@ -300,7 +302,7 @@ class InterestNameField(Field):
         for i, comp in enumerate(name):
             # If it's string, encode it first
             if isinstance(comp, str):
-                name[i] = Component.from_str(comp)
+                name[i] = Component.from_str(Component.escape_str(comp))
                 comp = name[i]
             # And then check the type
             if is_binary_str(comp):
@@ -389,7 +391,7 @@ class NameField(Field):
                 name = list(name)
                 for i, comp in enumerate(name):
                     if isinstance(comp, str):
-                        name[i] = Component.from_str(comp)
+                        name[i] = Component.from_str(Component.escape_str(comp))
                     elif not is_binary_str(comp):
                         raise TypeError('invalid type for name component')
             else:
@@ -442,11 +444,6 @@ class BytesField(Field):
 
 class TlvModel(metaclass=TlvModelMeta):
     _encoded_fields: List[Field]
-    _field_values: Dict[str, Any]
-
-    def __init__(self, name: str = ''):
-        self._field_values = {}
-        self._model_name = name
 
     def __repr__(self):
         values = ', '.join(f'{field.name}={field.get_value(self).__repr__()}' for field in self._encoded_fields)
@@ -464,7 +461,7 @@ class TlvModel(metaclass=TlvModelMeta):
         ret = 0
         for field in self._encoded_fields:
             ret += field.encoded_length(field.get_value(self), markers)
-        markers[f'{self._model_name}##encoded_length'] = ret
+        markers[f'##encoded_length'] = ret
         return ret
 
     def encode(self,
@@ -473,8 +470,8 @@ class TlvModel(metaclass=TlvModelMeta):
                markers: Optional[dict] = None) -> VarBinaryStr:
         if markers is None:
             markers = {}
-        if f'{self._model_name}##encoded_length' in markers:
-            length = markers[f'{self._model_name}##encoded_length']
+        if f'##encoded_length' in markers:
+            length = markers[f'##encoded_length']
         else:
             length = self.encoded_length(markers)
         if wire is None:
@@ -491,7 +488,7 @@ class TlvModel(metaclass=TlvModelMeta):
         offset = 0
         field_pos = 0
         ret = cls()
-        ret._field_values = {}  # Clean default values created in __init__
+        ret.__dict__ = {}  # Clean default values created in __init__
         while offset < len(wire):
             # Read TL
             offset_btl = offset
@@ -585,9 +582,9 @@ class RepeatedField(Field):
         self.element_type = element_type
 
     def get_value(self, instance):
-        if self.name not in instance._field_values:
-            instance._field_values[self.name] = []
-        return instance._field_values[self.name]
+        if self.name not in instance.__dict__:
+            instance.__dict__[self.name] = []
+        return instance.__dict__[self.name]
 
     def encoded_length(self, val, markers: dict) -> int:
         if not val:

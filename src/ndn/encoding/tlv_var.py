@@ -77,4 +77,6 @@ def parse_and_check_tl(wire: BinaryStr, expected_type: int) -> memoryview:
     size, siz_len = parse_tl_num(wire, typ_len)
     if typ != expected_type:
         raise ValueError(f'wire is of type {typ} but {expected_type} is expected')
-    return memoryview(wire)[typ_len + siz_len:typ_len + siz_len + size]
+    if len(wire) != typ_len+siz_len+size:
+        raise IndexError(f'wire size {len(wire)} mismatch with object size {size}')
+    return memoryview(wire)[typ_len+siz_len:typ_len+siz_len+size]

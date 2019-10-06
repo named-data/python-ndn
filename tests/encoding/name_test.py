@@ -268,3 +268,14 @@ class TestName:
         assert name[3] == b'\x08\x01d'
 
         assert Name.decode(b'\x07\x00') == ([], 2)
+
+    @staticmethod
+    def test_normalize():
+        name = b'\x07\x0c\x08\x01a\x08\x01b\x08\x01c\x08\x01\x1d'
+        assert Name.normalize(name) == [b'\x08\x01a', b'\x08\x01b', b'\x08\x01c', b'\x08\x01\x1d']
+
+        name = '/8=a/b/%63/\x1d'
+        assert Name.normalize(name) == [b'\x08\x01a', b'\x08\x01b', b'\x08\x01c', b'\x08\x01\x1d']
+
+        name = ['8=a', 'b', b'\x08\x01c', '\x1d']
+        assert Name.normalize(name) == [b'\x08\x01a', b'\x08\x01b', b'\x08\x01c', b'\x08\x01\x1d']

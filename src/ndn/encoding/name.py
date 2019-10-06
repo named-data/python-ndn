@@ -291,7 +291,7 @@ class Name:
         ret = list(name)
         for i, comp in enumerate(ret):
             if isinstance(comp, str):
-                ret[i] = Component.from_str(comp)
+                ret[i] = Component.from_str(Component.escape_str(comp))
             elif not is_binary_str(comp):
                 raise TypeError('invalid type for name component')
         return ret
