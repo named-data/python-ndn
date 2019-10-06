@@ -93,7 +93,6 @@ class Links(TlvModel):
 
 class InterestPacketValue(TlvModel):
     _signer = ProcedureArgument()
-    _sign_args = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
     _sig_value_buf = ProcedureArgument()
     _need_digest = ProcedureArgument()
@@ -117,7 +116,6 @@ class InterestPacketValue(TlvModel):
     signature_value = SignatureValueField(TypeNumber.INTEREST_SIGNATURE_VALUE,
                                           interest_sig=True,
                                           signer=_signer,
-                                          sign_args=_sign_args,
                                           covered_part=_sig_cover_part,
                                           starting_point=_sig_cover_start,
                                           value_buffer=_sig_value_buf)
@@ -127,13 +125,10 @@ class InterestPacketValue(TlvModel):
         if markers is None:
             markers = {}
         self._sig_cover_part.set_arg(markers, [])
-        if self._sign_args.get_arg(markers) is None:
-            self._sign_args.set_arg(markers, {})
 
         signer = self._signer.get_arg(markers)
         if signer is not None:
-            sign_arg = self._sign_args.get_arg(markers)
-            signer.write_signature_info(self.signature_info, **sign_arg)
+            signer.write_signature_info(self.signature_info)
         app_param = self.application_parameters
         if (signer is not None) and (app_param is None):
             app_param = b''
@@ -181,8 +176,7 @@ class InterestPacketValue(TlvModel):
 
 class InterestPacket(TlvModel):
     _signer = ProcedureArgument()
-    _sign_args = ProcedureArgument()
-    interest = ModelField(TypeNumber.INTEREST, InterestPacketValue, [_signer, _sign_args])
+    interest = ModelField(TypeNumber.INTEREST, InterestPacketValue, [_signer])
 
 
 class MetaInfo(TlvModel):
@@ -207,7 +201,6 @@ class MetaInfo(TlvModel):
 
 class DataPacketValue(TlvModel):
     _signer = ProcedureArgument()
-    _sign_args = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
     _sig_value_buf = ProcedureArgument()
 
@@ -220,7 +213,6 @@ class DataPacketValue(TlvModel):
     signature_value = SignatureValueField(TypeNumber.SIGNATURE_VALUE,
                                           interest_sig=True,
                                           signer=_signer,
-                                          sign_args=_sign_args,
                                           covered_part=_sig_cover_part,
                                           starting_point=_sig_cover_start,
                                           value_buffer=_sig_value_buf)
@@ -229,13 +221,10 @@ class DataPacketValue(TlvModel):
         if markers is None:
             markers = {}
         self._sig_cover_part.set_arg(markers, [])
-        if self._sign_args.get_arg(markers) is None:
-            self._sign_args.set_arg(markers, {})
 
         signer = self._signer.get_arg(markers)
         if signer is not None:
-            sign_arg = self._sign_args.get_arg(markers)
-            signer.write_signature_info(self.signature_info, **sign_arg)
+            signer.write_signature_info(self.signature_info)
 
         return super().encoded_length(markers)
 
@@ -259,8 +248,7 @@ class DataPacketValue(TlvModel):
 
 class DataPacket(TlvModel):
     _signer = ProcedureArgument()
-    _sign_args = ProcedureArgument()
-    data = ModelField(TypeNumber.DATA, DataPacketValue, [_signer, _sign_args])
+    data = ModelField(TypeNumber.DATA, DataPacketValue, [_signer])
 
 
 @dc.dataclass
@@ -320,7 +308,6 @@ def make_interest(name: NonStrictName,
         interest.interest.signature_info = SignatureInfo()
     markers = {}
     interest._signer.set_arg(markers, signer)
-    interest._sign_args.set_arg(markers, kwargs)
     ret = interest.encode(markers=markers)
     if need_final_name:
         return ret, InterestPacketValue.name.get_final_name(markers['interest##inner_markers'])
@@ -342,7 +329,6 @@ def make_data(name: NonStrictName,
         data.data.signature_info = SignatureInfo()
     markers = {}
     data._signer.set_arg(markers, signer)
-    data._sign_args.set_arg(markers, kwargs)
     return data.encode(markers=markers)
 
 

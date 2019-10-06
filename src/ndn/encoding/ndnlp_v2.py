@@ -1,7 +1,7 @@
 from typing import Optional
 from .tlv_type import BinaryStr
 from .tlv_var import parse_and_check_tl
-from .tlv_model import TlvModel, DecodeError, UintField, BytesField, ModelField
+from .tlv_model import TlvModel, UintField, BytesField, ModelField
 
 
 __all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack']
@@ -49,10 +49,7 @@ def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int],
     if with_tl:
         wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
     markers = {}
-    try:
-        ret = LpPacketValue.parse(wire, markers)
-    except DecodeError:
-        return None, None
+    ret = LpPacketValue.parse(wire, markers, ignore_critical=True)
 
     if ret.nack is not None:
         return ret.nack.nack_reason, ret.fragment

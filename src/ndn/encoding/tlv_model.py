@@ -211,14 +211,12 @@ class SignatureValueField(Field):
                  type_num: int,
                  interest_sig: bool,
                  signer: ProcedureArgument,
-                 sign_args: ProcedureArgument,
                  covered_part: ProcedureArgument,
                  starting_point: OffsetMarker,
                  value_buffer: ProcedureArgument):
         super().__init__(type_num)
         self.interest_sig = interest_sig
         self.signer = signer
-        self.sign_args = sign_args
         self.covered_part = covered_part
         self.starting_point = starting_point
         self.value_buffer = value_buffer
@@ -228,8 +226,7 @@ class SignatureValueField(Field):
         if signer is None:
             return 0
         else:
-            sign_args = self.sign_args.get_arg(markers)
-            sig_value_len = signer.get_signature_value_size(**sign_args)
+            sig_value_len = signer.get_signature_value_size()
             length = 1 + get_tl_num_size(sig_value_len) + sig_value_len
             markers[f'{self.name}##encoded_length'] = sig_value_len
             return length
@@ -256,8 +253,7 @@ class SignatureValueField(Field):
         signer = self.signer.get_arg(markers)
         if signer is not None:
             signer.write_signature_value(self.value_buffer.get_arg(markers),
-                                         self.covered_part.get_arg(markers),
-                                         **self.sign_args.get_arg(markers))
+                                         self.covered_part.get_arg(markers))
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         sig_buffer = memoryview(wire)[offset:offset+length]

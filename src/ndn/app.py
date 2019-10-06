@@ -69,12 +69,13 @@ class NDNApp:
     def put_data(self,
                  name: NonStrictName,
                  content: Optional[BinaryStr] = None,
-                 meta_info: Optional[MetaInfo] = None,
                  **kwargs):
         if not self.face.running:
             raise NetworkError('cannot send packet before connected')
         signer = self.keychain(kwargs)
-        if meta_info is None:
+        if 'meta_info' in kwargs:
+            meta_info = kwargs['meta_info']
+        else:
             meta_info = MetaInfo.from_dict(kwargs)
         data = make_data(name, meta_info, content, signer=signer, **kwargs)
         self.face.send(data)
@@ -82,7 +83,6 @@ class NDNApp:
     def express_interest(self,
                          name: NonStrictName,
                          app_param: Optional[BinaryStr] = None,
-                         interest_param: Optional[InterestParam] = None,
                          validator: Optional[Validator] = None,
                          **kwargs) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
         if not self.face.running:
@@ -91,7 +91,9 @@ class NDNApp:
             signer = self.keychain(kwargs)
         else:
             signer = None
-        if interest_param is None:
+        if 'interest_param' in kwargs:
+            interest_param = kwargs['interest_param']
+        else:
             if 'nonce' not in kwargs:
                 kwargs['nonce'] = randint(1, 2 ** 32 - 1)
             interest_param = InterestParam.from_dict(kwargs)
