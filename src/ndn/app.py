@@ -119,15 +119,17 @@ class NDNApp:
         await self.face.open()
         for name, route, validator in self._autoreg_routes:
             await self.register(name, route, validator)
-        if after_start:
-            aio.get_event_loop().create_task(after_start)
+        task = aio.ensure_future(after_start) if after_start else None
         logging.debug('Connected to NFD node, start running...')
         await self.face.run()
+        if task:
+            self.shutdown()
+            await task
 
     def shutdown(self):
         logging.info('Manually shutdown')
         self.face.shutdown()
-        for node in self._prefix_tree.itervalues():
+        for node in self._int_tree.itervalues():
             node.cancel()
         self._prefix_tree.clear()
         self._int_tree.clear()
@@ -148,7 +150,7 @@ class NDNApp:
         def decorator(func: Route):
             self._autoreg_routes.append((name, func, validator))
             if self.face.running:
-                aio.get_event_loop().create_task(self.register(name, func, validator))
+                aio.ensure_future(self.register(name, func, validator))
             return func
         return decorator
 

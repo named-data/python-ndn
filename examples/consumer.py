@@ -1,5 +1,5 @@
-import time
 import logging
+import ndn.utils
 from ndn.app import NDNApp
 from ndn.types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 from ndn.encoding import Name, Component, InterestParam
@@ -16,7 +16,7 @@ app = NDNApp()
 
 async def main():
     try:
-        timestamp = int(time.time() * 1000)
+        timestamp = ndn.utils.timestamp()
         name = Name.from_str('/example/testApp/randomData') + [Component.from_timestamp(timestamp)]
         print(f'Sending Interest {Name.to_str(name)}, {InterestParam(must_be_fresh=True, lifetime=6000)}')
         data_name, meta_info, content = await app.express_interest(

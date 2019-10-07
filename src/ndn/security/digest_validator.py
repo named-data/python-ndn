@@ -8,7 +8,7 @@ async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs) -> bool:
     sig_info = sig.signature_info
     covered_part = sig.signature_covered_part
     sig_value = sig.signature_value_buf
-    if sig_info.signature_type == SignatureType.DIGEST_SHA256:
+    if sig_info and sig_info.signature_type == SignatureType.DIGEST_SHA256:
         sha256_algo = sha256()
         if not covered_part or not sig_value:
             ret = False
