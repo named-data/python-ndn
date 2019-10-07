@@ -116,23 +116,29 @@ class NDNApp:
         return data
 
     async def main_loop(self, after_start: Awaitable = None):
+        async def starting_task():
+            for name, route, validator in self._autoreg_routes:
+                await self.register(name, route, validator)
+            if after_start:
+                await after_start
+
         await self.face.open()
-        for name, route, validator in self._autoreg_routes:
-            await self.register(name, route, validator)
-        task = aio.ensure_future(after_start) if after_start else None
+        task = aio.ensure_future(starting_task())
         logging.debug('Connected to NFD node, start running...')
         await self.face.run()
-        if task:
-            self.shutdown()
-            await task
-
-    def shutdown(self):
-        logging.info('Manually shutdown')
         self.face.shutdown()
+        self._clean_up()
+        await task
+
+    def _clean_up(self):
         for node in self._int_tree.itervalues():
             node.cancel()
         self._prefix_tree.clear()
         self._int_tree.clear()
+
+    def shutdown(self):
+        logging.info('Manually shutdown')
+        self.face.shutdown()
 
     def run_forever(self, after_start: Awaitable = None):
         task = self.main_loop(after_start)
