@@ -1,7 +1,5 @@
-import time
 import struct
-from random import randint
-from typing import Optional
+from ..utils import timestamp, gen_nonce_64
 from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
     SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num
 from ..security.sha256_digest_signer import DigestSha256Signer
@@ -32,10 +30,8 @@ def make_reg_route_cmd(name):
     ret.append(Component.from_bytes(cp.encode()))
 
     # Timestamp and nonce
-    tim = int(time.time() * 1000)
-    ret.append(Component.from_bytes(struct.pack('!Q', tim)))
-    nonce = randint(1, 2 ** 64 - 1)
-    ret.append(Component.from_bytes(struct.pack('!Q', nonce)))
+    ret.append(Component.from_bytes(struct.pack('!Q', timestamp())))
+    ret.append(Component.from_bytes(struct.pack('!Q', gen_nonce_64())))
 
     # SignatureInfo
     signer = DigestSha256Signer()

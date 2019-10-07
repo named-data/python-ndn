@@ -6,9 +6,9 @@ from ndn.encoding import Name, Component, InterestParam
 
 
 logging.basicConfig(format='[{asctime}]{levelname}:{message}',
-                        datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO,
-                        style='{')
+                    datefmt='%Y-%m-%d %H:%M:%S',
+                    level=logging.INFO,
+                    style='{')
 
 
 app = NDNApp()

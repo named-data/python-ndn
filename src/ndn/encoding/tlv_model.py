@@ -1,6 +1,6 @@
 import abc
 import struct
-from typing import Optional, Type, List, Iterable, Dict, Any
+from typing import Optional, Type, List, Iterable
 from functools import reduce
 from .tlv_type import BinaryStr, VarBinaryStr, is_binary_str
 from .tlv_var import write_tl_num, parse_tl_num, get_tl_num_size

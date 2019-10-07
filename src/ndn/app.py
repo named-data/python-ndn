@@ -1,8 +1,8 @@
 import struct
 import logging
 import asyncio as aio
-from random import randint
 from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
+from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
     make_data, InterestParam, make_interest, FormalName, SignaturePtrs
@@ -66,19 +66,16 @@ class NDNApp:
             raise NetworkError('cannot send packet before connected')
         self.face.send(data)
 
-    def put_data(self,
-                 name: NonStrictName,
-                 content: Optional[BinaryStr] = None,
-                 **kwargs):
-        if not self.face.running:
-            raise NetworkError('cannot send packet before connected')
+    def prepare_data(self, name: NonStrictName, content: Optional[BinaryStr] = None, **kwargs):
         signer = self.keychain(kwargs)
         if 'meta_info' in kwargs:
             meta_info = kwargs['meta_info']
         else:
             meta_info = MetaInfo.from_dict(kwargs)
-        data = make_data(name, meta_info, content, signer=signer, **kwargs)
-        self.face.send(data)
+        return make_data(name, meta_info, content, signer=signer, **kwargs)
+
+    def put_data(self, name: NonStrictName, content: Optional[BinaryStr] = None, **kwargs):
+        self.put_raw_packet(self.prepare_data(name, content, **kwargs))
 
     def express_interest(self,
                          name: NonStrictName,
@@ -95,7 +92,7 @@ class NDNApp:
             interest_param = kwargs['interest_param']
         else:
             if 'nonce' not in kwargs:
-                kwargs['nonce'] = randint(1, 2 ** 32 - 1)
+                kwargs['nonce'] = gen_nonce()
             interest_param = InterestParam.from_dict(kwargs)
         interest, final_name = make_interest(name, interest_param, app_param,
                                              signer=signer, need_final_name=True, **kwargs)
