@@ -2,7 +2,7 @@ from typing import List
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
-from ..encoding import Signer, SignatureType, KeyLocator, NonStrictName
+from ..encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr
 
 
 class Sha256WithRsaSigner(Signer):
@@ -22,7 +22,7 @@ class Sha256WithRsaSigner(Signer):
         key = RSA.import_key(self.key_der)
         return key.size_in_bytes()
 
-    def write_signature_value(self, wire: memoryview, contents: List[memoryview]):
+    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]):
         key = RSA.import_key(self.key_der)
         h = SHA256.new()
         for blk in contents:

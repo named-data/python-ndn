@@ -8,11 +8,20 @@ from .name import Name, Component
 
 
 __all__ = ['DecodeError', 'TlvModel', 'ProcedureArgument', 'OffsetMarker', 'UintField', 'BoolField',
-           'NameField', 'BytesField', 'ModelField', 'RepeatedField']
+           'NameField', 'BytesField', 'ModelField', 'RepeatedField', 'IncludeBase', 'IncludeBaseError']
 
 
 class DecodeError(Exception):
     pass
+
+
+class IncludeBaseError(Exception):
+    pass
+
+
+class IncludeBase:
+    def __init__(self, base):
+        self.base = base
 
 
 class TlvModelMeta(abc.ABCMeta):
@@ -27,6 +36,12 @@ class TlvModelMeta(abc.ABCMeta):
                 if isinstance(field_obj, Field):
                     field_obj.name = field_name
                     cls._encoded_fields.append(field_obj)
+                elif isinstance(field_obj, IncludeBase):
+                    if field_obj.base not in bases:
+                        raise IncludeBaseError(f"{field_obj.base} is not one of {name}'s base classes")
+                    if not issubclass(field_obj.base, TlvModel):
+                        raise IncludeBaseError(f"{field_obj.base} is not a TlvModel")
+                    cls._encoded_fields.extend(field_obj.base._encoded_fields)
 
         return cls
 

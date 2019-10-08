@@ -9,7 +9,7 @@ from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
 from .security.digest_keychain import make_digest_keychain
 from .security.digest_validator import sha256_digest_checker, params_sha256_checker
 from .transport.stream_socket import Face, UnixFace
-from .app_support.nfd_mgmt import make_reg_route_cmd
+from .app_support.nfd_mgmt import make_command, parse_response
 from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
 from .types import NetworkError, InterestTimeout, Validator, KeyChain, Route, InterestCanceled, \
     InterestNack, ValidationFailure
@@ -169,16 +169,24 @@ class NDNApp:
         if validator:
             node.validator = validator
         try:
-            _, _, reply = await self.express_interest(make_reg_route_cmd(name), lifetime=1000)
-            print(bytes(reply))  # TODO
-            return True
-        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure):
+            _, _, reply = await self.express_interest(make_command('rib', 'register', name=name), lifetime=1000)
+            ret = parse_response(reply)
+            if ret['status_code'] != 200:
+                logging.error(f'Registration for {Name.to_str(name)} failed: '
+                              f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                return False
+            else:
+                logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
+                              f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                return True
+        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
+            logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
             return False
 
     async def unregister(self, name: NonStrictName):
         name = Name.normalize(name)
         del self._prefix_tree[name]
-        pass
+        await self.express_interest(make_command('rib', 'unregister', name=name), lifetime=1000)
 
     def _on_nack(self, name: FormalName, nack_reason: int):
         node = self._int_tree[name]

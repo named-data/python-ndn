@@ -1,32 +1,55 @@
 import struct
 from ..utils import timestamp, gen_nonce_64
 from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
-    SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num
+    SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num, IncludeBase, parse_and_check_tl
 from ..security.sha256_digest_signer import DigestSha256Signer
+
+
+class Strategy(TlvModel):
+    name = NameField()
 
 
 class ControlParametersValue(TlvModel):
     name = NameField()
+    face_id = UintField(0x69)
+    uri = BytesField(0x72)
+    local_uri = BytesField(0x81)
+    origin = UintField(0x6f)
+    cost = UintField(0x6a)
+    capacity = UintField(0x83)
+    count = UintField(0x84)
+    base_congestion_mark_interval = UintField(0x87)
+    default_congestion_threshold = UintField(0x88)
+    mtu = UintField(0x89)
     flags = UintField(0x6c)
+    mask = UintField(0x70)
+    strategy = ModelField(0x6b, Strategy)
+    expiration_period = UintField(0x6d)
+    face_persistency = UintField(0x85)
 
 
 class ControlParameters(TlvModel):
     cp = ModelField(0x68, ControlParametersValue)
 
 
-class ControlResponse(TlvModel):
+class ControlResponse(ControlParametersValue):
     status_code = UintField(0x66)
     status_text = BytesField(0x67)
+    body = IncludeBase(ControlParametersValue)
 
 
-def make_reg_route_cmd(name):
-    ret = Name.from_str("/localhost/nfd/rib/register")
+def make_command(module, command, **kwargs):
+    ret = Name.from_str(f"/localhost/nfd/{module}/{command}")
 
     # Command parameters
     cp = ControlParameters()
     cp.cp = ControlParametersValue()
-    cp.cp.name = name
-    cp.cp.flags = 1
+    for k, v in kwargs.items():
+        if k == 'strategy':
+            cp.cp.strategy = Strategy()
+            cp.cp.strategy.name = v
+        else:
+            setattr(cp.cp, k, v)
     ret.append(Component.from_bytes(cp.encode()))
 
     # Timestamp and nonce
@@ -50,3 +73,10 @@ def make_reg_route_cmd(name):
     ret.append(Component.from_bytes(buf))
 
     return ret
+
+
+def parse_response(buf):
+    buf = parse_and_check_tl(memoryview(buf), 0x65)
+    cr = ControlResponse.parse(buf)
+    ret = {k.name: getattr(cr, k.name) for k in ControlResponse._encoded_fields}
+    return {k: v for k, v in ret.items() if v is not None}

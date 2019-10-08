@@ -1,6 +1,6 @@
 from typing import List
 from Cryptodome.Hash import SHA256
-from ..encoding import Signer, SignatureType
+from ..encoding import Signer, SignatureType, VarBinaryStr
 
 
 class DigestSha256Signer(Signer):
@@ -11,7 +11,7 @@ class DigestSha256Signer(Signer):
     def get_signature_value_size(self):
         return 32
 
-    def write_signature_value(self, wire: memoryview, contents: List[memoryview]):
+    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]):
         h = SHA256.new()
         for blk in contents:
             h.update(blk)
