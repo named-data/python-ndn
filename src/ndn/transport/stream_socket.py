@@ -6,10 +6,9 @@ from ..encoding.tlv_var import read_tl_num_from_stream
 
 class Face(metaclass=abc.ABCMeta):
     running: bool = False
-    callback: Callable[[int, bytes], Coroutine[Any, None, None]]
+    callback: Callable[[int, bytes], Coroutine[Any, None, None]] = None
 
-    def __init__(self, callback):
-        self.callback = callback
+    def __init__(self):
         self.running = False
 
     @abc.abstractmethod
@@ -56,8 +55,8 @@ class StreamFace(Face, metaclass=abc.ABCMeta):
 class UnixFace(StreamFace):
     path: str = '/var/run/nfd.sock'
 
-    def __init__(self, callback, path: str = ''):
-        super().__init__(callback)
+    def __init__(self, path: str = ''):
+        super().__init__()
         if path:
             self.path = path
 
@@ -70,8 +69,8 @@ class TcpFace(StreamFace):
     host: str
     port: int
 
-    def __init__(self, callback, host: str, port: int):
-        super().__init__(callback)
+    def __init__(self, host: str, port: int):
+        super().__init__()
         self.host = host
         self.port = port
 

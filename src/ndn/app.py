@@ -24,8 +24,11 @@ class NDNApp:
     data_validator: Validator = None
     _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator]]]
 
-    def __init__(self):
-        self.face = UnixFace(self._receive)
+    def __init__(self, face=None):
+        if not face:
+            face = UnixFace()
+        self.face = face
+        face.callback = self._receive
         self.keychain = make_digest_keychain()
         self._int_tree = NameTrie()
         self._prefix_tree = NameTrie()
@@ -118,7 +121,7 @@ class NDNApp:
         if await validator(name, sig):
             return name, meta_info, content
         else:
-            raise ValidationFailure
+            raise ValidationFailure(name, meta_info, content)
 
     async def main_loop(self, after_start: Awaitable = None):
         async def starting_task():

@@ -4,12 +4,14 @@ from ndn.transport.stream_socket import Face
 
 
 class DummyFace(Face):
-    def __init__(self, test_func, app):
-        super().__init__(app._receive)
+    app = None
+
+    def __init__(self, test_func):
+        super().__init__()
         self.output_buf = b''
         self.test_func = test_func
         self.event = aio.Event()
-        self.app = app
+        self.expected_len = 2 ** 32
 
     async def open(self):
         self.running = True
@@ -19,16 +21,28 @@ class DummyFace(Face):
 
     def send(self, data: bytes):
         self.output_buf += data
-        self.event.set()
+        if len(self.output_buf) >= self.expected_len:
+            self.event.set()
 
     async def run(self):
         await self.test_func(self)
-        self.app.shutdown()
+        if self.app:
+            self.app.shutdown()
 
     async def consume_output(self, expected_output, timeout=0.01):
-        await aio.wait_for(self.event.wait(), timeout)
+        self.expected_len = len(expected_output)
+        if len(self.output_buf) < self.expected_len:
+            await aio.wait_for(self.event.wait(), timeout)
+        self.expected_len = 2 ** 32
         self.event.clear()
         assert self.output_buf == expected_output
+        self.output_buf = b''
+
+    async def ignore_output(self, length, timeout=0.1):
+        self.expected_len = length
+        await aio.wait_for(self.event.wait(), timeout)
+        self.expected_len = 2 ** 32
+        self.event.clear()
         self.output_buf = b''
 
     async def input_packet(self, packet):
