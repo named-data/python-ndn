@@ -17,6 +17,12 @@ setup(
     url='https://github.com/zjkmxy/python-ndn',
     author='Xinyu Ma',
     author_email='xinyu.ma@cs.ucla.edu',
+    download_url='https://pypi.python.org/pypi/python-ndn',
+    project_urls={
+        "Bug Tracker": "https://github.com/zjkmxy/python-ndn/issues",
+        "Documentation": "https://python-ndn.readthedocs.io/",
+        "Source Code": "https://github.com/zjkmxy/python-ndn",
+    },
     license='LGPLv3',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[

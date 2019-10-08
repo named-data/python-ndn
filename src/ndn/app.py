@@ -99,21 +99,26 @@ class NDNApp:
         future = aio.get_event_loop().create_future()
         node = self._int_tree.setdefault(final_name, InterestTreeNode())
         node.append_interest(future, interest_param)
-        node.validator = validator
         self.face.send(interest)
-        return self._wait_for_data(future, interest_param.lifetime, final_name, node)
+        return self._wait_for_data(future, interest_param.lifetime, final_name, node, validator)
 
-    async def _wait_for_data(self, future: aio.Future, lifetime: int, name: FormalName, node: InterestTreeNode):
+    async def _wait_for_data(self, future: aio.Future, lifetime: int, name: FormalName,
+                             node: InterestTreeNode, validator: Validator):
         lifetime = 100 if lifetime is None else lifetime
         try:
-            data = await aio.wait_for(future, timeout=lifetime/1000.0)
+            name, meta_info, content, sig = await aio.wait_for(future, timeout=lifetime/1000.0)
         except aio.TimeoutError:
             if node.timeout(future):
                 del self._int_tree[name]
             raise InterestTimeout()
         except aio.CancelledError:
             raise InterestCanceled()
-        return data
+        if validator is None:
+            validator = self.data_validator
+        if await validator(name, sig):
+            return name, meta_info, content
+        else:
+            raise ValidationFailure
 
     async def main_loop(self, after_start: Awaitable = None):
         async def starting_task():
@@ -198,12 +203,7 @@ class NDNApp:
                        content: Optional[BinaryStr], sig: SignaturePtrs):
         clean_list = []
         for prefix, node in self._int_tree.prefixes(name):
-            validator = node.validator if node.validator else self.data_validator
-            if await validator(name, sig):
-                clean = node.satisfy(name, meta_info, content, prefix != name)
-            else:
-                clean = node.invalid(name, meta_info, content)
-            if clean:
+            if node.satisfy((name, meta_info, content, sig), prefix != name):
                 clean_list.append(prefix)
         for prefix in clean_list:
             del self._int_tree[prefix]

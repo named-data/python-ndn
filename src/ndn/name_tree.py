@@ -1,8 +1,8 @@
 import asyncio as aio
 from pygtrie import Trie
 from typing import List, Optional, Tuple
-from .encoding import InterestParam, FormalName, MetaInfo, BinaryStr
-from .types import InterestNack, ValidationFailure, Validator, Route
+from .encoding import InterestParam, FormalName, Data
+from .types import InterestNack, Validator, Route
 
 
 class NameTrie(Trie):
@@ -17,7 +17,6 @@ class NameTrie(Trie):
 
 class InterestTreeNode:
     pending_list: List[Tuple[aio.Future, int, bool, bool]] = None
-    validator: Optional[Validator] = None
 
     def __init__(self):
         self.pending_list = []
@@ -30,11 +29,11 @@ class InterestTreeNode:
             future.set_exception(InterestNack(nack_reason))
         return True
 
-    def satisfy(self, name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr], is_prefix: bool) -> bool:
+    def satisfy(self, data: Data, is_prefix: bool) -> bool:
         exact_match_interest = False
         for future, _, can_be_prefix, _ in self.pending_list:
             if can_be_prefix or not is_prefix:
-                future.set_result((name, meta_info, content))
+                future.set_result(data)
             else:
                 exact_match_interest = True
         if exact_match_interest:
@@ -42,11 +41,6 @@ class InterestTreeNode:
             return False
         else:
             return True
-
-    def invalidate(self, name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr]) -> bool:
-        for future, _, _, _ in self.pending_list:
-            future.set_exception(ValidationFailure(name, meta_info, content))
-        return True
 
     def timeout(self, future: aio.Future):
         self.pending_list = [ele for ele in self.pending_list if ele[0] is not future]
