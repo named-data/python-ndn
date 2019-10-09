@@ -284,8 +284,7 @@ def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
                   app_param: Optional[BinaryStr] = None,
                   signer: Signer = None,
-                  need_final_name: bool = False,
-                  **kwargs):
+                  need_final_name: bool = False):
     interest = InterestPacket()
     interest.interest = InterestPacketValue()
     interest.interest.name = name
@@ -318,8 +317,7 @@ def make_interest(name: NonStrictName,
 def make_data(name: NonStrictName,
               meta_info: MetaInfo,
               content: Optional[BinaryStr] = None,
-              signer: Signer = None,
-              **kwargs) -> bytearray:
+              signer: Signer = None) -> bytearray:
     data = DataPacket()
     data.data = DataPacketValue()
     data.data.meta_info = meta_info

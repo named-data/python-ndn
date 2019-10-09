@@ -38,30 +38,32 @@ class NDNApp:
 
     async def _receive(self, typ: int, data: BinaryStr):
         logging.debug('Packet received %s, %s' % (typ, bytes(data)))
-        try:
-            if typ == TypeNumber.INTEREST:
-                try:
-                    name, param, app_param, sig = parse_interest(data, with_tl=False)
-                except (DecodeError, TypeError, ValueError, struct.error):
-                    raise DecodeError
-                logging.debug('Interest received %s' % Name.to_str(name))
-                await self._on_interest(name, param, app_param, sig)
-            elif typ == TypeNumber.DATA:
-                try:
-                    name, meta_info, content, sig = parse_data(data, with_tl=False)
-                except (DecodeError, TypeError, ValueError, struct.error):
-                    raise DecodeError
-                logging.debug('Data received %s' % Name.to_str(name))
-                await self._on_data(name, meta_info, content, sig)
-            elif typ == LpTypeNumber.LP_PACKET:
-                try:
-                    nack_reason, interest = parse_network_nack(data, with_tl=False)
-                    name, _, _, _ = parse_interest(interest, with_tl=True)
-                except (DecodeError, TypeError, ValueError, struct.error):
-                    raise DecodeError
-                logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
-                self._on_nack(name, nack_reason)
-        except DecodeError:
+        if typ == TypeNumber.INTEREST:
+            try:
+                name, param, app_param, sig = parse_interest(data, with_tl=False)
+            except (DecodeError, TypeError, ValueError, struct.error):
+                logging.warning('Unable to decode received packet')
+                return
+            logging.debug('Interest received %s' % Name.to_str(name))
+            await self._on_interest(name, param, app_param, sig)
+        elif typ == TypeNumber.DATA:
+            try:
+                name, meta_info, content, sig = parse_data(data, with_tl=False)
+            except (DecodeError, TypeError, ValueError, struct.error):
+                logging.warning('Unable to decode received packet')
+                return
+            logging.debug('Data received %s' % Name.to_str(name))
+            await self._on_data(name, meta_info, content, sig)
+        elif typ == LpTypeNumber.LP_PACKET:
+            try:
+                nack_reason, interest = parse_network_nack(data, with_tl=False)
+                name, _, _, _ = parse_interest(interest, with_tl=True)
+            except (DecodeError, TypeError, ValueError, struct.error):
+                logging.warning('Unable to decode received packet')
+                return
+            logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
+            self._on_nack(name, nack_reason)
+        else:
             logging.warning('Unable to decode received packet')
 
     def put_raw_packet(self, data: BinaryStr):
@@ -75,7 +77,7 @@ class NDNApp:
             meta_info = kwargs['meta_info']
         else:
             meta_info = MetaInfo.from_dict(kwargs)
-        return make_data(name, meta_info, content, signer=signer, **kwargs)
+        return make_data(name, meta_info, content, signer=signer)
 
     def put_data(self, name: NonStrictName, content: Optional[BinaryStr] = None, **kwargs):
         self.put_raw_packet(self.prepare_data(name, content, **kwargs))
@@ -97,8 +99,7 @@ class NDNApp:
             if 'nonce' not in kwargs:
                 kwargs['nonce'] = gen_nonce()
             interest_param = InterestParam.from_dict(kwargs)
-        interest, final_name = make_interest(name, interest_param, app_param,
-                                             signer=signer, need_final_name=True, **kwargs)
+        interest, final_name = make_interest(name, interest_param, app_param, signer=signer, need_final_name=True)
         future = aio.get_event_loop().create_future()
         node = self._int_tree.setdefault(final_name, InterestTreeNode())
         node.append_interest(future, interest_param)
