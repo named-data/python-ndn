@@ -1,4 +1,4 @@
-ndn-python
+python-ndn
 ==========
 
 |Test Badge|

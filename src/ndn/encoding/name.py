@@ -228,11 +228,24 @@ class Name:
         return [Component.from_str(Component.escape_str(comp)) for comp in compstrs]
 
     @staticmethod
-    def to_str(name: FormalName) -> str:
+    def to_str(name: NonStrictName) -> str:
+        name = Name.normalize(name)
         return '/' + '/'.join(Component.to_str(comp) for comp in name)
 
     @staticmethod
-    def is_prefix(lhs: FormalName, rhs: FormalName) -> bool:
+    def from_bytes(buf: BinaryStr) -> FormalName:
+        return Name.decode(buf)[0]
+
+    @staticmethod
+    def to_bytes(name: NonStrictName) -> bytes:
+        if not is_binary_str(name):
+            name = Name.encode(Name.normalize(name))
+        return bytes(name)
+
+    @staticmethod
+    def is_prefix(lhs: NonStrictName, rhs: NonStrictName) -> bool:
+        lhs = Name.normalize(lhs)
+        rhs = Name.normalize(rhs)
         left_len = len(lhs)
         return left_len <= len(rhs) and lhs == rhs[:left_len]
 

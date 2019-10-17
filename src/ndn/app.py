@@ -43,9 +43,7 @@ class NDNApp:
     _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator]]]
 
     def __init__(self, face=None):
-        if not face:
-            face = UnixFace()
-        self.face = face
+        self.face = face if face else UnixFace()
         face.callback = self._receive
         self.keychain = make_digest_keychain()
         self._int_tree = NameTrie()
