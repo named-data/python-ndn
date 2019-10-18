@@ -44,7 +44,7 @@ class NDNApp:
 
     def __init__(self, face=None):
         self.face = face if face else UnixFace()
-        face.callback = self._receive
+        self.face.callback = self._receive
         self.keychain = make_digest_keychain()
         self._int_tree = NameTrie()
         self._prefix_tree = NameTrie()
