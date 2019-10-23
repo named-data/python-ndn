@@ -24,10 +24,8 @@ from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
     make_data, InterestParam, make_interest, FormalName, SignaturePtrs
-from .security.keychain.keychain import Keychain
-from .security.keychain.keychain_digest import KeychainDigest
-from .security.digest_validator import sha256_digest_checker, params_sha256_checker
-from .transport.stream_socket import Face, UnixFace
+from .security import Keychain, sha256_digest_checker, params_sha256_checker
+from .transport.stream_socket import Face
 from .app_support.nfd_mgmt import make_command, parse_response
 from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
 from .types import NetworkError, InterestTimeout, Validator, Route, InterestCanceled, \

@@ -23,6 +23,7 @@ from ndn.app import NDNApp
 from ndn.types import InterestCanceled, InterestNack, InterestTimeout, ValidationFailure
 from ndn.encoding import Component, Name, FormalName, SignaturePtrs
 from ndn.transport.dummy_face import DummyFace
+from ndn.security import KeychainDigest
 
 
 class NDNAppTestSuite:
@@ -30,7 +31,8 @@ class NDNAppTestSuite:
 
     def test_main(self):
         face = DummyFace(self.face_proc)
-        self.app = NDNApp(face)
+        keychain = KeychainDigest()
+        self.app = NDNApp(face, keychain)
         face.app = self.app
         self.app.run_forever(after_start=self.app_main())
 

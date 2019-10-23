@@ -20,7 +20,7 @@ import struct
 from ..utils import timestamp, gen_nonce_64
 from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
     SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num, IncludeBase, parse_and_check_tl
-from ..security.sha256_digest_signer import DigestSha256Signer
+from ..security import DigestSha256Signer
 
 
 class Strategy(TlvModel):

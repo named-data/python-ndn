@@ -18,19 +18,31 @@
 # -----------------------------------------------------------------------------
 from typing import List
 from Cryptodome.Hash import SHA256
-from ..encoding import Signer, SignatureType, VarBinaryStr
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Signature import pkcs1_15
+from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr
 
 
-class DigestSha256Signer(Signer):
+class Sha256WithRsaSigner(Signer):
+    key_name: NonStrictName
+    key_der: bytes
+
+    def __init__(self, key_name: NonStrictName, key_der: bytes):
+        self.key_name = key_name
+        self.key_der = key_der
+        self.key = RSA.import_key(self.key_der)
+
     def write_signature_info(self, signature_info):
-        signature_info.signature_type = SignatureType.DIGEST_SHA256
-        signature_info.key_locator = None
+        signature_info.signature_type = SignatureType.SHA256_WITH_RSA
+        signature_info.key_locator = KeyLocator()
+        signature_info.key_locator.name = self.key_name
 
     def get_signature_value_size(self):
-        return 32
+        return self.key.size_in_bytes()
 
     def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]):
         h = SHA256.new()
         for blk in contents:
             h.update(blk)
-        wire[:] = h.digest()
+        signature = pkcs1_15.new(self.key).sign(h)
+        wire[:] = signature
