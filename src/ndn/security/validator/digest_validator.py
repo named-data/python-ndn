@@ -18,8 +18,8 @@
 # -----------------------------------------------------------------------------
 import logging
 from hashlib import sha256
-from ..encoding import FormalName, SignatureType, Name, SignaturePtrs
-from ..types import Validator
+from ...encoding import FormalName, SignatureType, Name, SignaturePtrs
+from ...types import Validator
 
 
 async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs) -> bool:

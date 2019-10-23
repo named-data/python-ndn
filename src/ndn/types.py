@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
-from typing import Optional, Callable, Any, Coroutine, Dict
-from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, Signer, SignaturePtrs
+from typing import Optional, Callable, Any, Coroutine
+from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, SignaturePtrs
 
 
 Route = Callable[[FormalName, InterestParam, Optional[BinaryStr]], None]

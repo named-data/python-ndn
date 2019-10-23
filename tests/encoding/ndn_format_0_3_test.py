@@ -18,7 +18,7 @@
 # -----------------------------------------------------------------------------
 import hashlib
 import pytest
-from ndn.security.sha256_digest_signer import DigestSha256Signer
+from ndn.security import DigestSha256Signer
 from ndn.encoding import Name, Component, InterestParam, MetaInfo, ContentType, SignatureType, \
     make_interest, make_data, parse_interest, parse_data, DecodeError
 
