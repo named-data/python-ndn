@@ -24,28 +24,37 @@ from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
     make_data, InterestParam, make_interest, FormalName, SignaturePtrs
-from .security.digest_keychain import make_digest_keychain
+from .security.keychain.keychain import Keychain
+from .security.keychain.keychain_digest import KeychainDigest
 from .security.digest_validator import sha256_digest_checker, params_sha256_checker
 from .transport.stream_socket import Face, UnixFace
 from .app_support.nfd_mgmt import make_command, parse_response
 from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
-from .types import NetworkError, InterestTimeout, Validator, KeyChain, Route, InterestCanceled, \
+from .types import NetworkError, InterestTimeout, Validator, Route, InterestCanceled, \
     InterestNack, ValidationFailure
+from .client_conf import read_client_conf, default_face, default_keychain
 
 
 class NDNApp:
     face: Face = None
-    keychain: KeyChain = None
+    keychain: Keychain = None
     _int_tree: NameTrie = None
     _prefix_tree: NameTrie = None
     int_validator: Validator = None
     data_validator: Validator = None
     _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator]]]
 
-    def __init__(self, face=None):
-        self.face = face if face else UnixFace()
-        face.callback = self._receive
-        self.keychain = make_digest_keychain()
+    def __init__(self, face=None, keychain=None):
+        config = read_client_conf() if not face or not keychain else {}
+        if face:
+            self.face = face
+        else:
+            self.face = default_face(config['transport'])
+        self.face.callback = self._receive
+        if keychain:
+            self.keychain = keychain
+        else:
+            self.keychain = default_keychain(config['pib'], config['tpm'])
         self._int_tree = NameTrie()
         self._prefix_tree = NameTrie()
         self.data_validator = sha256_digest_checker
@@ -88,7 +97,7 @@ class NDNApp:
         self.face.send(data)
 
     def prepare_data(self, name: NonStrictName, content: Optional[BinaryStr] = None, **kwargs):
-        signer = self.keychain(kwargs)
+        signer = self.keychain.get_signer(kwargs)
         if 'meta_info' in kwargs:
             meta_info = kwargs['meta_info']
         else:
@@ -106,7 +115,7 @@ class NDNApp:
         if not self.face.running:
             raise NetworkError('cannot send packet before connected')
         if app_param is not None:
-            signer = self.keychain(kwargs)
+            signer = self.keychain.get_signer(kwargs)
         else:
             signer = None
         if 'interest_param' in kwargs:

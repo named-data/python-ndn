@@ -1,5 +1,8 @@
 import os
 from configparser import ConfigParser
+from .security.tpm.tpm_file import TpmFile
+from .security.keychain.keychain_sqlite3 import Keychain, KeychainSqlite3
+from .transport.stream_socket import Face, UnixFace, TcpFace
 
 
 def read_client_conf():
@@ -53,3 +56,33 @@ def read_client_conf():
     for key in ['pib', 'tpm']:
         ret[key] = resolve_loaction(ret[key])
     return ret
+
+
+def default_keychain(pib: str, tpm: str) -> Keychain:
+    pib_schema, pib_loc = pib.split(':')
+    tpm_schema, tpm_loc = tpm.split(':')
+    if tpm_schema == 'tpm-file':
+        tpm = TpmFile(tpm_loc)
+    else:
+        raise ValueError(f'Unrecognized tpm schema: {tpm}')
+    if pib_schema == 'pib-sqlite3':
+        pib = KeychainSqlite3(os.path.join(pib_loc, 'pib.db'), tpm)
+    else:
+        raise ValueError(f'Unrecognized pib schema: {pib}')
+    return pib
+
+
+def default_face(face: str) -> Face:
+    schema, uri = face.split('://')
+    if schema == 'unix':
+        return UnixFace(uri)
+    elif schema == 'tcp' or schema == 'tcp4':
+        if uri.find(':') >= 0:
+            host, port = uri.split(':')
+            port = port
+        else:
+            host = uri
+            port = 6363
+        return TcpFace(host, int(port))
+    else:
+        raise ValueError(f'Unrecognized face: {face}')

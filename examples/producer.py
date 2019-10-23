@@ -39,7 +39,7 @@ def on_interest(name: FormalName, param: InterestParam, _app_param: Optional[Bin
     print(f'<< D: {Name.to_str(name)}')
     print(MetaInfo(freshness_period=10000))
     print(f'Content: (size: {len(content)})')
-    print('Signature: (type: DigestSha256, value_length: 32)')
+    print('Signature: (type: SignatureSha256WithRsa, value_length: 256)')
     print('')
 
 

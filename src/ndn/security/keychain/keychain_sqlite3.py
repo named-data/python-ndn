@@ -1,9 +1,12 @@
-import os
 import collections
 import sqlite3
 from typing import Iterator
 from dataclasses import dataclass
+from typing import Dict, Any
 from ...encoding import FormalName, BinaryStr, NonStrictName, Name
+from ..sha256_digest_signer import DigestSha256Signer
+from ..tpm.tpm import Tpm
+from .keychain import Keychain
 
 
 @dataclass
@@ -147,15 +150,17 @@ class Identity(collections.abc.Mapping):
         return Key(self.pib, self.name, row_id, Name.from_bytes(key_name), key_bits, is_default != 0)
 
 
-class PibSqlite3(collections.abc.Mapping):
+class KeychainSqlite3(Keychain):
     # __getitem__ will be called extra times, but there is no need to optimize for performance
+    tpm: Tpm
     tpm_locator: str
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, tpm: Tpm):
         self.conn = sqlite3.connect(path)
         cursor = self.conn.execute('SELECT tpm_locator FROM tpmInfo')
         self.tpm_locator = cursor.fetchone()[0]
         cursor.close()
+        self.tpm = tpm
 
     def __iter__(self) -> Iterator[FormalName]:
         cursor = self.conn.execute('SELECT identity FROM identities')
@@ -211,13 +216,33 @@ class PibSqlite3(collections.abc.Mapping):
             self.set_default_identity(name)
         return self[name]
 
-    def close(self):
+    def shutdown(self):
         self.conn.close()
 
     def del_identity(self, name: NonStrictName):
         name = Name.to_bytes(name)
         self.conn.execute('DELETE FROM identities WHERE identity=?', (name,))
         self.conn.commit()
+
+    def get_signer(self, sign_args: Dict[str, Any]):
+        if sign_args.pop('no_signature', False):
+            return None
+        if sign_args.pop('digest_sha256', False):
+            return DigestSha256Signer()
+        key_name = sign_args.pop('key', None)
+        if not key_name:
+            id_name = sign_args.pop('identity', None)
+            if id_name:
+                if isinstance(id_name, Identity):
+                    identity = id_name
+                else:
+                    identity = self[id_name]
+            else:
+                identity = self.default_identity()
+            key_name = identity.default_key().name
+        elif isinstance(key_name, Key):
+            key_name = key_name.name
+        return self.tpm.get_signer(Name.to_bytes(key_name))
 
     def new_key(self, id_name: NonStrictName) -> Key:
         # TODO: implement missing functions

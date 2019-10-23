@@ -22,7 +22,6 @@ from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, Signer, Si
 
 Route = Callable[[FormalName, InterestParam, Optional[BinaryStr]], None]
 Validator = Callable[[FormalName, SignaturePtrs], Coroutine[Any, None, bool]]
-KeyChain = Callable[[Dict[str, Any]], Signer]
 
 
 class NetworkError(Exception):
