@@ -21,6 +21,7 @@ from base64 import b64decode
 from hashlib import sha256
 from ...encoding import Signer
 from ..signer.sha256_rsa_signer import Sha256WithRsaSigner
+from ..signer.sha256_ecdsa_signer import Sha256WithEcdsaSigner
 from .tpm import Tpm
 
 
@@ -43,4 +44,9 @@ class TpmFile(Tpm):
         with open(file_name, 'rb') as f:
             key_b64 = f.read()
         key_der = b64decode(key_b64)
-        return Sha256WithRsaSigner(key_name, key_der)
+        for signer in [Sha256WithRsaSigner, Sha256WithEcdsaSigner]:
+            try:
+                return signer(key_name, key_der)
+            except ValueError:
+                pass
+        raise ValueError('Key format is not supported')
