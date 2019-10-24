@@ -41,7 +41,7 @@ class Sha256WithEcdsaSigner(Signer):
         self.key_size = self.curve_bit * 2 // 8
 
     def write_signature_info(self, signature_info):
-        signature_info.signature_type = SignatureType.SHA256_WITH_RSA
+        signature_info.signature_type = SignatureType.SHA256_WITH_ECDSA
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = self.key_name
 

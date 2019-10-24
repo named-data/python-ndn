@@ -17,9 +17,12 @@
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 import os
+import sys
 from configparser import ConfigParser
 from .security import TpmFile, Keychain, KeychainSqlite3
 from .transport.stream_socket import Face, UnixFace, TcpFace
+if sys.platform == 'darwin':
+    from .security.tpm.tpm_osx_keychain import TpmOsxKeychain
 
 
 def read_client_conf():
@@ -57,7 +60,7 @@ def read_client_conf():
     ret = {
         'transport': 'unix:///var/run/nfd.sock',
         'pib': 'pib-sqlite3',
-        'tpm': 'tpm-file'
+        'tpm': 'tpm-osxkeychain' if sys.platform == 'darwin' else 'tpm-file'
     }
     if path:
         parser = ConfigParser()
@@ -80,6 +83,8 @@ def default_keychain(pib: str, tpm: str) -> Keychain:
     tpm_schema, tpm_loc = tpm.split(':')
     if tpm_schema == 'tpm-file':
         tpm = TpmFile(tpm_loc)
+    elif tpm_schema == 'tpm-osxkeychain':
+        tpm = TpmOsxKeychain()
     else:
         raise ValueError(f'Unrecognized tpm schema: {tpm}')
     if pib_schema == 'pib-sqlite3':

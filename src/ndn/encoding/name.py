@@ -187,7 +187,7 @@ class Component:
                 if ret in Component.CHARSET and ret not in {'%', '='}:
                     return ret
                 else:
-                    return f"%{val:02x}"
+                    return f"%{val:02X}"
 
             return ret + "".join(decode(val) for val in component[offset:])
 

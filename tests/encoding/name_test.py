@@ -43,8 +43,8 @@ class TestComponent:
         with pytest.raises(ValueError):
             Component.from_str(":/?#[]@")
         comp = Component.from_bytes(b':/?#[]@')
-        assert Component.to_str(comp) == "%3a%2f%3f%23%5b%5d%40"
-        assert Component.from_str("%3A%2F%3F%23%5B%5D%40") == comp
+        assert Component.to_str(comp) == "%3A%2F%3F%23%5B%5D%40"
+        assert Component.from_str("%3a%2f%3f%23%5b%5d%40") == comp
 
         with pytest.raises(ValueError):
             Component.from_str("/")
@@ -74,7 +74,7 @@ class TestComponent:
     @staticmethod
     def test_other_types():
         comp = b'\x09\x039\x3dA'
-        assert Component.to_str(comp) == "9=9%3dA"
+        assert Component.to_str(comp) == "9=9%3DA"
         assert Component.from_str('9%3DA') != comp
         assert Component.from_str('9=9%3DA') == comp
 
@@ -180,8 +180,8 @@ class TestName:
         assert Name.to_str(Name.from_str('hello/world/')) == '/hello/world'
 
         assert Name.to_str(Name.from_str('hello/world/  ')) == '/hello/world/%20%20'
-        assert Name.to_str(Name.from_str('/:?#[]@')) == '/%3a%3f%23%5b%5d%40'
-        assert Name.to_str(Name.from_str(' hello\t/\tworld \r\n')) == '/%20hello%09/%09world%20%0d%0a'
+        assert Name.to_str(Name.from_str('/:?#[]@')) == '/%3A%3F%23%5B%5D%40'
+        assert Name.to_str(Name.from_str(' hello\t/\tworld \r\n')) == '/%20hello%09/%09world%20%0D%0A'
 
         assert Name.to_str(Name.from_str('')) == '/'
         assert Name.to_str(Name.from_str(' ')) == '/%20'

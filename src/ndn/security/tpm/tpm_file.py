@@ -19,7 +19,7 @@
 import os
 from base64 import b64decode
 from hashlib import sha256
-from ...encoding import Signer
+from ...encoding import Signer, FormalName, Name
 from ..signer.sha256_rsa_signer import Sha256WithRsaSigner
 from ..signer.sha256_ecdsa_signer import Sha256WithEcdsaSigner
 from .tpm import Tpm
@@ -37,7 +37,8 @@ class TpmFile(Tpm):
         algo.update(key_name)
         return algo.digest().hex() + '.privkey'
 
-    def get_signer(self, key_name: bytes) -> Signer:
+    def get_signer(self, key_name: FormalName) -> Signer:
+        key_name = Name.to_bytes(key_name)
         file_name = os.path.join(self.path, self._to_file_name(key_name))
         if not os.path.exists(file_name):
             raise KeyError(key_name)

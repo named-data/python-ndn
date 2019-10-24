@@ -260,7 +260,7 @@ class KeychainSqlite3(Keychain):
             key_name = identity.default_key().name
         elif isinstance(key_name, Key):
             key_name = key_name.name
-        return self.tpm.get_signer(Name.to_bytes(key_name))
+        return self.tpm.get_signer(key_name)
 
     def new_key(self, id_name: NonStrictName) -> Key:
         # TODO: implement missing functions

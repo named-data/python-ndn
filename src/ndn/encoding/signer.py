@@ -25,8 +25,6 @@ __all__ = ['Signer']
 
 
 class Signer(metaclass=abc.ABCMeta):
-    __signers = {}
-
     @abc.abstractmethod
     def write_signature_info(self, signature_info):
         pass
