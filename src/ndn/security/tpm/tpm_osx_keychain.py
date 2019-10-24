@@ -17,6 +17,7 @@
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 import sys
+import logging
 from ctypes import c_void_p, pointer
 from Cryptodome.Hash import SHA256
 from ...encoding import Signer, FormalName, Name, SignatureType, KeyLocator
@@ -74,7 +75,7 @@ class TpmOsxKeychain(Tpm):
     def get_signer(self, key_name: FormalName) -> Signer:
         sec = OsxSec()
         with ReleaseGuard() as g:
-            print(Name.to_str(key_name))
+            logging.debug('Get OSX Key %s' % Name.to_str(key_name))
             g.key_label = CFSTR(Name.to_str(key_name))
             g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 6, cf.kCFTypeDictionaryKeyCallBacks, None))
             cf.CFDictionaryAddValue(g.query, sec.kSecClass, sec.kSecClassKey)
