@@ -172,6 +172,7 @@ class KeychainSqlite3(Keychain):
     # __getitem__ will be called extra times, but there is no need to optimize for performance
     tpm: Tpm
     tpm_locator: str
+    _signer_cache: dict
 
     def __init__(self, path: str, tpm: Tpm):
         self.conn = sqlite3.connect(path)
@@ -179,6 +180,7 @@ class KeychainSqlite3(Keychain):
         self.tpm_locator = cursor.fetchone()[0]
         cursor.close()
         self.tpm = tpm
+        self._signer_cache = {}
 
     def __iter__(self) -> Iterator[FormalName]:
         cursor = self.conn.execute('SELECT identity FROM identities')
@@ -260,7 +262,12 @@ class KeychainSqlite3(Keychain):
             key_name = identity.default_key().name
         elif isinstance(key_name, Key):
             key_name = key_name.name
-        return self.tpm.get_signer(key_name)
+        key_name_bytes = Name.to_bytes(key_name)
+        signer = self._signer_cache.get(key_name_bytes, None)
+        if not signer:
+            signer = self.tpm.get_signer(key_name)
+            self._signer_cache[key_name_bytes] = signer
+        return signer
 
     def new_key(self, id_name: NonStrictName) -> Key:
         # TODO: implement missing functions

@@ -20,7 +20,7 @@ import sys
 import logging
 from ctypes import c_void_p, pointer
 from Cryptodome.Hash import SHA256
-from ...encoding import Signer, FormalName, Name, SignatureType, KeyLocator
+from ...encoding import Signer, NonStrictName, Name, SignatureType, KeyLocator
 from .tpm import Tpm
 if sys.platform == 'darwin':
     from ...contrib.cocoapy import cf, CFSTR, ObjCInstance, cfstring_to_string, cfnumber_to_number
@@ -72,7 +72,7 @@ class OsxSigner(Signer):
 
 
 class TpmOsxKeychain(Tpm):
-    def get_signer(self, key_name: FormalName) -> Signer:
+    def get_signer(self, key_name: NonStrictName) -> Signer:
         sec = OsxSec()
         with ReleaseGuard() as g:
             logging.debug('Get OSX Key %s' % Name.to_str(key_name))

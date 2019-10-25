@@ -17,10 +17,10 @@
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 import abc
-from ...encoding import Signer
+from ...encoding import Signer, NonStrictName
 
 
 class Tpm(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def get_signer(self, key_name: bytes) -> Signer:
+    def get_signer(self, key_name: NonStrictName) -> Signer:
         pass
