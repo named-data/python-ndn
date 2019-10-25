@@ -36,7 +36,8 @@ class OsxSigner(Signer):
             self.key_size = key_bits // 8
         elif key_type == cfstring_to_string(OsxSec().kSecAttrKeyTypeECSECPrimeRandom):
             self.key_type = SignatureType.SHA256_WITH_ECDSA
-            self.key_size = key_bits * 2 // 8
+            self.key_size = (key_bits * 2 + 7) // 8
+            self.key_size += self.key_size % 2
         else:
             raise ValueError(f'Unrecognized key type {key_type}')
 

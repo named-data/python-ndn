@@ -95,7 +95,10 @@ class NDNApp:
         self.face.send(data)
 
     def prepare_data(self, name: NonStrictName, content: Optional[BinaryStr] = None, **kwargs):
-        signer = self.keychain.get_signer(kwargs)
+        if 'signer' in kwargs:
+            signer = kwargs['signer']
+        else:
+            signer = self.keychain.get_signer(kwargs)
         if 'meta_info' in kwargs:
             meta_info = kwargs['meta_info']
         else:
@@ -112,7 +115,9 @@ class NDNApp:
                          **kwargs) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
         if not self.face.running:
             raise NetworkError('cannot send packet before connected')
-        if app_param is not None:
+        if 'signer' in kwargs:
+            signer = kwargs['signer']
+        elif app_param is not None:
             signer = self.keychain.get_signer(kwargs)
         else:
             signer = None
