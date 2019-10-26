@@ -484,6 +484,17 @@ class TlvModel(metaclass=TlvModelMeta):
                 return False
         return True
 
+    def asdict(self, dict_factory=dict):
+        result = []
+        for field in self._encoded_fields:
+            if isinstance(field, ModelField):
+                result.append((field.name, field.get_value(self).asdict()))
+            elif isinstance(field, RepeatedField):
+                result.append((field.name, field.aslist(self)))
+            else:
+                result.append((field.name, field.get_value(self)))
+        return dict_factory(result)
+
     def encoded_length(self, markers: Optional[dict] = None) -> int:
         if markers is None:
             markers = {}
@@ -647,3 +658,12 @@ class RepeatedField(Field):
         new_ele = self.element_type.parse_from(instance, markers, wire, offset, length, offset_btl)
         lst.append(new_ele)
         return lst
+
+    def aslist(self, instance):
+        ret = []
+        for x in self.get_value(instance):
+            if isinstance(x, TlvModel):
+                ret.append(x.asdict())
+            else:
+                ret.append(x)
+        return ret

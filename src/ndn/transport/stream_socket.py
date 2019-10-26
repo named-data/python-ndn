@@ -84,13 +84,16 @@ class UnixFace(StreamFace):
 
 
 class TcpFace(StreamFace):
-    host: str
-    port: int
+    host: str = '127.0.0.1'
+    port: int = 6363
 
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str = '', port: int = 0):
         super().__init__()
-        self.host = host
-        self.port = port
+        if host:
+            self.host = host
+        if port:
+            self.port = port
 
-    async def open(self) -> Tuple[aio.StreamReader, aio.StreamWriter]:
-        return await aio.open_connection(self.host, self.port)
+    async def open(self):
+        self.reader, self.writer = await aio.open_connection(self.host, self.port)
+        self.running = True
