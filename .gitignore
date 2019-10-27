@@ -122,3 +122,4 @@ checkpoint
 # Special
 # Requirements should be specified by setup.py
 requirements.txt
+main.py
