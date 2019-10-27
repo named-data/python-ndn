@@ -177,15 +177,18 @@ class NDNApp:
         logging.info('Manually shutdown')
         self.face.shutdown()
 
-    def run_forever(self, after_start: Awaitable = None):
+    def run_forever(self, after_start: Awaitable = None) -> bool:
         task = self.main_loop(after_start)
         try:
             aio.get_event_loop().run_until_complete(task)
+            ret = True
         except KeyboardInterrupt:
             logging.info('Receiving Ctrl+C, shutdown')
+            ret = False
         finally:
             self.face.shutdown()
         logging.debug('Face is down now')
+        return ret
 
     def route(self, name: NonStrictName, validator: Optional[Validator] = None):
         name = Name.normalize(name)

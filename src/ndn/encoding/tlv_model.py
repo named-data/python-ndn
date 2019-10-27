@@ -491,6 +491,8 @@ class TlvModel(metaclass=TlvModelMeta):
                 result.append((field.name, field.get_value(self).asdict()))
             elif isinstance(field, RepeatedField):
                 result.append((field.name, field.aslist(self)))
+            elif isinstance(field, BytesField):
+                result.append((field.name, bytes(field.get_value(self))))
             else:
                 result.append((field.name, field.get_value(self)))
         return dict_factory(result)
@@ -664,6 +666,8 @@ class RepeatedField(Field):
         for x in self.get_value(instance):
             if isinstance(x, TlvModel):
                 ret.append(x.asdict())
+            elif isinstance(x, memoryview):
+                ret.append(bytes(x))
             else:
                 ret.append(x)
         return ret

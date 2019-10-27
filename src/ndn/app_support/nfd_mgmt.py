@@ -206,5 +206,10 @@ def make_command(module, command, **kwargs):
 def parse_response(buf):
     buf = parse_and_check_tl(memoryview(buf), 0x65)
     cr = ControlResponse.parse(buf)
-    ret = {k.name: getattr(cr, k.name) for k in ControlResponse._encoded_fields}
-    return {k: v for k, v in ret.items() if v is not None}
+    ret = {}
+    for k in ControlResponse._encoded_fields:
+        val = getattr(cr, k.name)
+        if isinstance(val, memoryview):
+            val = bytes(val)
+        ret[k.name] = val
+    return ret
