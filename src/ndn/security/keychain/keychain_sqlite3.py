@@ -16,11 +16,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
-import collections
 import sqlite3
 from typing import Iterator
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict, Any, Mapping
 from ...encoding import FormalName, BinaryStr, NonStrictName, Name
 from ..signer.sha256_digest_signer import DigestSha256Signer
 from ..tpm.tpm import Tpm
@@ -36,7 +35,7 @@ class Certificate:
     is_default: bool
 
 
-class Key(collections.abc.Mapping):
+class Key(Mapping[FormalName, Certificate]):
     row_id: int
     identity: FormalName
     name: FormalName
@@ -103,7 +102,7 @@ class Key(collections.abc.Mapping):
         return Certificate(id=row_id, key=self.name, name=cert_name, data=cert_data, is_default=is_default != 0)
 
 
-class Identity(collections.abc.Mapping):
+class Identity(Mapping[FormalName, Key]):
     row_id: int
     name: FormalName
     is_default: bool
@@ -135,9 +134,9 @@ class Identity(collections.abc.Mapping):
         cursor = self.pib.conn.execute('SELECT key_name FROM keys WHERE identity_id=?', (self.row_id,))
         while True:
             name = cursor.fetchone()
-            if not name[0]:
+            if not name:
                 break
-            yield Name.from_bytes(name)
+            yield Name.from_bytes(name[0])
         cursor.close()
 
     def del_key(self, name: NonStrictName):

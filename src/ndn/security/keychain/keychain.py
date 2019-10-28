@@ -17,10 +17,11 @@
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 import abc
+import collections
 from typing import Dict, Any
 
 
-class Keychain:
+class Keychain(collections.abc.Mapping):
     @abc.abstractmethod
     def get_signer(self, sign_args: Dict[str, Any]):
         pass

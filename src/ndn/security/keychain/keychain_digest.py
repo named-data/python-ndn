@@ -27,3 +27,12 @@ class KeychainDigest(Keychain):
             return None
         else:
             return DigestSha256Signer()
+
+    def __iter__(self):
+        return None
+
+    def __len__(self) -> int:
+        return 0
+
+    def __getitem__(self, name):
+        raise KeyError(name)

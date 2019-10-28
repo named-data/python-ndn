@@ -44,12 +44,12 @@ class NDNApp:
 
     def __init__(self, face=None, keychain=None):
         config = read_client_conf() if not face or not keychain else {}
-        if face:
+        if face is not None:
             self.face = face
         else:
             self.face = default_face(config['transport'])
         self.face.callback = self._receive
-        if keychain:
+        if keychain is not None:
             self.keychain = keychain
         else:
             self.keychain = default_keychain(config['pib'], config['tpm'])
