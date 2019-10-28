@@ -24,6 +24,7 @@ from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBin
 
 
 class Sha256WithEcdsaSigner(Signer):
+    # SHA256 doesn't work for P-384 and P-521
     key_name: NonStrictName
     key_der: bytes
     curve_bit: int
@@ -47,11 +48,13 @@ class Sha256WithEcdsaSigner(Signer):
         signature_info.key_locator.name = self.key_name
 
     def get_signature_value_size(self):
-        return self.key_size
+        return self.key_size + 8
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]):
+    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
         h = SHA256.new()
         for blk in contents:
             h.update(blk)
-        signature = DSS.new(self.key, 'fips-186-3').sign(h)
-        wire[:] = signature
+        signature = DSS.new(self.key, 'fips-186-3', 'der').sign(h)
+        real_len = len(signature)
+        wire[:real_len] = signature
+        return real_len

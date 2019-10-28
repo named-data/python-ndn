@@ -22,7 +22,7 @@ from typing import Optional, List, Tuple
 from .name import Name, Component
 from .signer import Signer
 from .tlv_type import VarBinaryStr, BinaryStr, NonStrictName, FormalName
-from .tlv_var import parse_and_check_tl
+from .tlv_var import parse_and_check_tl, shrink_length
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
     ProcedureArgument, RepeatedField
@@ -168,7 +168,8 @@ class InterestPacketValue(TlvModel):
         InterestPacketValue.signature_value.calculate_signature(markers)
         if self._need_digest.get_arg(markers):
             digest_cover_start = self._digest_cover_start.get_arg(markers)
-            digest_cover_end = self._digest_cover_end.get_arg(markers)
+            shrink_size = markers.get('signature_value##shrink_len', 0)
+            digest_cover_end = self._digest_cover_end.get_arg(markers) - shrink_size
             digest_covered_part = [wire_view[digest_cover_start:digest_cover_end]]
             self._digest_cover_part.set_arg(markers, digest_covered_part)
             sha256_algo = sha256()
@@ -326,6 +327,9 @@ def make_interest(name: NonStrictName,
     markers = {}
     interest._signer.set_arg(markers, signer)
     ret = interest.encode(markers=markers)
+    shrink_size = markers['interest##inner_markers'].get('signature_value##shrink_len', 0)
+    if shrink_size > 0:
+        ret = shrink_length(ret, shrink_size)
     if need_final_name:
         return ret, InterestPacketValue.name.get_final_name(markers['interest##inner_markers'])
     else:
@@ -335,7 +339,7 @@ def make_interest(name: NonStrictName,
 def make_data(name: NonStrictName,
               meta_info: MetaInfo,
               content: Optional[BinaryStr] = None,
-              signer: Signer = None) -> bytearray:
+              signer: Signer = None) -> VarBinaryStr:
     data = DataPacket()
     data.data = DataPacketValue()
     data.data.meta_info = meta_info
@@ -345,7 +349,11 @@ def make_data(name: NonStrictName,
         data.data.signature_info = SignatureInfo()
     markers = {}
     data._signer.set_arg(markers, signer)
-    return data.encode(markers=markers)
+    ret = data.encode(markers=markers)
+    shrink_size = markers['data##inner_markers'].get('signature_value##shrink_len', 0)
+    if shrink_size > 0:
+        ret = shrink_length(ret, shrink_size)
+    return ret
 
 
 def parse_interest(wire: BinaryStr, with_tl: bool = True) -> Interest:

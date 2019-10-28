@@ -260,6 +260,8 @@ class SignatureValueField(Field):
             return 0
         else:
             sig_value_len = signer.get_signature_value_size()
+            if sig_value_len >= 253:
+                raise ValueError(f'Too long signatrue is not supported: {sig_value_len} >= 253')
             length = 1 + get_tl_num_size(sig_value_len) + sig_value_len
             markers[f'{self.name}##encoded_length'] = sig_value_len
             return length
@@ -277,6 +279,7 @@ class SignatureValueField(Field):
             origin_offset = offset
             sig_value_len = markers[f'{self.name}##encoded_length']
             offset += write_tl_num(self.type_num, wire, offset)
+            markers[f'{self.name}##wire_length'] = wire[offset:offset+1]
             offset += write_tl_num(sig_value_len, wire, offset)
             self.value_buffer.set_arg(markers, wire[offset:offset + sig_value_len])
             offset += sig_value_len
@@ -285,8 +288,12 @@ class SignatureValueField(Field):
     def calculate_signature(self, markers: dict):
         signer = self.signer.get_arg(markers)
         if signer is not None:
-            signer.write_signature_value(self.value_buffer.get_arg(markers),
-                                         self.covered_part.get_arg(markers))
+            sig_value_len = markers[f'{self.name}##encoded_length']
+            real_len = signer.write_signature_value(self.value_buffer.get_arg(markers),
+                                                    self.covered_part.get_arg(markers))
+            if real_len != sig_value_len:
+                markers[f'{self.name}##shrink_len'] = sig_value_len - real_len
+                markers[f'{self.name}##wire_length'][0] = real_len
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         sig_buffer = memoryview(wire)[offset:offset+length]

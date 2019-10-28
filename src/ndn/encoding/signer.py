@@ -34,5 +34,5 @@ class Signer(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]):
+    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
         pass

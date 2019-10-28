@@ -29,8 +29,9 @@ class DigestSha256Signer(Signer):
     def get_signature_value_size(self):
         return 32
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]):
+    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
         h = SHA256.new()
         for blk in contents:
             h.update(blk)
         wire[:] = h.digest()
+        return 32

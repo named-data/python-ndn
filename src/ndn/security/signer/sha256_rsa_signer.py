@@ -40,9 +40,10 @@ class Sha256WithRsaSigner(Signer):
     def get_signature_value_size(self):
         return self.key.size_in_bytes()
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]):
+    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
         h = SHA256.new()
         for blk in contents:
             h.update(blk)
         signature = pkcs1_15.new(self.key).sign(h)
         wire[:] = signature
+        return len(signature)

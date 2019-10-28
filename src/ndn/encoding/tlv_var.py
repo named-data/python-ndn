@@ -98,3 +98,18 @@ def parse_and_check_tl(wire: BinaryStr, expected_type: int) -> memoryview:
     if len(wire) != typ_len+siz_len+size:
         raise IndexError(f'wire size {len(wire)} mismatch with object size {size}')
     return memoryview(wire)[typ_len+siz_len:typ_len+siz_len+size]
+
+
+def shrink_length(wire: VarBinaryStr, val: int) -> VarBinaryStr:
+    wire = memoryview(wire)
+    typ, typ_len = parse_tl_num(wire, 0)
+    size, siz_len = parse_tl_num(wire, typ_len)
+    real_size = size - val
+    new_siz_len = write_tl_num(real_size, wire, typ_len)
+    if new_siz_len == siz_len:
+        return wire[:-val]
+    else:
+        diff = siz_len - new_siz_len
+        write_tl_num(typ, wire, diff)
+        write_tl_num(real_size, wire, typ_len + diff)
+        return wire[diff:-val]

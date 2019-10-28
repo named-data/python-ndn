@@ -38,6 +38,7 @@ class OsxSigner(Signer):
             self.key_type = SignatureType.SHA256_WITH_ECDSA
             self.key_size = (key_bits * 2 + 7) // 8
             self.key_size += self.key_size % 2
+            self.key_size += 8
         else:
             raise ValueError(f'Unrecognized key type {key_type}')
 
@@ -52,7 +53,7 @@ class OsxSigner(Signer):
     def __del__(self):
         cf.CFRelease(self.key_ref)
 
-    def write_signature_value(self, wire, contents):
+    def write_signature_value(self, wire, contents) -> int:
         h = SHA256.new()
         for blk in contents:
             h.update(blk)
@@ -69,7 +70,10 @@ class OsxSigner(Signer):
             g.sig = sec.security.SecKeyCreateSignature(self.key_ref, algo, g.digest, pointer(error))
             if error.value is not None:
                 raise RuntimeError('Create signature failed')
-            wire[:] = sec.get_data(g.sig)
+            signature = sec.get_data(g.sig)
+        real_len = len(signature)
+        wire[:real_len] = signature
+        return real_len
 
 
 class TpmOsxKeychain(Tpm):
