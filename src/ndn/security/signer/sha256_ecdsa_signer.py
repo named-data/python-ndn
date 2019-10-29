@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
-from typing import List
+from typing import List, Union
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import ECC
 from Cryptodome.Signature import DSS
@@ -30,7 +30,7 @@ class Sha256WithEcdsaSigner(Signer):
     curve_bit: int
     key_size: int
 
-    def __init__(self, key_name: NonStrictName, key_der: bytes):
+    def __init__(self, key_name: NonStrictName, key_der: Union[bytes, str]):
         self.key_name = key_name
         self.key_der = key_der
         self.key = ECC.import_key(self.key_der)

@@ -19,6 +19,7 @@
 import pytest
 import struct
 from ndn.encoding import write_tl_num, pack_uint_bytes, parse_tl_num, get_tl_num_size
+from ndn.encoding.tlv_var import shrink_length
 
 
 class TestWriteTlNum:
@@ -111,3 +112,18 @@ class TestGetTlNumSize:
         assert get_tl_num_size(65535) == 3
         assert get_tl_num_size(65536) == 5
         assert get_tl_num_size(10000000000) == 9
+
+
+class TestShrinkLength:
+    @staticmethod
+    def test_1():
+        assert shrink_length(bytearray(b'\x07\x03\x01\x00\x00'), 2) == b'\x07\x01\x01'
+        assert shrink_length(bytearray(b'\x07\x03\x01\x00\x00'), 1) == b'\x07\x02\x01\x00'
+
+    @staticmethod
+    def test_2():
+        arr = memoryview(bytearray(0x106))
+        arr[0:6] = b'\xFD\x03\x00\xFD\x00\xFF'
+        ret = shrink_length(arr, 3)
+        assert ret[0:6] == b'\xfd\x03\x00\xfc\x00\x00'
+        assert arr[0:6] == b'\xfd\x03\xfd\x03\x00\xfc'

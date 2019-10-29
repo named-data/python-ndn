@@ -101,6 +101,7 @@ def parse_and_check_tl(wire: BinaryStr, expected_type: int) -> memoryview:
 
 
 def shrink_length(wire: VarBinaryStr, val: int) -> VarBinaryStr:
+    # assert val > 0
     wire = memoryview(wire)
     typ, typ_len = parse_tl_num(wire, 0)
     size, siz_len = parse_tl_num(wire, typ_len)
