@@ -260,8 +260,6 @@ class SignatureValueField(Field):
             return 0
         else:
             sig_value_len = signer.get_signature_value_size()
-            if sig_value_len >= 253:
-                raise ValueError(f'Too long signatrue is not supported: {sig_value_len} >= 253')
             length = 1 + get_tl_num_size(sig_value_len) + sig_value_len
             markers[f'{self.name}##encoded_length'] = sig_value_len
             return length
@@ -292,6 +290,8 @@ class SignatureValueField(Field):
             real_len = signer.write_signature_value(self.value_buffer.get_arg(markers),
                                                     self.covered_part.get_arg(markers))
             if real_len != sig_value_len:
+                if sig_value_len >= 253:
+                    raise ValueError(f'Long signatrue with flexible length is not supported: {sig_value_len} >= 253')
                 markers[f'{self.name}##shrink_len'] = sig_value_len - real_len
                 markers[f'{self.name}##wire_length'][0] = real_len
 

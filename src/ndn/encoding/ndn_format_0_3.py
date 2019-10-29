@@ -83,8 +83,8 @@ class SignatureType:
     NOT_SIGNED = None
     DIGEST_SHA256 = 0
     SHA256_WITH_RSA = 1
-    SHA256_WITH_ECDSA = 2
-    HMAC_WITH_SHA256 = 3
+    SHA256_WITH_ECDSA = 3
+    HMAC_WITH_SHA256 = 4
 
 
 class KeyLocator(TlvModel):
