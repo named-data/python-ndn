@@ -18,9 +18,10 @@
 # -----------------------------------------------------------------------------
 import sys
 import logging
+from typing import Tuple
 from ctypes import c_void_p, pointer
 from Cryptodome.Hash import SHA256
-from ...encoding import Signer, NonStrictName, Name, SignatureType, KeyLocator
+from ...encoding import Signer, NonStrictName, Name, SignatureType, KeyLocator, BinaryStr, FormalName
 from .tpm import Tpm
 if sys.platform == 'darwin':
     from ...contrib.cocoapy import cf, CFSTR, ObjCInstance, cfstring_to_string, cfnumber_to_number
@@ -91,7 +92,7 @@ class TpmOsxKeychain(Tpm):
 
             g.dic = c_void_p()
             ret = sec.security.SecItemCopyMatching(g.query, pointer(g.dic))
-            if ret:
+            if ret != sec.errSecSuccess:
                 raise ValueError(f"Unable to load specific key {key_name}")
 
             key_type = cfstring_to_string(cf.CFDictionaryGetValue(g.dic, sec.kSecAttrKeyType))
@@ -99,3 +100,27 @@ class TpmOsxKeychain(Tpm):
             key_ref = cf.CFRetain(cf.CFDictionaryGetValue(g.dic, sec.kSecValueRef))
 
             return OsxSigner(key_name, key_bits, key_type, key_ref)
+
+    def has_key(self, key_name: FormalName) -> bool:
+        sec = OsxSec()
+        with ReleaseGuard() as g:
+            logging.debug('Get OSX Key %s' % Name.to_str(key_name))
+            g.key_label = CFSTR(Name.to_str(key_name))
+            g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 6, cf.kCFTypeDictionaryKeyCallBacks, None))
+            cf.CFDictionaryAddValue(g.query, sec.kSecClass, sec.kSecClassKey)
+            cf.CFDictionaryAddValue(g.query, sec.kSecAttrLabel, g.key_label)
+            cf.CFDictionaryAddValue(g.query, sec.kSecAttrKeyClass, sec.kSecAttrKeyClassPrivate)
+            cf.CFDictionaryAddValue(g.query, sec.kSecReturnAttributes, sec.kCFBooleanTrue)
+            cf.CFDictionaryAddValue(g.query, sec.kSecReturnRef, sec.kCFBooleanTrue)
+
+            g.dic = c_void_p()
+            ret = sec.security.SecItemCopyMatching(g.query, pointer(g.dic))
+            if ret == sec.errSecSuccess:
+                return True
+            elif ret == sec.errSecItemNotFound:
+                return False
+            else:
+                raise ValueError(f"Error happened when searching specific key {key_name}")
+
+    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
+        pass

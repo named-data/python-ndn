@@ -20,7 +20,7 @@
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 import sys
-from ctypes import cdll, c_void_p, c_ubyte, POINTER
+from ctypes import cdll, c_void_p, c_ubyte, POINTER, c_int32
 if sys.platform == 'darwin':
     from ..cocoapy import cf, CFIndex, CFRange
 
@@ -39,7 +39,7 @@ class OsxSec(object):
         self.security = cdll.LoadLibrary(
             "/System/Library/Frameworks/Security.framework/Versions/Current/Security")
 
-        self.security.SecItemCopyMatching.restype = c_void_p
+        self.security.SecItemCopyMatching.restype = c_int32
         self.security.SecItemCopyMatching.argtypes = [c_void_p, POINTER(c_void_p)]
 
         self.security.SecKeyCreateSignature.restype = c_void_p
@@ -69,6 +69,9 @@ class OsxSec(object):
         cf.CFRetain.argtypes = [c_void_p]
 
         self.kCFBooleanTrue = c_void_p.in_dll(cf, "kCFBooleanTrue")
+
+        self.errSecSuccess = 0
+        self.errSecItemNotFound = -25300
 
     @staticmethod
     def create_data(data: bytes) -> c_void_p:
