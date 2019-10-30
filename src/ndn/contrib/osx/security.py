@@ -20,9 +20,9 @@
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 import sys
-from ctypes import cdll, c_void_p, c_ubyte, POINTER, c_int32
+from ctypes import cdll, c_void_p, c_ubyte, POINTER, c_int32, c_ulong, c_uint16
 if sys.platform == 'darwin':
-    from ..cocoapy import cf, CFIndex, CFRange
+    from ..cocoapy import cf, CFIndex, CFRange, CFAllocatorRef
 
 
 class OsxSec(object):
@@ -48,6 +48,31 @@ class OsxSec(object):
         self.security.SecKeyIsAlgorithmSupported.restype = c_ubyte
         self.security.SecKeyIsAlgorithmSupported.argtypes = [c_void_p, CFIndex, c_void_p]
 
+        self.security.SecAccessControlCreateWithFlags.restype = c_void_p
+        self.security.SecAccessControlCreateWithFlags.argtypes = [CFAllocatorRef, c_void_p, c_ulong, POINTER(c_void_p)]
+
+        self.security.SecKeyCreateRandomKey.restype = c_void_p
+        self.security.SecKeyCreateRandomKey.argtypes = [c_void_p, POINTER(c_void_p)]
+
+        self.security.SecKeyCopyPublicKey.restype = c_void_p
+        self.security.SecKeyCopyPublicKey.argtypes = [c_void_p]
+
+        self.security.SecKeyCopyExternalRepresentation.restype = c_void_p
+        self.security.SecKeyCopyExternalRepresentation.argtypes = [c_void_p, POINTER(c_void_p)]
+
+        self.security.SecItemAdd.restype = c_int32
+        self.security.SecItemAdd.argtypes = [c_void_p, POINTER(c_void_p)]
+
+        self.security.SecItemUpdate.restype = c_int32
+        self.security.SecItemUpdate.argtypes = [c_void_p, c_void_p]
+
+        self.security.SecAccessCreate.restype = c_int32
+        self.security.SecAccessCreate.argtypes = [c_void_p, c_void_p, POINTER(c_void_p)]
+
+        self.security.SecACLCreateWithSimpleContents.restype = c_int32
+        self.security.SecACLCreateWithSimpleContents.argtypes = [c_void_p, c_void_p, c_void_p,
+                                                                 c_uint16, POINTER(c_void_p)]
+
         self.kSecClass = c_void_p.in_dll(self.security, "kSecClass")
         self.kSecClassKey = c_void_p.in_dll(self.security, "kSecClassKey")
         self.kSecAttrLabel = c_void_p.in_dll(self.security, "kSecAttrLabel")
@@ -64,6 +89,15 @@ class OsxSec(object):
             self.security, "kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256")
         self.kSecKeyAlgorithmECDSASignatureDigestX962SHA256 = c_void_p.in_dll(
             self.security, "kSecKeyAlgorithmECDSASignatureDigestX962SHA256")
+        self.kSecAttrTokenID = c_void_p.in_dll(self.security, "kSecAttrTokenID")
+        self.kSecAttrTokenIDSecureEnclave = c_void_p.in_dll(self.security, "kSecAttrTokenIDSecureEnclave")
+        self.kSecPrivateKeyAttrs = c_void_p.in_dll(self.security, "kSecPrivateKeyAttrs")
+        self.kSecAttrIsPermanent = c_void_p.in_dll(self.security, "kSecAttrIsPermanent")
+        self.kSecAttrAccessControl = c_void_p.in_dll(self.security, "kSecAttrAccessControl")
+        self.kSecAttrAccess = c_void_p.in_dll(self.security, "kSecAttrAccess")
+        self.kSecAttrAccessibleAfterFirstUnlock = c_void_p.in_dll(self.security, "kSecAttrAccessibleAfterFirstUnlock")
+        self.kSecAccessControlPrivateKeyUsage = 1 << 30
+        self.kSecAttrApplicationTag = c_void_p.in_dll(self.security, "kSecAttrApplicationTag")
 
         cf.CFRetain.restype = c_void_p
         cf.CFRetain.argtypes = [c_void_p]

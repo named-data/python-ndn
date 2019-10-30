@@ -52,4 +52,6 @@ class Tpm(metaclass=abc.ABCMeta):
                 key_id = Component.from_bytes(h.digest())
             else:
                 raise ValueError(f'KeyIdType not supported: {key_id_type}')
+        elif isinstance(key_id, str):
+            key_id = Component.from_str(key_id)
         return id_name + [KEY_COMPONENT, key_id]
