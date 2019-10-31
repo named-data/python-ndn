@@ -30,7 +30,7 @@ if sys.platform == 'darwin':
 
 
 class OsxSigner(Signer):
-    def __init__(self, key_name, key_bits, key_type, key_ref):
+    def __init__(self, key_name: NonStrictName, key_bits, key_type, key_ref):
         self.key_ref = key_ref
         self.key_name = key_name
         if key_type == cfstring_to_string(OsxSec().kSecAttrKeyTypeRSA):
@@ -79,7 +79,8 @@ class OsxSigner(Signer):
 
 
 class TpmOsxKeychain(Tpm):
-    def get_signer(self, key_name: NonStrictName) -> Signer:
+    @staticmethod
+    def _get_key(key_name: NonStrictName):
         sec = OsxSec()
         with ReleaseGuard() as g:
             logging.debug('Get OSX Key %s' % Name.to_str(key_name))
@@ -93,35 +94,26 @@ class TpmOsxKeychain(Tpm):
 
             g.dic = c_void_p()
             ret = sec.security.SecItemCopyMatching(g.query, pointer(g.dic))
-            if ret != sec.errSecSuccess:
-                raise ValueError(f"Unable to load specific key {key_name}")
+            if ret == sec.errSecItemNotFound:
+                raise KeyError(f"Unable to find key {key_name}")
+            elif ret != sec.errSecSuccess:
+                raise RuntimeError(f"Error happened when searching specific key {key_name}")
 
             key_type = cfstring_to_string(cf.CFDictionaryGetValue(g.dic, sec.kSecAttrKeyType))
             key_bits = cfnumber_to_number(cf.CFDictionaryGetValue(g.dic, sec.kSecAttrKeySizeInBits))
             key_ref = cf.CFRetain(cf.CFDictionaryGetValue(g.dic, sec.kSecValueRef))
+        return key_type, key_bits, key_ref
 
-            return OsxSigner(key_name, key_bits, key_type, key_ref)
+    def get_signer(self, key_name: NonStrictName) -> Signer:
+        key_type, key_bits, key_ref = self._get_key(key_name)
+        return OsxSigner(key_name, key_bits, key_type, key_ref)
 
     def has_key(self, key_name: FormalName) -> bool:
-        sec = OsxSec()
-        with ReleaseGuard() as g:
-            logging.debug('Get OSX Key %s' % Name.to_str(key_name))
-            g.key_label = CFSTR(Name.to_str(key_name))
-            g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 6, cf.kCFTypeDictionaryKeyCallBacks, None))
-            cf.CFDictionaryAddValue(g.query, sec.kSecClass, sec.kSecClassKey)
-            cf.CFDictionaryAddValue(g.query, sec.kSecAttrLabel, g.key_label)
-            cf.CFDictionaryAddValue(g.query, sec.kSecAttrKeyClass, sec.kSecAttrKeyClassPrivate)
-            cf.CFDictionaryAddValue(g.query, sec.kSecReturnAttributes, sec.kCFBooleanTrue)
-            cf.CFDictionaryAddValue(g.query, sec.kSecReturnRef, sec.kCFBooleanTrue)
-
-            g.dic = c_void_p()
-            ret = sec.security.SecItemCopyMatching(g.query, pointer(g.dic))
-            if ret == sec.errSecSuccess:
-                return True
-            elif ret == sec.errSecItemNotFound:
-                return False
-            else:
-                raise ValueError(f"Error happened when searching specific key {key_name}")
+        try:
+            self._get_key(key_name)
+            return True
+        except KeyError:
+            return False
 
     @staticmethod
     def _convert_key_format(key_bits: BinaryStr, key_type: str):

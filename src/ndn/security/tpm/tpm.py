@@ -20,8 +20,8 @@ import abc
 from typing import Tuple
 from Cryptodome.Hash import SHA256
 from Cryptodome.Random import get_random_bytes
+from ...app_support.security_v2 import KEY_COMPONENT
 from ...encoding import Signer, NonStrictName, BinaryStr, FormalName, Component
-from ..consts import KEY_COMPONENT
 
 
 class Tpm(metaclass=abc.ABCMeta):

@@ -29,9 +29,8 @@ from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
 
 
 __all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'SignatureInfo', 'Delegation',
-           'Links', 'InterestPacketValue', 'InterestPacket', 'MetaInfo', 'DataPacketValue', 'DataPacket',
-           'InterestParam', 'SignaturePtrs', 'make_interest', 'make_data', 'parse_interest', 'parse_data',
-           'Interest', 'Data']
+           'Links', 'MetaInfo', 'InterestParam', 'SignaturePtrs', 'make_interest', 'make_data',
+           'parse_interest', 'parse_data', 'Interest', 'Data']
 
 
 class TypeNumber:
@@ -116,6 +115,7 @@ class InterestPacketValue(TlvModel):
     _need_digest = ProcedureArgument()
     _digest_cover_part = ProcedureArgument()
     _digest_buf = ProcedureArgument()
+    _shrink_len = ProcedureArgument(0)
 
     name = InterestNameField(need_digest=_need_digest,
                              signature_covered_part=_sig_cover_part,
@@ -132,11 +132,11 @@ class InterestPacketValue(TlvModel):
     application_parameters = BytesField(TypeNumber.APPLICATION_PARAMETERS)
     signature_info = ModelField(TypeNumber.INTEREST_SIGNATURE_INFO, SignatureInfo)
     signature_value = SignatureValueField(TypeNumber.INTEREST_SIGNATURE_VALUE,
-                                          interest_sig=True,
                                           signer=_signer,
                                           covered_part=_sig_cover_part,
                                           starting_point=_sig_cover_start,
-                                          value_buffer=_sig_value_buf)
+                                          value_buffer=_sig_value_buf,
+                                          shrink_len=_shrink_len)
     _digest_cover_end = OffsetMarker()
 
     def encoded_length(self, markers: Optional[dict] = None) -> int:
@@ -168,7 +168,7 @@ class InterestPacketValue(TlvModel):
         InterestPacketValue.signature_value.calculate_signature(markers)
         if self._need_digest.get_arg(markers):
             digest_cover_start = self._digest_cover_start.get_arg(markers)
-            shrink_size = markers.get('signature_value##shrink_len', 0)
+            shrink_size = self._shrink_len.get_arg(markers)
             digest_cover_end = self._digest_cover_end.get_arg(markers) - shrink_size
             digest_covered_part = [wire_view[digest_cover_start:digest_cover_end]]
             self._digest_cover_part.set_arg(markers, digest_covered_part)
@@ -222,6 +222,7 @@ class DataPacketValue(TlvModel):
     _signer = ProcedureArgument()
     _sig_cover_part = ProcedureArgument()
     _sig_value_buf = ProcedureArgument()
+    _shrink_len = ProcedureArgument(0)
 
     _sig_cover_start = OffsetMarker()
     name = NameField("/")
@@ -230,11 +231,11 @@ class DataPacketValue(TlvModel):
     # v0.2 Data packets has critical SignatureType-specific TLVs
     signature_info = ModelField(TypeNumber.SIGNATURE_INFO, SignatureInfo, ignore_critical=True)
     signature_value = SignatureValueField(TypeNumber.SIGNATURE_VALUE,
-                                          interest_sig=True,
                                           signer=_signer,
                                           covered_part=_sig_cover_part,
                                           starting_point=_sig_cover_start,
-                                          value_buffer=_sig_value_buf)
+                                          value_buffer=_sig_value_buf,
+                                          shrink_len=_shrink_len)
 
     def encoded_length(self, markers: Optional[dict] = None) -> int:
         if markers is None:
@@ -327,7 +328,7 @@ def make_interest(name: NonStrictName,
     markers = {}
     interest._signer.set_arg(markers, signer)
     ret = interest.encode(markers=markers)
-    shrink_size = markers['interest##inner_markers'].get('signature_value##shrink_len', 0)
+    shrink_size = interest.interest._shrink_len.get_arg(markers['interest##inner_markers'])
     if shrink_size > 0:
         ret = shrink_length(ret, shrink_size)
     if need_final_name:
@@ -350,7 +351,7 @@ def make_data(name: NonStrictName,
     markers = {}
     data._signer.set_arg(markers, signer)
     ret = data.encode(markers=markers)
-    shrink_size = markers['data##inner_markers'].get('signature_value##shrink_len', 0)
+    shrink_size = data.data._shrink_len.get_arg(markers['data##inner_markers'])
     if shrink_size > 0:
         ret = shrink_length(ret, shrink_size)
     return ret

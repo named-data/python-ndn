@@ -18,9 +18,10 @@
 # -----------------------------------------------------------------------------
 import hashlib
 import pytest
+from typing import List
 from ndn.security import DigestSha256Signer
 from ndn.encoding import Name, Component, InterestParam, MetaInfo, ContentType, SignatureType, \
-    make_interest, make_data, parse_interest, parse_data, DecodeError
+    make_interest, make_data, parse_interest, parse_data, DecodeError, Signer, VarBinaryStr
 
 
 class TestInterestMake:
@@ -199,6 +200,23 @@ class TestDataMake:
                 b"\x14\x0c\x18\x01\x00\x19\x02\x03\xe8\x1a\x03\x25\x01\x02"
                 b"\x16\x03\x1b\x01\x00"
                 b"\x17 \x03\xb8,\x18\xffMw\x84\x86\xa5a\x94e\xcc\xdaQ\x15\xb7\xfb\x19\xab\x9d1lw\'\xdf\xac\x03#\xcad")
+
+    @staticmethod
+    def test_shrink_signature():
+        class ShrinkSigner(Signer):
+            def write_signature_info(self, signature_info):
+                pass
+
+            def get_signature_value_size(self) -> int:
+                return 10
+
+            def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+                return 5
+
+        name = '/test'
+        meta_info = MetaInfo(content_type=ContentType.BLOB)
+        data = make_data(name, meta_info, signer=ShrinkSigner())
+        assert data == b'\x06\x16\x07\x06\x08\x04test\x14\x03\x18\x01\x00\x16\x00\x17\x05\x00\x00\x00\x00\x00'
 
 
 class TestInterestParse:

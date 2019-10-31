@@ -242,17 +242,17 @@ class BoolField(Field):
 class SignatureValueField(Field):
     def __init__(self,
                  type_num: int,
-                 interest_sig: bool,
                  signer: ProcedureArgument,
                  covered_part: ProcedureArgument,
                  starting_point: OffsetMarker,
-                 value_buffer: ProcedureArgument):
+                 value_buffer: ProcedureArgument,
+                 shrink_len: ProcedureArgument):
         super().__init__(type_num)
-        self.interest_sig = interest_sig
         self.signer = signer
         self.covered_part = covered_part
         self.starting_point = starting_point
         self.value_buffer = value_buffer
+        self.shrink_len = shrink_len
 
     def encoded_length(self, val, markers: dict) -> int:
         signer = self.signer.get_arg(markers)
@@ -289,10 +289,10 @@ class SignatureValueField(Field):
             sig_value_len = markers[f'{self.name}##encoded_length']
             real_len = signer.write_signature_value(self.value_buffer.get_arg(markers),
                                                     self.covered_part.get_arg(markers))
+            self.shrink_len.set_arg(markers, sig_value_len - real_len)
             if real_len != sig_value_len:
                 if sig_value_len >= 253:
                     raise ValueError(f'Long signatrue with flexible length is not supported: {sig_value_len} >= 253')
-                markers[f'{self.name}##shrink_len'] = sig_value_len - real_len
                 markers[f'{self.name}##wire_length'][0] = real_len
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):

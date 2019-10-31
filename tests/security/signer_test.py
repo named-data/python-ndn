@@ -1,17 +1,29 @@
 from Cryptodome.Util.asn1 import DerSequence
+from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import ECC
+from Cryptodome.Signature import DSS
 from ndn.encoding import make_data, MetaInfo, parse_data
 from ndn.security import Sha256WithEcdsaSigner, Sha256WithRsaSigner, HmacSha256Signer
 
 
 class TestSha256WithEcdsaSigner:
-    def test_der_format(self):
-        # Ecdsa signature is not unique, so we only test the format
-        key = ECC.generate(curve="P-256").export_key(format="DER")
+    def test_verify(self):
+        # Ecdsa signature is not unique, so we only test if we can verify it
+        pri_key = ECC.generate(curve="P-256")
+        key = pri_key.export_key(format="DER")
+        pub_key = pri_key.public_key()
         signer = Sha256WithEcdsaSigner("/K/KEY/x", key)
-        pkt = make_data("/A", MetaInfo(), signer=signer)
+        pkt = make_data("/test", MetaInfo(), b"test content", signer=signer)
         _, _, _, sig_ptrs = parse_data(pkt)
+        # Test its format is ASN.1 der format
         DerSequence().decode(bytes(sig_ptrs.signature_value_buf))
+        verifier = DSS.new(pub_key, 'fips-186-3', 'der')
+        h = SHA256.new()
+        for content in sig_ptrs.signature_covered_part:
+            h.update(content)
+        # verify() throws ValueError if it fails, the return value is undefined
+        # So do not assert its value
+        verifier.verify(h, bytes(sig_ptrs.signature_value_buf))
 
 
 class TestSha256WithHmacSigner:

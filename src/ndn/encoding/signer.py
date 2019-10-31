@@ -30,7 +30,7 @@ class Signer(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_signature_value_size(self):
+    def get_signature_value_size(self) -> int:
         pass
 
     @abc.abstractmethod
