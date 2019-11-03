@@ -20,7 +20,7 @@ from typing import Optional
 from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
     SignatureInfo, TypeNumber, RepeatedField, IncludeBase, ProcedureArgument, OffsetMarker,\
     MetaInfo, VarBinaryStr
-from ..encoding.tlv_model import SignatureValueField
+from ..encoding.ndn_format_0_3 import DataPacketValue
 
 
 KEY_COMPONENT = Component.from_str('KEY')
@@ -64,24 +64,9 @@ class CertificateV2SignatureInfo(SignatureInfo, CertificateV2Extension):
     certificate_v2_extension = IncludeBase(CertificateV2Extension)
 
 
-class CertificateV2Value(TlvModel):
-    _signer = ProcedureArgument()
-    _sig_cover_part = ProcedureArgument()
-    _sig_value_buf = ProcedureArgument()
-    _shrink_len = ProcedureArgument()
-
-    _sig_cover_start = OffsetMarker()
-    name = NameField("/")
-    meta_info = ModelField(TypeNumber.META_INFO, MetaInfo)
-    content = BytesField(TypeNumber.CONTENT)
-    # v0.2 Data packets has critical SignatureType-specific TLVs
+class CertificateV2Value(DataPacketValue):
+    _base = IncludeBase(DataPacketValue)
     signature_info = ModelField(TypeNumber.SIGNATURE_INFO, CertificateV2SignatureInfo, ignore_critical=True)
-    signature_value = SignatureValueField(TypeNumber.SIGNATURE_VALUE,
-                                          signer=_signer,
-                                          covered_part=_sig_cover_part,
-                                          starting_point=_sig_cover_start,
-                                          value_buffer=_sig_value_buf,
-                                          shrink_len=_shrink_len)
 
 
 def self_sign(key_name, pub_key, signer) -> VarBinaryStr:

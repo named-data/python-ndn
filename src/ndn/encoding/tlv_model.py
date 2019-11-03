@@ -48,18 +48,26 @@ class TlvModelMeta(abc.ABCMeta):
 
         # Collect encoded fields
         cls._encoded_fields = []
+        index_dict = {}
         for field_name in cls.__dict__:
             if not field_name.startswith('__'):
                 field_obj = getattr(cls, field_name)
                 if isinstance(field_obj, Field):
                     field_obj.name = field_name
-                    cls._encoded_fields.append(field_obj)
+                    if field_name not in index_dict:
+                        cls._encoded_fields.append(field_obj)
+                        index_dict[field_name] = len(cls._encoded_fields) - 1
+                    else:
+                        cls._encoded_fields[index_dict[field_name]] = field_obj
                 elif isinstance(field_obj, IncludeBase):
                     if field_obj.base not in bases:
                         raise IncludeBaseError(f"{field_obj.base} is not one of {name}'s base classes")
                     if not issubclass(field_obj.base, TlvModel):
                         raise IncludeBaseError(f"{field_obj.base} is not a TlvModel")
+                    cur_len = len(cls._encoded_fields)
                     cls._encoded_fields.extend(field_obj.base._encoded_fields)
+                    for i in range(cur_len, len(cls._encoded_fields)):
+                        index_dict[cls._encoded_fields[i].name] = i
 
         return cls
 
