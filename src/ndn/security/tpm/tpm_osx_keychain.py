@@ -115,6 +115,16 @@ class TpmOsxKeychain(Tpm):
         except KeyError:
             return False
 
+    def delete_key(self, key_name: FormalName):
+        sec = OsxSec()
+        with ReleaseGuard() as g:
+            logging.debug('Delete OSX Key %s' % Name.to_str(key_name))
+            g.key_label = CFSTR(Name.to_str(key_name))
+            g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 3, cf.kCFTypeDictionaryKeyCallBacks, None))
+            cf.CFDictionaryAddValue(g.query, sec.kSecClass, sec.kSecClassKey)
+            cf.CFDictionaryAddValue(g.query, sec.kSecAttrLabel, g.key_label)
+            sec.security.SecItemDelete(g.query)
+
     @staticmethod
     def _convert_key_format(key_bits: BinaryStr, key_type: str):
         if key_type == 'rsa':

@@ -16,10 +16,12 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
-from typing import Optional
-from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
-    SignatureInfo, TypeNumber, RepeatedField, IncludeBase, ProcedureArgument, OffsetMarker,\
-    MetaInfo, VarBinaryStr
+from typing import Tuple
+from datetime import datetime
+from ..utils import timestamp
+from ..encoding import Component, Name, ModelField, TlvModel, ContentType, BytesField,\
+    SignatureInfo, TypeNumber, RepeatedField, IncludeBase, MetaInfo, VarBinaryStr,\
+    get_tl_num_size, write_tl_num, parse_and_check_tl, FormalName
 from ..encoding.ndn_format_0_3 import DataPacketValue
 
 
@@ -69,5 +71,41 @@ class CertificateV2Value(DataPacketValue):
     signature_info = ModelField(TypeNumber.SIGNATURE_INFO, CertificateV2SignatureInfo, ignore_critical=True)
 
 
-def self_sign(key_name, pub_key, signer) -> VarBinaryStr:
-    pass
+class SafeBag(TlvModel):
+    certificate_v2 = BytesField(TypeNumber.DATA)
+    # We do not use ModelField due to 2 reasons:
+    # 1. The encoded length of CertificateV2 is unknown.
+    # 2. Generally we already have an encoded certificate when exporting a SafeBag.
+    encrypted_key_bag = BytesField(SecurityV2TypeNumber.ENCRYPTED_KEY_BAG)
+
+
+def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
+    cert_val = CertificateV2Value()
+    cert_name = Name.normalize(key_name) + [SELF_COMPONENT, Component.from_version(timestamp())]
+    cert_val.name = cert_name
+    cert_val.content = pub_key
+    cert_val.meta_info = MetaInfo(content_type=ContentType.KEY, freshness_period=3600000)
+    cert_val.signature_info = CertificateV2SignatureInfo()
+    cert_val.signature_info.validity_period = ValidityPeriod()
+    cert_val.signature_info.validity_period.not_before = b'19700101T000000'
+    end_time = datetime.utcnow()
+    not_after = (f'{end_time.year+20:04}{end_time.month:02}{end_time.day:02}T'
+                 f'{end_time.hour:02}{end_time.minute:02}{end_time.second:02}').encode()
+    cert_val.signature_info.validity_period.not_after = not_after
+
+    markers = {}
+    cert_val._signer.set_arg(markers, signer)
+    value = cert_val.encode(markers=markers)
+    shrink_size = cert_val._shrink_len.get_arg(markers)
+    type_len = get_tl_num_size(TypeNumber.DATA)
+    size_len = get_tl_num_size(len(value) - shrink_size)
+    buf = bytearray(type_len + size_len + len(value) - shrink_size)
+    write_tl_num(TypeNumber.DATA, buf)
+    write_tl_num(len(value) - shrink_size, buf, type_len)
+    buf[type_len+size_len:] = memoryview(value)[0:len(value)-shrink_size]
+    return cert_name, buf
+
+
+def parse_certificate(wire) -> CertificateV2Value:
+    wire = parse_and_check_tl(wire, TypeNumber.DATA)
+    return CertificateV2Value.parse(wire)

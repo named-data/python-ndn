@@ -21,6 +21,7 @@ from typing import Iterator
 from dataclasses import dataclass
 from typing import Dict, Any, Mapping
 from ...encoding import FormalName, BinaryStr, NonStrictName, Name
+from ...app_support.security_v2 import self_sign
 from ..signer.sha256_digest_signer import DigestSha256Signer
 from ..tpm.tpm import Tpm
 from .keychain import Keychain
@@ -229,8 +230,20 @@ class KeychainSqlite3(Keychain):
     def new_identity(self, name: NonStrictName) -> Identity:
         name = Name.to_bytes(name)
         if name not in self:
-            self.conn.execute('INSERT INTO identities (identity) values (?)', (name,))
+            self.conn.execute('INSERT INTO identities (identity) VALUES (?)', (name,))
             self.conn.commit()
+        else:
+            raise KeyError(f'Identity {Name.to_str(name)} already exists')
+        if not self.has_default_identity():
+            self.set_default_identity(name)
+        return self[name]
+
+    def touch_identity(self, id_name: NonStrictName) -> Identity:
+        name = Name.to_bytes(id_name)
+        if name not in self:
+            self.conn.execute('INSERT INTO identities (identity) VALUES (?)', (name,))
+            self.conn.commit()
+            self.new_key(name)
         if not self.has_default_identity():
             self.set_default_identity(name)
         return self[name]
@@ -240,8 +253,11 @@ class KeychainSqlite3(Keychain):
 
     def del_identity(self, name: NonStrictName):
         name = Name.to_bytes(name)
+        for key_name in self[name]:
+            self.tpm.delete_key(key_name)
         self.conn.execute('DELETE FROM identities WHERE identity=?', (name,))
         self.conn.commit()
+        self._signer_cache = {}
 
     def get_signer(self, sign_args: Dict[str, Any]):
         if sign_args.pop('no_signature', False):
@@ -268,12 +284,44 @@ class KeychainSqlite3(Keychain):
             self._signer_cache[key_name_bytes] = signer
         return signer
 
-    def new_key(self, id_name: NonStrictName) -> Key:
-        # TODO: implement missing functions
-        pass
-
     def del_key(self, name: NonStrictName):
-        pass
+        formal_name = Name.normalize(name)
+        name = Name.to_bytes(name)
+        self.conn.execute('DELETE FROM keys WHERE key_name=?', (name,))
+        self.conn.commit()
+        self.tpm.delete_key(formal_name)
+        self._signer_cache = {}
 
     def del_cert(self, name: NonStrictName):
+        name = Name.to_bytes(name)
+        self.conn.execute('DELETE FROM certificates WHERE certificate_name=?', (name,))
+        self.conn.commit()
+        self._signer_cache = {}
+
+    def new_key(self, id_name: NonStrictName, key_type: str = 'ec', **kwargs) -> Key:
+        name = Name.normalize(id_name)
+        if name not in self:
+            raise KeyError(f'Identity {Name.to_str(id_name)} does not exist')
+        identity = self[name]
+        key_name, pub_key = self.tpm.generate_key(name, key_type, **kwargs)
+        signer = self.tpm.get_signer(key_name)
+        cert_name, cert_data = self_sign(key_name, pub_key, signer)
+        key_name = Name.to_bytes(key_name)
+        cert_name = Name.to_bytes(cert_name)
+        self.conn.execute('INSERT INTO keys (identity_id, key_name, key_bits) VALUES (?, ?, ?)',
+                          (identity.row_id, key_name, pub_key))
+        self.conn.execute('INSERT INTO certificates (key_id, certificate_name, certificate_data)'
+                          'VALUES ((SELECT id FROM keys WHERE key_name=?), ?, ?)',
+                          (key_name, cert_name, cert_data))
+        self.conn.commit()
+
+        if not identity.has_default_key():
+            identity.set_default_key(key_name)
+        return identity[key_name]
+
+    def export_safebag(self):
+        # TODO: Implement export & import
+        pass
+
+    def import_safebag(self):
         pass

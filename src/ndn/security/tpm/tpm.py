@@ -37,6 +37,10 @@ class Tpm(metaclass=abc.ABCMeta):
     def has_key(self, key_name: FormalName) -> bool:
         pass
 
+    @abc.abstractmethod
+    def delete_key(self, key_name: FormalName):
+        pass
+
     def construct_key_name(self, id_name: FormalName, pub_key: BinaryStr, **kwargs) -> FormalName:
         key_id = kwargs.pop('key_id', None)
         key_id_type = kwargs.pop('key_id_type', 'random')

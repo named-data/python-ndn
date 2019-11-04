@@ -68,6 +68,14 @@ class TpmFile(Tpm):
         with open(file_name, 'w') as f:
             f.write(key_b64)
 
+    def delete_key(self, key_name: FormalName):
+        key_name = Name.encode(key_name)
+        file_name = os.path.join(self.path, self._to_file_name(key_name))
+        try:
+            os.remove(file_name)
+        except FileNotFoundError:
+            pass
+
     def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
         if key_type == 'rsa':
             siz = kwargs.pop('key_size', 2048)

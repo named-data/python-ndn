@@ -42,6 +42,9 @@ class OsxSec(object):
         self.security.SecItemCopyMatching.restype = c_int32
         self.security.SecItemCopyMatching.argtypes = [c_void_p, POINTER(c_void_p)]
 
+        self.security.SecItemDelete.restype = c_int32
+        self.security.SecItemDelete.argtypes = [c_void_p]
+
         self.security.SecKeyCreateSignature.restype = c_void_p
         self.security.SecKeyCreateSignature.argtypes = [c_void_p, c_void_p, c_void_p, POINTER(c_void_p)]
 
