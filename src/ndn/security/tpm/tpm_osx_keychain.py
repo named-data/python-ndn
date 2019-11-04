@@ -108,7 +108,7 @@ class TpmOsxKeychain(Tpm):
         key_type, key_bits, key_ref = self._get_key(key_name)
         return OsxSigner(key_name, key_bits, key_type, key_ref)
 
-    def has_key(self, key_name: FormalName) -> bool:
+    def key_exist(self, key_name: FormalName) -> bool:
         try:
             self._get_key(key_name)
             return True

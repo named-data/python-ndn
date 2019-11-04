@@ -79,7 +79,7 @@ class TestEncodeDecode:
 
         class Derived(Base):
             m1 = UintField(0x01)
-            _ = IncludeBase(Base)
+            _base = IncludeBase(Base)
             m3 = UintField(0x03)
 
         obj = Derived()
@@ -115,6 +115,33 @@ class TestEncodeDecode:
         obj = B2.parse(b'\x03\x06\x01\x01\x01\x02\x01\x02')
         assert obj.a.m1 == 1
         assert obj.a.m2 == 2
+
+    def test_diamond(self):
+        class A(TlvModel):
+            m1 = UintField(0x01)
+
+        class B1(A):
+            _base = IncludeBase(A)
+            m1 = UintField(0x02)
+            m4 = UintField(0x04)
+
+        class B2(A):
+            _base = IncludeBase(A)
+            m1 = UintField(0x03)
+            m5 = UintField(0x05)
+
+        class D(B1, B2):
+            _b2 = IncludeBase(B2)
+            _b1 = IncludeBase(B1)
+
+        obj = D()
+        obj.m1, obj.m2, obj.m4, obj.m5 = 1, 2, 4, 5
+        assert obj.encode() == b'\x02\x01\x01\x05\x01\x05\x04\x01\x04'
+
+        obj = D.parse(b'\x02\x01\x01\x05\x01\x05\x04\x01\x04')
+        assert obj.m1 == 1
+        assert obj.m4 == 4
+        assert obj.m5 == 5
 
 
 class TestAsDict:

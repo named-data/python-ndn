@@ -18,7 +18,7 @@
 # -----------------------------------------------------------------------------
 import abc
 import asyncio as aio
-from typing import Optional, Callable, Coroutine, Any, Tuple
+from typing import Optional, Callable, Coroutine, Any
 from ..encoding.tlv_var import read_tl_num_from_stream
 
 

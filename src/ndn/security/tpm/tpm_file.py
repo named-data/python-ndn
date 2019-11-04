@@ -56,7 +56,7 @@ class TpmFile(Tpm):
                 pass
         raise ValueError('Key format is not supported')
 
-    def has_key(self, key_name: FormalName) -> bool:
+    def key_exist(self, key_name: FormalName) -> bool:
         key_name = Name.encode(key_name)
         file_name = os.path.join(self.path, self._to_file_name(key_name))
         return os.path.exists(file_name)

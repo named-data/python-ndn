@@ -64,10 +64,12 @@ class TlvModelMeta(abc.ABCMeta):
                         raise IncludeBaseError(f"{field_obj.base} is not one of {name}'s base classes")
                     if not issubclass(field_obj.base, TlvModel):
                         raise IncludeBaseError(f"{field_obj.base} is not a TlvModel")
-                    cur_len = len(cls._encoded_fields)
-                    cls._encoded_fields.extend(field_obj.base._encoded_fields)
-                    for i in range(cur_len, len(cls._encoded_fields)):
-                        index_dict[cls._encoded_fields[i].name] = i
+                    for field in field_obj.base._encoded_fields:
+                        if field.name not in index_dict:
+                            cls._encoded_fields.append(field)
+                            index_dict[field.name] = len(cls._encoded_fields) - 1
+                        else:
+                            cls._encoded_fields[index_dict[field.name]] = field
 
         return cls
 

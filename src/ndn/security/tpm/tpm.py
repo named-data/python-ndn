@@ -34,7 +34,7 @@ class Tpm(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def has_key(self, key_name: FormalName) -> bool:
+    def key_exist(self, key_name: FormalName) -> bool:
         pass
 
     @abc.abstractmethod
@@ -48,7 +48,7 @@ class Tpm(metaclass=abc.ABCMeta):
             if key_id_type == 'random':
                 while True:
                     key_id = Component.from_bytes(get_random_bytes(8))
-                    if not self.has_key(id_name + [KEY_COMPONENT, key_id]):
+                    if not self.key_exist(id_name + [KEY_COMPONENT, key_id]):
                         break
             elif key_id_type == 'sha256':
                 h = SHA256.new()
