@@ -280,7 +280,7 @@ class SignatureValueField(Field):
             return 0
         else:
             sig_cover_start = self.starting_point.get_arg(markers)
-            if sig_cover_start:
+            if sig_cover_start is not None:
                 sig_cover_part = self.covered_part.get_arg(markers)
                 sig_cover_part.append(wire[sig_cover_start:offset])
 

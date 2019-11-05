@@ -318,10 +318,3 @@ class KeychainSqlite3(Keychain):
         if not identity.has_default_key():
             identity.set_default_key(key_name)
         return identity[key_name]
-
-    def export_safebag(self):
-        # TODO: Implement export & import
-        pass
-
-    def import_safebag(self):
-        pass

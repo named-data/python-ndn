@@ -38,8 +38,8 @@ class TpmFile(Tpm):
         return sha256(key_name).digest().hex() + '.privkey'
 
     @staticmethod
-    def _base64_newline(src: str):
-        return '\n'.join(src[i*64:i*64+64] for i in range((len(src) + 63) // 64))
+    def _base64_newline(src: bytes):
+        return b'\n'.join(src[i*64:i*64+64] for i in range((len(src) + 63) // 64))
 
     def get_signer(self, key_name: NonStrictName) -> Signer:
         key_name = Name.to_bytes(key_name)
@@ -65,7 +65,7 @@ class TpmFile(Tpm):
         key_name = Name.encode(key_name)
         key_b64 = self._base64_newline(b64encode(key_der))
         file_name = os.path.join(self.path, self._to_file_name(key_name))
-        with open(file_name, 'w') as f:
+        with open(file_name, 'wb') as f:
             f.write(key_b64)
 
     def delete_key(self, key_name: FormalName):
