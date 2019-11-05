@@ -312,7 +312,7 @@ class KeychainSqlite3(Keychain):
                           (identity.row_id, key_name, pub_key))
         self.conn.execute('INSERT INTO certificates (key_id, certificate_name, certificate_data)'
                           'VALUES ((SELECT id FROM keys WHERE key_name=?), ?, ?)',
-                          (key_name, cert_name, cert_data))
+                          (key_name, cert_name, bytes(cert_data)))
         self.conn.commit()
 
         if not identity.has_default_key():
