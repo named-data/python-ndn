@@ -26,6 +26,12 @@ __all__ = ['get_tl_num_size', 'write_tl_num', 'pack_uint_bytes', 'parse_tl_num',
 
 
 def get_tl_num_size(val: int) -> int:
+    """
+    Calculate the length of a TL variable.
+
+    :param val: an integer standing for Type or Length.
+    :return: The length of var.
+    """
     if val <= 0xFC:
         return 1
     elif val <= 0xFFFF:

@@ -29,4 +29,10 @@ NonStrictName = Union[Iterable[Union[BinaryStr, str]], str, BinaryStr]
 
 
 def is_binary_str(var):
+    """
+    Check whether var is of type BinaryStr.
+
+    :param var: The variable to check.
+    :return: True if var is a BinaryStr.
+    """
     return isinstance(var, bytes) or isinstance(var, bytearray) or isinstance(var, memoryview)

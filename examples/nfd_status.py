@@ -58,7 +58,7 @@ def main():
         app_main = retry()
         try:
             running = app.run_forever(after_start=app_main)
-        except FileNotFoundError:
+        except (FileNotFoundError, ConnectionRefusedError):
             app_main.close()
         if running:
             time.sleep(1.0)

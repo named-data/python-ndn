@@ -30,8 +30,7 @@ TODO List
 ---------
 
 - Documentation
-- Correct usage of license
-- Security Part
+- Security part (validator, access control)
 - Sync and other fantastic things
 
 

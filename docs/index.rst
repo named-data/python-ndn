@@ -6,15 +6,20 @@
 Welcome to python-ndn's documentation!
 ======================================
 
+
+Table Of Contents
+-----------------
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :glob:
 
    *
+   src/encoding/encoding
+   src/examples/basic_app
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
