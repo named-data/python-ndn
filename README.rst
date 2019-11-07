@@ -26,13 +26,6 @@ To do unit tests:
 
   make test
 
-TODO List
----------
-
-- Documentation
-- Security part (validator, access control)
-- Sync and other fantastic things
-
 
 .. |Test Badge| image:: https://github.com/zjkmxy/python-ndn/workflows/test/badge.svg
     :target: https://github.com/zjkmxy/python-ndn

@@ -13,9 +13,13 @@ Table Of Contents
    :maxdepth: 3
    :glob:
 
-   *
+   src/readme
+   src/installation
    src/encoding/encoding
-   src/examples/basic_app
+   src/examples/examples
+   src/contribute_support
+   src/future
+   src/authors
 
 
 Indices and tables

@@ -7,7 +7,7 @@ Connect to NFD
 NDNApp connects to an NFD node and provides interface to express and process Interests.
 The following code initializes an NDNApp instance with default configuration.
 
-.. code-block::
+.. code-block:: python3
 
     from ndn.app import NDNApp
     app = NDNApp()
@@ -15,7 +15,7 @@ The following code initializes an NDNApp instance with default configuration.
 
 If there is a main function for the application, use the ``after_start`` argument.
 
-.. code-block::
+.. code-block:: python3
 
     from ndn.app import NDNApp
     app = NDNApp()
@@ -33,7 +33,7 @@ A consumer can use ``express_interest`` to express an Interest.
 If a Data is received and validated, it returns the Name, MetaInfo and Content of Data.
 Otherwise, an exception is thrown.
 
-.. code-block::
+.. code-block:: python3
 
     from ndn.encoding import Name
 
@@ -72,7 +72,7 @@ A producer can call ``route`` to register a permanent route.
 Route registration can be done before application is started.
 NDNApp will automatically announce that route to the NFD node.
 
-.. code-block::
+.. code-block:: python3
 
     @app.route('/example/testApp')
     def on_interest(name, interest_param, application_param):
