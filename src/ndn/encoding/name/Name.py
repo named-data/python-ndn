@@ -16,6 +16,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
+"""
+Component module is a collection of functions processing NDN Names.
+"""
 from functools import reduce
 from typing import List, Optional, Iterable
 from . import Component
@@ -24,11 +27,34 @@ from ..tlv_var import write_tl_num, parse_tl_num, get_tl_num_size
 
 
 TYPE_NAME = 0x07
+"""The TLV type of NDN Name."""
 
 
 def from_str(val: str) -> List[bytearray]:
-    # TODO: declare the differences: ":" and "."
-    # Remove leading and tailing '/'
+    r"""
+    Construct a Name from a URI string.
+
+    :param val: URI string. Character out of :const:`ndn.encoding.name.Component.CHARSET` will be
+        escaped automatically. Leading and tailing ``'/'`` will be removed.
+
+        .. note::
+            Additional periods are not allowed here. To create a zero-size Component, use two slashes
+            to surround it. Also, there should be no scheme identifier and authority component in the
+            URI.
+
+    :return: :class:`FormalName`.
+
+    :examples:
+        >>> from ndn.encoding.name import Name
+        >>> Name.from_str("example/name")
+        [bytearray(b'\x08\x07example'), bytearray(b'\x08\x04name')]
+
+        >>> Name.from_str("/a//32=b/")
+        [bytearray(b'\x08\x01a'), bytearray(b'\x08\x00'), bytearray(b'\x20\x01b')]
+
+        >>> Name.from_str('/a/../b')
+        [bytearray(b'\x08\x01a'), bytearray(b'\x08\x02..'), bytearray(b'\x08\x01b')]
+    """
     cnt_slash = 0
     if val.startswith('/'):
         val = val[1:]
@@ -43,21 +69,56 @@ def from_str(val: str) -> List[bytearray]:
 
 
 def to_str(name: NonStrictName) -> str:
+    r"""
+    Convert an NDN Name to a URI string.
+
+    :param name: the input NDN Name.
+    :type name: :class:`NonStrictName`
+    :return: the URI.
+
+    :examples:
+        >>> from ndn.encoding.name import Name
+        >>> Name.to_str('Σπυρίδων')
+        '/%CE%A3%CF%80%CF%85%CF%81%CE%AF%CE%B4%CF%89%CE%BD'
+    """
     name = normalize(name)
     return '/' + '/'.join(Component.to_str(comp) for comp in name)
 
 
 def from_bytes(buf: BinaryStr) -> FormalName:
+    r"""
+    Decode the Name from its TLV encoded form.
+
+    :param buf: encoded Name.
+    :return: Decoded Name.
+    :rtype: :class:`FormalName`
+    """
     return decode(buf)[0]
 
 
 def to_bytes(name: NonStrictName) -> bytes:
+    r"""
+    Encode a Name via TLV encoding.
+
+    :param name: Name to encode.
+    :type name: :class:`NonStrictName`
+    :return: Encoded Name.
+    """
     if not is_binary_str(name):
         name = encode(normalize(name))
     return bytes(name)
 
 
 def is_prefix(lhs: NonStrictName, rhs: NonStrictName) -> bool:
+    r"""
+    Test if a Name is a prefix of another Name.
+
+    :param lhs: prefix to be tested.
+    :type lhs: :class:`NonStrictName`
+    :param rhs: full name to test on.
+    :type rhs: :class:`NonStrictName`
+    :return: ``True`` if ``lhs`` is a prefix of ``rhs``.
+    """
     lhs = normalize(lhs)
     rhs = normalize(rhs)
     left_len = len(lhs)
@@ -118,16 +179,24 @@ def decode(buf: BinaryStr, offset: int = 0) -> (List[memoryview], int):
 
 
 def normalize(name: NonStrictName) -> FormalName:
-    """
+    r"""
     Convert a NonStrictName to a FormalName.
     If name is a binary string, decode it.
     If name is a str, encode it into FormalName.
     If name is a list, encode all str elements into Components.
 
-    :param name: the NonStrictName
-    :type name: NonStrictName
+    :param name: the NonStrictName.
+    :type name: :class:`NonStrictName`
     :return: the FormalName. It may be a swallow copy of name.
-    :rtype: FormalName
+    :rtype: :class:`FormalName`
+
+    :examples:
+        >>> from ndn.encoding.name import Name
+        >>> Name.normalize(f'{i}' for i in range(3))
+        [bytearray(b'\x08\x010'), bytearray(b'\x08\x011'), bytearray(b'\x08\x012')]
+
+        >>> Name.normalize(['Алек', b'%\x01\x00'])
+        [bytearray(b'\x08\x08\xd0\x90\xd0\xbb\xd0\xb5\xd0\xba'), b'%\x01\x00']
     """
     if is_binary_str(name):
         return decode(name)[0]
