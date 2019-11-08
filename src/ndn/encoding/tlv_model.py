@@ -30,19 +30,31 @@ __all__ = ['DecodeError', 'TlvModel', 'ProcedureArgument', 'OffsetMarker', 'Uint
 
 
 class DecodeError(Exception):
+    """
+    TODO
+    """
     pass
 
 
 class IncludeBaseError(Exception):
+    """
+    TODO
+    """
     pass
 
 
 class IncludeBase:
+    """
+    Include all fields from a base class.
+    """
     def __init__(self, base):
         self.base = base
 
 
 class TlvModelMeta(abc.ABCMeta):
+    """
+    Metaclass for TlvModel, used to collect fields
+    """
     def __new__(mcs, name, bases, attrs):
         cls = super().__new__(mcs, name, bases, attrs)
 
@@ -75,6 +87,9 @@ class TlvModelMeta(abc.ABCMeta):
 
 
 class Field(metaclass=abc.ABCMeta):
+    """
+    Field of TlvModel.
+    """
     def __init__(self, type_num: int, default=None):
         """
         Initialize a TLV field.
@@ -173,6 +188,9 @@ class OffsetMarker(ProcedureArgument):
 
 
 class UintField(Field):
+    """
+    NonNegativeInteger field.
+    """
     def __init__(self, type_num: int, default=None, fixed_len: int = None):
         super().__init__(type_num, default)
         if fixed_len not in {None, 1, 2, 4, 8}:
@@ -232,6 +250,9 @@ class UintField(Field):
 
 
 class BoolField(Field):
+    """
+    Boolean field.
+    """
     def encoded_length(self, val, markers: dict) -> int:
         tl_size = get_tl_num_size(self.type_num) + 1
         return tl_size if val else 0
@@ -423,6 +444,9 @@ class InterestNameField(Field):
 
 
 class NameField(Field):
+    """
+    NDN Name field.
+    """
     def __init__(self, default=None):
         super().__init__(Name.TYPE_NAME, default)
 
@@ -467,6 +491,9 @@ class NameField(Field):
 
 
 class BytesField(Field):
+    r"""
+    Field for \*OCTET.
+    """
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
             return 0
@@ -489,6 +516,9 @@ class BytesField(Field):
 
 
 class TlvModel(metaclass=TlvModelMeta):
+    """
+    Used to describe a TLV format.
+    """
     _encoded_fields: List[Field]
 
     def __repr__(self):
@@ -583,6 +613,9 @@ class TlvModel(metaclass=TlvModelMeta):
 
 
 class ModelField(Field):
+    """
+    Field for nested TlvModel.
+    """
     def __init__(self,
                  type_num: int,
                  model_type: Type[TlvModel],
@@ -635,6 +668,9 @@ class ModelField(Field):
 
 
 class RepeatedField(Field):
+    """
+    Field for an array of a specific type.
+    """
     def __init__(self, element_type: Field):
         # default should be None here to prevent unintended modification
         super().__init__(element_type.type_num, None)

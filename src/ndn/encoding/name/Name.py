@@ -17,7 +17,7 @@
 # along with python-ndn.  If not, see <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 """
-Component module is a collection of functions processing NDN Names.
+Name module is a collection of functions processing NDN Names.
 """
 from functools import reduce
 from typing import List, Optional, Iterable
@@ -42,7 +42,7 @@ def from_str(val: str) -> List[bytearray]:
             to surround it. Also, there should be no scheme identifier and authority component in the
             URI.
 
-    :return: :class:`FormalName`.
+    :return: :any:`FormalName`.
 
     :examples:
         >>> from ndn.encoding.name import Name
@@ -73,7 +73,7 @@ def to_str(name: NonStrictName) -> str:
     Convert an NDN Name to a URI string.
 
     :param name: the input NDN Name.
-    :type name: :class:`NonStrictName`
+    :type name: :any:`NonStrictName`
     :return: the URI.
 
     :examples:
@@ -91,7 +91,7 @@ def from_bytes(buf: BinaryStr) -> FormalName:
 
     :param buf: encoded Name.
     :return: Decoded Name.
-    :rtype: :class:`FormalName`
+    :rtype: :any:`FormalName`
     """
     return decode(buf)[0]
 
@@ -101,7 +101,7 @@ def to_bytes(name: NonStrictName) -> bytes:
     Encode a Name via TLV encoding.
 
     :param name: Name to encode.
-    :type name: :class:`NonStrictName`
+    :type name: :any:`NonStrictName`
     :return: Encoded Name.
     """
     if not is_binary_str(name):
@@ -114,9 +114,9 @@ def is_prefix(lhs: NonStrictName, rhs: NonStrictName) -> bool:
     Test if a Name is a prefix of another Name.
 
     :param lhs: prefix to be tested.
-    :type lhs: :class:`NonStrictName`
+    :type lhs: :any:`NonStrictName`
     :param rhs: full name to test on.
-    :type rhs: :class:`NonStrictName`
+    :type rhs: :any:`NonStrictName`
     :return: ``True`` if ``lhs`` is a prefix of ``rhs``.
     """
     lhs = normalize(lhs)
@@ -186,9 +186,9 @@ def normalize(name: NonStrictName) -> FormalName:
     If name is a list, encode all str elements into Components.
 
     :param name: the NonStrictName.
-    :type name: :class:`NonStrictName`
+    :type name: :any:`NonStrictName`
     :return: the FormalName. It may be a swallow copy of name.
-    :rtype: :class:`FormalName`
+    :rtype: :any:`FormalName`
 
     :examples:
         >>> from ndn.encoding.name import Name

@@ -23,9 +23,22 @@ __all__ = ['BinaryStr', 'VarBinaryStr', 'FormalName', 'NonStrictName', 'is_binar
 
 
 BinaryStr = Union[bytes, bytearray, memoryview]
+r"""A binary string is any of :class:`bytes`, :class:`bytearray`, :class:`memoryview`."""
+
 VarBinaryStr = Union[bytearray, memoryview]
+r"""A variant binary string is a :class:`bytearray` or a non-readonly :class:`memoryview`."""
+
 FormalName = List[BinaryStr]
+r"""A FormalName is a list of encoded Components."""
+
 NonStrictName = Union[Iterable[Union[BinaryStr, str]], str, BinaryStr]
+r"""
+A NonStrictName is any of below:
+
+- A URI string.
+- A list or iterator of Components, in the form of either encoded TLV or URI string.
+- An encoded Name of type :class:`bytes`, :class:`bytearray` or :class:`memoryview`.
+"""
 
 
 def is_binary_str(var):
@@ -33,6 +46,6 @@ def is_binary_str(var):
     Check whether var is of type BinaryStr.
 
     :param var: The variable to check.
-    :return: True if var is a BinaryStr.
+    :return: True if var is a :any:`BinaryStr`.
     """
     return isinstance(var, bytes) or isinstance(var, bytearray) or isinstance(var, memoryview)
