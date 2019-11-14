@@ -38,14 +38,16 @@ A NonStrictName is any of below:
 - A URI string.
 - A list or iterator of Components, in the form of either encoded TLV or URI string.
 - An encoded Name of type :class:`bytes`, :class:`bytearray` or :class:`memoryview`.
+
+See also :ref:`label-different-names`
 """
 
 
 def is_binary_str(var):
-    """
+    r"""
     Check whether var is of type BinaryStr.
 
     :param var: The variable to check.
-    :return: True if var is a :any:`BinaryStr`.
+    :return: ``True`` if var is a :any:`BinaryStr`.
     """
     return isinstance(var, bytes) or isinstance(var, bytearray) or isinstance(var, memoryview)

@@ -43,6 +43,14 @@ def get_tl_num_size(val: int) -> int:
 
 
 def write_tl_num(val: int, buf: VarBinaryStr, offset: int = 0) -> int:
+    """
+    Write a Type or Length value into a buffer.
+
+    :param val: the value.
+    :param buf: the buffer.
+    :param offset: the starting offset.
+    :return: the encoded length.
+    """
     if val <= 0xFC:
         struct.pack_into('!B', buf, offset, val)
         return 1
@@ -58,6 +66,12 @@ def write_tl_num(val: int, buf: VarBinaryStr, offset: int = 0) -> int:
 
 
 def pack_uint_bytes(val: int) -> bytes:
+    """
+    Pack an non-negative integer value into bytes
+
+    :param val: the integer.
+    :return: the buffer.
+    """
     if val <= 0xFF:
         return struct.pack('!B', val)
     elif val <= 0xFFFF:
@@ -69,6 +83,13 @@ def pack_uint_bytes(val: int) -> bytes:
 
 
 def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
+    """
+    Parse a Type or Length variable from a buffer.
+
+    :param buf: the buffer.
+    :param offset: the starting offset.
+    :return: a pair (value, size parsed).
+    """
     ret = buf[offset]
     if ret <= 0xFC:
         return ret, 1
@@ -81,6 +102,12 @@ def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
 
 
 async def read_tl_num_from_stream(reader: aio.StreamReader) -> int:
+    """
+    Read a Type or Length variable from a StreamReader.
+
+    :param reader: the StreamReader.
+    :return: the value read.
+    """
     buf = await reader.readexactly(1)
     num = buf[0]
     if num <= 0xFC:
@@ -97,6 +124,16 @@ async def read_tl_num_from_stream(reader: aio.StreamReader) -> int:
 
 
 def parse_and_check_tl(wire: BinaryStr, expected_type: int) -> memoryview:
+    """
+    Parse Type and Length, and then check:
+
+    - If the Type equals `expected_type`;
+    - If the Length equals the length of `wire`.
+
+    :param wire: the TLV encoded wire.
+    :param expected_type: expected Type.
+    :return: a pointer to the memory of Value.
+    """
     typ, typ_len = parse_tl_num(wire, 0)
     size, siz_len = parse_tl_num(wire, typ_len)
     if typ != expected_type:

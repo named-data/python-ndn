@@ -31,14 +31,14 @@ __all__ = ['DecodeError', 'TlvModel', 'ProcedureArgument', 'OffsetMarker', 'Uint
 
 class DecodeError(Exception):
     """
-    TODO
+    Raised when there is a critical field (Type is odd) that is unrecognized, redundant or out-of-order.
     """
     pass
 
 
 class IncludeBaseError(Exception):
     """
-    TODO
+    Raised when IncludeBase is used to include a non-base class.
     """
     pass
 
@@ -53,7 +53,7 @@ class IncludeBase:
 
 class TlvModelMeta(abc.ABCMeta):
     """
-    Metaclass for TlvModel, used to collect fields
+    Metaclass for TlvModel, used to collect fields.
     """
     def __new__(mcs, name, bases, attrs):
         cls = super().__new__(mcs, name, bases, attrs)
@@ -88,38 +88,73 @@ class TlvModelMeta(abc.ABCMeta):
 
 class Field(metaclass=abc.ABCMeta):
     """
-    Field of TlvModel.
+    Field of :class:`TlvModel`.
+    A field with value ``None`` will be omitted in encoding TLV.
+    There is no required field in a :class:`TlvModel`, i.e. any Field can be ``None``.
+
+    :ivar name: The name of the field
+    :vartype name: str
+
+    :ivar type_num: The Type number used in TLV encoding
+    :vartype type_num: int
+
+    :ivar default: The default value used for parsing and encoding.
+
+        - If this field is absent during parsing, ``default`` is used to fill in this field.
+        - If this field is not explicitly assigned to None before encoding,
+          ``default`` is used.
     """
     def __init__(self, type_num: int, default=None):
         """
         Initialize a TLV field.
 
         :param type_num: Type number.
-        :param default: Default value used for parsing and encoding.
-            If this field is absent during parsing, return default.
-            If this field is not explicitly assigned to None before encoding, use default.
+        :param default: default value used for parsing and encoding.
         """
         self.name = None
         self.type_num = type_num
         self.default = default
 
     def __get__(self, instance, owner):
+        """
+        Get the value of this field in a specific instance.
+        Simply call :meth:`get_value` if ``instance`` is not ``None``.
+
+        :param instance: the instance that this field is being accessed through.
+        :param owner: the owner class of this field.
+        :return: the value of this field.
+        """
         if instance is None:
             return self
         return self.get_value(instance)
 
     def __set__(self, instance, value):
+        """
+        Set the value of this field.
+
+        :param instance: the instance whose field is being set.
+        :param value: the new value.
+        """
         instance.__dict__[self.name] = value
 
     def get_value(self, instance):
+        """
+        Get the value of this field in a specific instance.
+        Most fields use ``instance.__dict__`` to access the value.
+
+        :param instance: the instance that this field is being accessed through.
+        :return: the value of this field.
+        """
         return instance.__dict__.get(self.name, self.default)
 
     @abc.abstractmethod
     def encoded_length(self, val, markers: dict) -> int:
-        """
+        r"""
         Preprocess value and get encoded length of this field.
-        The function may use markers[f'{self.name}##encoded_length'] to store the length without TL.
-        Other marker variables starting with f'{self.name}##' may also be used.
+        The function may use ``markers[f'{self.name}##encoded_length']`` to store the length without TL.
+        Other marker variables starting with ``f'{self.name}##'`` may also be used.
+        Generally, marker variables are only used to store temporary values and avoid duplicated calculation.
+        One field should not access to another field's marker by its name.
 
         This function may also use other marker variables. However, in that case,
         this field must be unique in a TlvModel. Usage of marker variables should follow
@@ -127,32 +162,65 @@ class Field(metaclass=abc.ABCMeta):
 
         :param val: value of this field
         :param markers: encoding marker variables
-        :return: encoded length
+        :return: encoded length without TL.
+            It is expected as the exact length when encoding this field.
+            The only exception is ``SignatureValueField`` (invisible to application developer).
         """
         pass
 
     @abc.abstractmethod
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         """
-        Encode this field into wire. Must be called after encoded_length.
+        Encode this field into wire. Must be called after :meth:`encoded_length`.
 
         :param val: value of this field
         :param markers: encoding marker variables
         :param wire: buffer to encode
         :param offset: offset of this field in wire
-        :return: encoded_length.
+        :return: encoded length without TL.
+            It is expected to be the same as :meth:`encoded_length` returns.
         """
         pass
 
     @abc.abstractmethod
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        """
+        Parse the value of this field from an encoded wire.
+
+        :param instance: the instance to parse into.
+        :param markers: encoding marker variables. Only used in special cases.
+        :param wire: the TLV encoded wire.
+        :param offset: the offset of this field's Value in ``wire``.
+        :param length: the Length of this field's Value.
+        :param offset_btl: the offset of this field's TLV.
+
+            .. code-block:: python3
+
+                assert offset == (offset_btl
+                                + get_tl_num_size(self.type_num)
+                                + get_tl_num_size(length))
+
+        :return: the value.
+        """
         pass
 
     def skipping_process(self, markers: dict, wire: BinaryStr, offset: int):
+        """
+        Called when this field does not occur in ``wire`` and thus be skipped.
+
+        :param markers: encoding marker variables.
+        :param wire: the TLV encoded wire.
+        :param offset: the offset where this field should have been if it occurred.
+        """
         pass
 
 
 class ProcedureArgument(Field):
+    """
+    A marker variable used during encoding or parsing.
+    It does not have a value.
+    Instead, it provides a way to access a specific variable in ``markers``.
+    """
     def __init__(self, default=None):
         super().__init__(-1, default)
 
@@ -166,19 +234,40 @@ class ProcedureArgument(Field):
         pass
 
     def __get__(self, instance, owner):
+        """
+        :return: itself.
+        """
         return self
 
     def __set__(self, instance, value):
+        """
+        This is not allowed and will raise a :class:`TypeError` if called.
+        """
         raise TypeError('ProcedureArgument can only be set via set_arg()')
 
     def get_arg(self, markers: dict):
+        """
+        Get its value from ``markers``
+
+        :param markers: the markers dict.
+        :return: its value.
+        """
         return markers.get(f'{self.name}##args', self.default)
 
     def set_arg(self, markers: dict, val):
+        """
+        Set its value in ``markers``.
+
+        :param markers: the markers dict.
+        :param val: the new value.
+        """
         markers[f'{self.name}##args'] = val
 
 
 class OffsetMarker(ProcedureArgument):
+    """
+    A marker variable that records its position in TLV wire in terms of offset.
+    """
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         self.set_arg(markers, offset)
         return 0
@@ -190,6 +279,14 @@ class OffsetMarker(ProcedureArgument):
 class UintField(Field):
     """
     NonNegativeInteger field.
+
+    Type: :class:`int`
+
+    Its Length is 1, 2, 4 or 8 when present.
+
+    :ivar fixed_len: the fixed value for Length if it's not ``None``.
+        Only 1, 2, 4 and 8 are acceptable.
+    :vartype fixed_len: int
     """
     def __init__(self, type_num: int, default=None, fixed_len: int = None):
         super().__init__(type_num, default)
@@ -252,6 +349,15 @@ class UintField(Field):
 class BoolField(Field):
     """
     Boolean field.
+
+    Type: :class:`bool`
+
+    Its Length is always 0.
+    When present, its Value is ``True``.
+    When absent, its Value is ``None``, which is equivalent to ``False``.
+
+    .. note::
+        The default value is always ``None``.
     """
     def encoded_length(self, val, markers: dict) -> int:
         tl_size = get_tl_num_size(self.type_num) + 1
@@ -445,7 +551,9 @@ class InterestNameField(Field):
 
 class NameField(Field):
     """
-    NDN Name field.
+    NDN Name field. Its Type is always :any:`Name.TYPE_NAME`.
+
+    Type: :any:`NonStrictName`
     """
     def __init__(self, default=None):
         super().__init__(Name.TYPE_NAME, default)
@@ -492,7 +600,12 @@ class NameField(Field):
 
 class BytesField(Field):
     r"""
-    Field for \*OCTET.
+    Field for ``*OCTET``.
+
+    Type: :any:`BinaryStr`
+
+    .. note::
+        Do not assign it with a :class:`str`.
     """
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
@@ -516,8 +629,11 @@ class BytesField(Field):
 
 
 class TlvModel(metaclass=TlvModelMeta):
-    """
+    r"""
     Used to describe a TLV format.
+
+    :ivar _encoded_fields: a list of :any:`Field` in order.
+    :vartype _encoded_fields: List[Field]
     """
     _encoded_fields: List[Field]
 
@@ -526,12 +642,24 @@ class TlvModel(metaclass=TlvModelMeta):
         return f'{self.__class__.__name__}({values})'
 
     def __eq__(self, other):
+        """
+        Compare two TlvModels
+
+        :param other: the other TlvModel to compare with.
+        :return: whether all Fields are equal.
+        """
         for field in self._encoded_fields:
             if field.get_value(self) != field.get_value(other):
                 return False
         return True
 
     def asdict(self, dict_factory=dict):
+        """
+        Return a dict to represent this TlvModel.
+
+        :param dict_factory: class of dict.
+        :return: the dict.
+        """
         result = []
         for field in self._encoded_fields:
             if isinstance(field, ModelField):
@@ -545,6 +673,12 @@ class TlvModel(metaclass=TlvModelMeta):
         return dict_factory(result)
 
     def encoded_length(self, markers: Optional[dict] = None) -> int:
+        """
+        Get the encoded Length of this TlvModel.
+
+        :param markers: encoding marker variables.
+        :return: the encoded Length.
+        """
         if markers is None:
             markers = {}
         ret = 0
@@ -557,6 +691,15 @@ class TlvModel(metaclass=TlvModelMeta):
                wire: VarBinaryStr = None,
                offset: int = 0,
                markers: Optional[dict] = None) -> VarBinaryStr:
+        r"""
+        Encode the TlvModel.
+
+        :param wire: the buffer to contain the encoded wire.
+            A new :class:`bytearray` will be created if it's ``None``.
+        :param offset: the starting offset.
+        :param markers: encoding marker variables.
+        :return: wire.
+        """
         if markers is None:
             markers = {}
         if f'##encoded_length' in markers:
@@ -572,6 +715,16 @@ class TlvModel(metaclass=TlvModelMeta):
 
     @classmethod
     def parse(cls, wire: BinaryStr, markers: Optional[dict] = None, ignore_critical: bool = False):
+        """
+        Parse a TlvModel from TLV encoded wire.
+
+        :param wire: the TLV encoded wire.
+        :param markers: encoding marker variables.
+        :param ignore_critical: whether to ignore unknown critical fields.
+        :return: parsed TlvModel.
+
+        :raises DecodeError: a critical field is unrecognized, redundant or out-of-order.
+        """
         if markers is None:
             markers = {}
         offset = 0
@@ -613,8 +766,16 @@ class TlvModel(metaclass=TlvModelMeta):
 
 
 class ModelField(Field):
-    """
+    r"""
     Field for nested TlvModel.
+
+    Type: :any:`TlvModel`
+
+    :ivar model_type: the type of its value.
+    :vartype model_type: :any:`TlvModelMeta`
+
+    :ivar ignore_critical: whether to ignore critical fields (whose Types are odd).
+    :vartype ignore_critical: :class:`bool`
     """
     def __init__(self,
                  type_num: int,
@@ -668,8 +829,20 @@ class ModelField(Field):
 
 
 class RepeatedField(Field):
-    """
+    r"""
     Field for an array of a specific type.
+    All elements will be directly encoded into TLV wire in order, sharing the same Type.
+    The ``type_num`` of ``element_type`` is used.
+
+    Type: :class:`list`
+
+    :vartype element_type: :any:`Field`
+    :ivar element_type: the type of elements in the list.
+
+        .. warning::
+
+            Please always create a new :any:`Field` instance.
+            Don't use an existing one.
     """
     def __init__(self, element_type: Field):
         # default should be None here to prevent unintended modification

@@ -92,6 +92,8 @@ def from_bytes(buf: BinaryStr) -> FormalName:
     :param buf: encoded Name.
     :return: Decoded Name.
     :rtype: :any:`FormalName`
+
+    :raises ValueError: if the Type is not :any:`TYPE_NAME` .
     """
     return decode(buf)[0]
 
@@ -189,6 +191,8 @@ def normalize(name: NonStrictName) -> FormalName:
     :type name: :any:`NonStrictName`
     :return: the FormalName. It may be a swallow copy of name.
     :rtype: :any:`FormalName`
+
+    :raises TypeError: if the name or one of its element has a unrecognized type.
 
     :examples:
         >>> from ndn.encoding.name import Name

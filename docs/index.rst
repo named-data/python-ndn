@@ -11,7 +11,6 @@ Table Of Contents
 -----------------
 .. toctree::
    :maxdepth: 3
-   :glob:
 
    src/readme
    src/installation

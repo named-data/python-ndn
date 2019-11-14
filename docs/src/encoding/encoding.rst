@@ -12,12 +12,14 @@ There are three parts of this package:
 1. **TLV elements**: process TLV variables, Names and NameComponents.
 
 2. **TlvModel**: design a general way to describe a TLV format.
-   A TLV object can be described with a class derived from :class:`TlvModel`,
-   with members of type :class:`Field`.
+   A TLV object can be described with a class derived from :any:`TlvModel`,
+   with members of type :any:`Field`.
 
 3. **NDN Packet Fotmat v0.3**: functions used to encode and parse
    Interest and Data packets in
    `NDN Packet Format Spec 0.3 <http://named-data.net/doc/NDN-packet-spec/current/>`_.
+
+.. _label-different-names:
 
 :any:`FormalName` and :any:`NonStrictName`
 ------------------------------------------
