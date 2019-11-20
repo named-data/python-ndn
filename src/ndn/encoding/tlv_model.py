@@ -699,6 +699,11 @@ class TlvModel(metaclass=TlvModelMeta):
         :param offset: the starting offset.
         :param markers: encoding marker variables.
         :return: wire.
+
+        :raises ValueError: some field is assigned with improper value.
+        :raises TypeError: some field is assigned with value of wrong type.
+        :raises IndexError: wire does not have enough length.
+        :raises struct.error: a negative number is assigned to any non-negative integer field.
         """
         if markers is None:
             markers = {}
@@ -724,6 +729,7 @@ class TlvModel(metaclass=TlvModelMeta):
         :return: parsed TlvModel.
 
         :raises DecodeError: a critical field is unrecognized, redundant or out-of-order.
+        :raises IndexError: the Length of a field exceeds the size of wire.
         """
         if markers is None:
             markers = {}

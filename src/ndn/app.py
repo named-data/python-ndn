@@ -34,6 +34,14 @@ from .client_conf import read_client_conf, default_face, default_keychain
 
 
 class NDNApp:
+    """
+    An NDN application.
+
+    :ivar face: the Face used to connection to a NFD node.
+    :ivar keychain: the Keychain to store Identities and Keys, providing Signers.
+    :ivar int_validator: the default validator for Interest packets.
+    :ivar data_validator: the default validator for Data packets.
+    """
     face: Face = None
     keychain: Keychain = None
     _int_tree: NameTrie = None
@@ -60,6 +68,12 @@ class NDNApp:
         self._autoreg_routes = []
 
     async def _receive(self, typ: int, data: BinaryStr):
+        """
+        Pipeline when a packet is received.
+
+        :param typ: the Type.
+        :param data: the Value of the packet without TL.
+        """
         logging.debug('Packet received %s, %s' % (typ, bytes(data)))
         if typ == TypeNumber.INTEREST:
             try:
@@ -90,11 +104,28 @@ class NDNApp:
             logging.warning('Unable to decode received packet')
 
     def put_raw_packet(self, data: BinaryStr):
+        r"""
+        Send a raw Data packet.
+
+        :param data: TLV encoded Data packet.
+        :type data: :any:`BinaryStr`
+        :raises NetworkError: the face to NFD is down.
+        """
         if not self.face.running:
             raise NetworkError('cannot send packet before connected')
         self.face.send(data)
 
     def prepare_data(self, name: NonStrictName, content: Optional[BinaryStr] = None, **kwargs):
+        r"""
+        Prepare a Data packet by generating, encoding and signing it.
+
+        :param name: the Name.
+        :type name: :any:`NonStrictName`
+        :param content: the Content.
+        :type content: Optional[:any:`BinaryStr`]
+        :param kwargs: :ref:`label-keyword-arguments`.
+        :return: TLV encoded Data packet.
+        """
         if 'signer' in kwargs:
             signer = kwargs['signer']
         else:
@@ -106,6 +137,16 @@ class NDNApp:
         return make_data(name, meta_info, content, signer=signer)
 
     def put_data(self, name: NonStrictName, content: Optional[BinaryStr] = None, **kwargs):
+        r"""
+        Publish a Data packet.
+
+        :param name: the Name.
+        :type name: :any:`NonStrictName`
+        :param content: the Content.
+        :type content: Optional[:any:`BinaryStr`]
+        :param kwargs: :ref:`label-keyword-arguments`.
+        :return: TLV encoded Data packet.
+        """
         self.put_raw_packet(self.prepare_data(name, content, **kwargs))
 
     def express_interest(self,
@@ -113,6 +154,34 @@ class NDNApp:
                          app_param: Optional[BinaryStr] = None,
                          validator: Optional[Validator] = None,
                          **kwargs) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
+        r"""
+        Express an Interest packet.
+
+        The Interest packet is sent immediately and a coroutine used to get the result is returned.
+        Awaiting on what is returned will block until the Data is received and return that Data.
+        An exception is raised if unable to receive the Data.
+
+        :param name: the Name.
+        :type name: :any:`NonStrictName`
+        :param app_param: the ApplicationParameters.
+        :type app_param: Optional[:any:`BinaryStr`]
+        :param validator: the Validator used to verify the Data received.
+        :type validator: Optional[:any:`Validator`]
+        :param kwargs: :ref:`label-keyword-arguments`.
+        :return: A tuple of (Name, MetaInfo, Content) after ``await``.
+        :rtype: Coroutine[Any, None, Tuple[:any:`FormalName`, :any:`MetaInfo`, Optional[:any:`BinaryStr`]]]
+
+        The following exception is raised by ``express_interest``:
+
+        :raises NetworkError: the face to NFD is down before sending this Interest.
+
+        The following exceptions are raised by the coroutine returned:
+
+        :raises InterestNack: an NetworkNack is received.
+        :raises InterestTimeout: time out.
+        :raises ValidationFailure: unable to validate the Data packet.
+        :raises InterestCanceled: the face to NFD is shut down after sending this Interest.
+        """
         if not self.face.running:
             raise NetworkError('cannot send packet before connected')
         if 'signer' in kwargs:
@@ -153,6 +222,11 @@ class NDNApp:
             raise ValidationFailure(name, meta_info, content)
 
     async def main_loop(self, after_start: Awaitable = None):
+        """
+        The main loop of NDNApp.
+
+        :param after_start: the coroutine to start after connection to NFD is established.
+        """
         async def starting_task():
             for name, route, validator in self._autoreg_routes:
                 await self.register(name, route, validator)
@@ -174,10 +248,26 @@ class NDNApp:
         self._int_tree.clear()
 
     def shutdown(self):
+        """
+        Manually shutdown the face to NFD.
+        """
         logging.info('Manually shutdown')
         self.face.shutdown()
 
     def run_forever(self, after_start: Awaitable = None) -> bool:
+        """
+        A non-async wrapper of :meth:`main_loop`.
+
+        :param after_start: the coroutine to start after connection to NFD is established.
+
+        :examples:
+            .. code-block:: python3
+
+                app = NDNApp()
+
+                if __name__ == '__main__':
+                    app.run_forever(after_start=main())
+        """
         task = self.main_loop(after_start)
         try:
             aio.get_event_loop().run_until_complete(task)
@@ -191,6 +281,31 @@ class NDNApp:
         return ret
 
     def route(self, name: NonStrictName, validator: Optional[Validator] = None):
+        """
+        A decorator used to register a permanent route for a specific prefix.
+
+        This function is non-blocking and can be called at any time.
+        If it is called before connecting to NFD, NDNApp will remember this route and
+        automatically register it every time when a connection is established.
+        Failure in registering this route to NFD will be ignored.
+
+        The decorated function should accept 3 arguments: Name, Interest parameters and ApplicationParameters.
+
+        :param name: the Name prefix for this route.
+        :type name: :any:`NonStrictName`
+        :param validator: the Validator used to validate coming Interests.
+            Interests which fails to be validated will be dropped without raising any exception.
+        :type validator: Optional[:any:`Validator`]
+
+        :examples:
+            .. code-block:: python3
+
+                app = NDNApp()
+
+                @app.route('/example/rpc')
+                def on_interest(name: FormalName, param: InterestParam, app_param):
+                    pass
+        """
         name = Name.normalize(name)
 
         def decorator(func: Route):
@@ -201,6 +316,20 @@ class NDNApp:
         return decorator
 
     async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None):
+        """
+        Register a route for a specific prefix dynamically.
+
+        :param name: the Name prefix for this route.
+        :type name: :any:`NonStrictName`
+        :param func: the onInterest function for the specified route.
+        :type func: Callable[[:any:`FormalName`, :any:`InterestParam`, Optional[:any:`BinaryStr`]], ``None``]
+        :param validator: the Validator used to validate coming Interests.
+        :type validator: Optional[:any:`Validator`]
+        :return: ``True`` if the registration succeeded.
+
+        :raises ValueError: the prefix is already registered.
+        :raises NetworkError: the face to NFD is down now.
+        """
         name = Name.normalize(name)
         node = self._prefix_tree.setdefault(name, PrefixTreeNode())
         if node.callback:
@@ -224,6 +353,12 @@ class NDNApp:
             return False
 
     async def unregister(self, name: NonStrictName):
+        """
+        Unregister a route for a specific prefix.
+
+        :param name: the Name prefix.
+        :type name: :any:`NonStrictName`
+        """
         name = Name.normalize(name)
         del self._prefix_tree[name]
         await self.express_interest(make_command('rib', 'unregister', name=name), lifetime=1000)

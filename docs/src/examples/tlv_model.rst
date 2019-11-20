@@ -117,8 +117,25 @@ Overriding fields will be encoded in their *original* places, irrelevant to the 
 Parsing
 -------
 
-TODO:
+A TlvModel can be parsed from a wire. All fields are parsed in order.
+Out of order or unknown fields are ignored if they are non-critical.
+An unknown critical field leads to :any:`DecodeError` .
 
-- Fields are parsed in order.
-- Out of order / Unknown fields are decided by critical.
-- Signature.
+.. code-block:: python3
+
+    from ndn.encoding import *
+
+    class Model(TlvModel):          # Model = [Name] [IntVal] [StrVal] [BoolVal]
+        name = NameField()          # Name = NAME-TYPE TLV-LENGTH ...
+        int_val = UintField(0x03)   # IntVal = INT-VAL-TYPE TLV-LENGTH nonNegativeInteger
+        str_val = BytesField(0x02)  # StrVal = STR-VAL-TYPE TLV-LENGTH *OCTET
+        bool_val = BoolField(0x01)  # BoolVal = BOOL-VAL-TYPE 0
+
+    model = Model.parse(b'\x07\x06\x08\x04name\x02\nbit string')
+    assert Name.to_str(model.name) == '/name'
+    assert model.str_val == b'bit string'
+
+Signature
+---------
+
+Please contact the developer if you have to have a Signature field in your model.

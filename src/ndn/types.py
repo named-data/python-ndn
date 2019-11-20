@@ -21,22 +21,40 @@ from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, SignatureP
 
 
 Route = Callable[[FormalName, InterestParam, Optional[BinaryStr]], None]
+r"""An OnInterest callback function for a route."""
+
 Validator = Callable[[FormalName, SignaturePtrs], Coroutine[Any, None, bool]]
+r"""A validator used to validate an Interest or Data packet."""
 
 
 class NetworkError(Exception):
+    """
+    Raised when trying to send a packet before connecting to NFD.
+    """
     pass
 
 
 class InterestTimeout(Exception):
+    """
+    Raised when an Interest times out.
+    """
     pass
 
 
 class InterestCanceled(Exception):
+    """
+    Raised when an Interest is cancelled due to the loss of connection to NFD.
+    """
     pass
 
 
 class InterestNack(Exception):
+    """
+    Raised when receiving a NetworkNack.
+
+    :ivar reason: reason for Nack.
+    :vartype reason: int
+    """
     reason: int
 
     def __init__(self, reason: int):
@@ -44,6 +62,16 @@ class InterestNack(Exception):
 
 
 class ValidationFailure(Exception):
+    """
+    Raised when failing to validate a Data packet.
+
+    :ivar name: the Name of Data.
+    :vartype name: :any:`FormalName`
+    :ivar meta_info: the MetaInfo.
+    :vartype meta_info: :any:`MetaInfo`
+    :ivar content: the Content of Data.
+    :vartype content: Optional[:any:`BinaryStr`]
+    """
     name: FormalName
     meta_info: MetaInfo
     content: Optional[BinaryStr]

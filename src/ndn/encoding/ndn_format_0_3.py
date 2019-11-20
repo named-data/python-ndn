@@ -34,6 +34,12 @@ __all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'Signatur
 
 
 class TypeNumber:
+    r"""
+    TLV Type numbers used in `NDN Packet Format 0.3
+    <https://named-data.net/doc/NDN-packet-spec/current/types.html>`_.
+
+    Constant names are changed to PEP 8 style, i.e., all upper cases with underscores separating words.
+    """
     INTEREST = 0x05
     DATA = 0x06
 
@@ -72,6 +78,18 @@ class TypeNumber:
 
 
 class ContentType:
+    r"""
+    Numbers used in ContentType.
+
+    ====   ===================================
+    Type   Description
+    ====   ===================================
+    BLOB   Payload identified by the data name
+    LINK   A list of delegations
+    KEY    Public Key
+    NACK   Application-level NACK
+    ====   ===================================
+    """
     BLOB = 0
     LINK = 1
     KEY = 2
@@ -79,6 +97,19 @@ class ContentType:
 
 
 class SignatureType:
+    r"""
+    Numbers used in SignatureType.
+
+    =================   ==============================================
+    Type                Description
+    =================   ==============================================
+    NOT_SIGNED          Not signed
+    DIGEST_SHA256       SHA-256 digest (only for integrity protection)
+    SHA256_WITH_RSA     RSA signature over a SHA-256 digest
+    SHA256_WITH_ECDSA   An ECDSA signature over a SHA-256 digest
+    HMAC_WITH_SHA256    SHA256 hash-based message authentication codes
+    =================   ==============================================
+    """
     NOT_SIGNED = None
     DIGEST_SHA256 = 0
     SHA256_WITH_RSA = 1
@@ -273,6 +304,28 @@ class DataPacket(TlvModel):
 
 @dc.dataclass
 class InterestParam:
+    r"""
+    A dataclass collecting the parameters of an Interest, except ApplicationParameters.
+
+    :ivar can_be_prefix: CanBePrefix. ``False`` by default.
+    :vartype can_be_prefix: bool
+
+    :ivar must_be_fresh: MustBeFresh. ``False`` by default.
+    :vartype must_be_fresh: bool
+
+    :ivar nonce: Nonce. ``None`` by default.
+    :vartype nonce: int
+
+    :ivar lifetime: InterestLifetime in milliseconds. ``4000`` by default.
+    :vartype lifetime: int
+
+    :ivar hop_limit: HopLimit. ``None`` by default.
+    :vartype hop_limit: int
+
+    :ivar forwarding_hint: ForwardingHint. The type should be list of pairs of Preference and Name.
+        e.g.: ``[(1, "/ndn/name1"), (2, ["ndn", "name2"])]``
+    :vartype forwarding_hint: :class:`List` [ :class:`Tuple` [ :class:`int` , :any:`NonStrictName` ]]
+    """
     can_be_prefix: bool = False
     must_be_fresh: bool = False
     nonce: Optional[int] = None
@@ -289,6 +342,25 @@ class InterestParam:
 
 @dc.dataclass
 class SignaturePtrs:
+    r"""
+    A set of pointers used to verify a packet.
+
+    :ivar signature_info: the SignatureInfo.
+    :vartype signature_info: :any:`SignatureInfo`
+
+    :ivar signature_covered_part: a list of pointers, each of which points to a memory covered by signature.
+    :vartype signature_covered_part: :class:`List` [ :class:`memoryview` ]
+
+    :ivar signature_value_buf: a pointer to SignatureValue (TL excluded).
+    :vartype signature_value_buf: :class:`memoryview`
+
+    :ivar digest_covered_part: a list of pointers, each of which points to a memory covered by
+        ParametersSha256DigestComponent.
+    :vartype digest_covered_part: :class:`List` [ :class:`memoryview` ]
+
+    :ivar digest_value_buf: a pointer to ParametersSha256DigestComponent (TL excluded).
+    :vartype digest_value_buf: :class:`memoryview`
+    """
     signature_info: Optional[SignatureInfo] = None
     signature_covered_part: Optional[List[BinaryStr]] = dc.field(default_factory=list)
     signature_value_buf: Optional[BinaryStr] = None
@@ -303,8 +375,21 @@ Data = Tuple[FormalName, MetaInfo, Optional[BinaryStr], SignaturePtrs]
 def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
                   app_param: Optional[BinaryStr] = None,
-                  signer: Signer = None,
+                  signer: Optional[Signer] = None,
                   need_final_name: bool = False):
+    r"""
+    Make an Interest packet.
+
+    :param name: the Name field.
+    :type name: :any:`NonStrictName`
+    :param interest_param: basic parameters of the Interest.
+    :param app_param: the ApplicationParameters field.
+    :type app_param: :class:`Optional` [ :any:`BinaryStr` ]
+    :param signer: a Signer to sign this Interest. ``None`` if it is unsigned.
+    :param need_final_name: if ``True``, also return the final Name with ParametersSha256DigestComponent.
+    :return: TLV encoded Interest packet. If ``need_final_name``, return a tuple of the packet
+        and the final Name.
+    """
     interest = InterestPacket()
     interest.interest = InterestPacketValue()
     interest.interest.name = name
@@ -340,7 +425,18 @@ def make_interest(name: NonStrictName,
 def make_data(name: NonStrictName,
               meta_info: MetaInfo,
               content: Optional[BinaryStr] = None,
-              signer: Signer = None) -> VarBinaryStr:
+              signer: Optional[Signer] = None) -> VarBinaryStr:
+    r"""
+    Make a Data packet.
+
+    :param name: the Name field.
+    :type name: :any:`NonStrictName`
+    :param meta_info: the MetaIndo field.
+    :param content: the Content.
+    :type content: :class:`Optional` [ :any:`BinaryStr` ]
+    :param signer: a Signer to sign this Interest. ``None`` if it is unsigned.
+    :return: TLV encoded Data packet.
+    """
     data = DataPacket()
     data.data = DataPacketValue()
     data.data.meta_info = meta_info
@@ -358,6 +454,17 @@ def make_data(name: NonStrictName,
 
 
 def parse_interest(wire: BinaryStr, with_tl: bool = True) -> Interest:
+    r"""
+    Parse a TLV encoded Interest.
+
+    :param wire: the buffer.
+    :type wire: :any:`BinaryStr`
+    :param with_tl: ``True`` if the packet has Type and Length.
+        ``False`` if ``wire`` only has the Value part.
+    :return: a Tuple of Name, InterestParameters, ApplicationParameters and :any:`SignaturePtrs`.
+    :rtype: :class:`Tuple` [ :any:`FormalName` , :any:`InterestParam` ,
+        :class:`Optional` [ :any:`BinaryStr` ], :any:`SignaturePtrs` ]
+    """
     if with_tl:
         wire = parse_and_check_tl(wire, TypeNumber.INTEREST)
     markers = {}
@@ -384,6 +491,17 @@ def parse_interest(wire: BinaryStr, with_tl: bool = True) -> Interest:
 
 
 def parse_data(wire: BinaryStr, with_tl: bool = True) -> Data:
+    r"""
+    Parse a TLV encoded Data.
+
+    :param wire: the buffer.
+    :type wire: :any:`BinaryStr`
+    :param with_tl: ``True`` if the packet has Type and Length.
+        ``False`` if ``wire`` only has the Value part.
+    :return: a Tuple of Name, MetaInfo, Content and :any:`SignaturePtrs`.
+    :rtype: :class:`Tuple` [ :any:`FormalName` , :any:`MetaInfo` ,
+        :class:`Optional` [ :any:`BinaryStr` ], :any:`SignaturePtrs` ]
+    """
     if with_tl:
         wire = parse_and_check_tl(wire, TypeNumber.DATA)
     markers = {}

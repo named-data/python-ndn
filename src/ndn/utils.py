@@ -21,12 +21,27 @@ from random import randint
 
 
 def timestamp():
+    """
+    Generate a timestamp number.
+
+    :return: the time in milliseconds since the epoch as an integer
+    """
     return int(time.time() * 1000)
 
 
 def gen_nonce():
+    """
+    Generate a random nonce.
+
+    :return: a random 32-bit unsigned integer.
+    """
     return randint(1, 2 ** 32 - 1)
 
 
 def gen_nonce_64():
+    """
+    Generate a random 64-bit nonce.
+
+    :return: a random 64-bit unsigned integer.
+    """
     return randint(1, 2 ** 64 - 1)

@@ -14,7 +14,10 @@ Table Of Contents
 
    src/readme
    src/installation
+   src/app
    src/encoding/encoding
+   src/security/security
+   src/misc
    src/examples/examples
    src/contribute_support
    src/future

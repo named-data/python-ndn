@@ -17,7 +17,7 @@ There are three parts of this package:
 
 3. **NDN Packet Fotmat v0.3**: functions used to encode and parse
    Interest and Data packets in
-   `NDN Packet Format Spec 0.3 <http://named-data.net/doc/NDN-packet-spec/current/>`_.
+   `NDN Packet Format Spec 0.3 <https://named-data.net/doc/NDN-packet-spec/current/>`_.
 
 .. _label-different-names:
 

@@ -25,9 +25,9 @@ The types of NameComonent follows
 `Name Component Assignment policy <https://redmine.named-data.net/projects/ndn-tlv/wiki/NameComponentType>`_.
 Type constants are following
 
-======================   =============
+======================   =====================================
 Type                     Description
-======================   =============
+======================   =====================================
 TYPE_INVALID             Invalid name component type
 TYPE_GENERIC             Implicit SHA-256 digest component
 TYPE_IMPLICIT_SHA256     SHA-256 digest of Interest Parameters
@@ -38,7 +38,7 @@ TYPE_BYTE_OFFSET         Byte offset
 TYPE_VERSION             Version number
 TYPE_TIMESTAMP           Unix timestamp in microseconds
 TYPE_SEQUENCE_NUM        Sequence number
-======================   =============
+======================   =====================================
 
 """
 import string
