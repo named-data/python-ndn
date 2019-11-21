@@ -22,6 +22,21 @@ from typing import Dict, Any
 
 
 class Keychain(collections.abc.Mapping):
+    """
+    The abstract Keychain class, derived from :class:`collections.abc.Mapping`.
+    It behaves like an immutable dict from :any:`FormalName` to Identity.
+    The implementation of Identity varies with concrete implementations.
+    Generally, its methods should also accept :any:`NonStrictName` as inputs.
+    This includes operators such as ``in`` and ``[]``.
+    """
+    # __getitem__ will be called extra times, but there is no need to optimize for performance
     @abc.abstractmethod
     def get_signer(self, sign_args: Dict[str, Any]):
+        """
+        Get a signer from sign_args.
+
+        :param sign_args: the signing arguments provided by the application.
+        :return: a signer.
+        :rtype: :any:`Signer`
+        """
         pass

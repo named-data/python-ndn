@@ -8,24 +8,9 @@ python-ndn
 
 A Named Data Networking client library with AsyncIO support in Python 3.
 
-Instructions for developer
---------------------------
+It supports Python >=3.6 and PyPy3 >=7.1.1.
 
-To setup python3.6 virtual environment:
-
-.. code-block:: bash
-
-  python3.6 -m venv venv
-  . venv/bin/activate
-  pip3 install -e .
-  pip3 install pytest pytest-cov
-
-To do unit tests:
-
-.. code-block:: bash
-
-  make test
-
+Please see our documentation_ if you have any issues.
 
 .. |Test Badge| image:: https://github.com/zjkmxy/python-ndn/workflows/test/badge.svg
     :target: https://github.com/zjkmxy/python-ndn
@@ -42,3 +27,5 @@ To do unit tests:
 .. |Doc Badge| image:: https://readthedocs.org/projects/python-ndn/badge/?version=latest
     :target: https://python-ndn.readthedocs.io/en/latest/?badge=latest
     :alt: Doc Status
+
+.. _documentation: https://python-ndn.readthedocs.io/en/latest

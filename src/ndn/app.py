@@ -294,7 +294,11 @@ class NDNApp:
         :param name: the Name prefix for this route.
         :type name: :any:`NonStrictName`
         :param validator: the Validator used to validate coming Interests.
-            Interests which fails to be validated will be dropped without raising any exception.
+            An Interest without ApplicationParameters and SignatureInfo will be considered valid without
+            calling validator.
+            Interests with malformed ParametersSha256DigestComponent will be dropped before going into the validator.
+            Otherwise NDNApp will try to validate the Interest with the validator.
+            Interests which fail to be validated will be dropped without raising any exception.
         :type validator: Optional[:any:`Validator`]
 
         :examples:

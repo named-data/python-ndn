@@ -16,7 +16,7 @@ setup(
     description='An NDN client library with AsyncIO support in Python 3',
     url='https://github.com/zjkmxy/python-ndn',
     author='Xinyu Ma',
-    author_email='xinyu.ma@cs.ucla.edu',
+    author_email='ma.xinyu.26a@kyoto-u.jp',
     download_url='https://pypi.python.org/pypi/python-ndn',
     project_urls={
         "Bug Tracker": "https://github.com/zjkmxy/python-ndn/issues",
@@ -26,16 +26,18 @@ setup(
     license='LGPLv3',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
 
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries',
+        'Topic :: Internet',
+        'Topic :: System :: Networking',
 
         'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
 
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8'
+        'Programming Language :: Python :: 3.8',
     ],
 
     keywords='NDN',

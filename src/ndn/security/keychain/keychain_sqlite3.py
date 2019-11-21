@@ -29,6 +29,20 @@ from .keychain import Keychain
 
 @dataclass
 class Certificate:
+    """
+    A dataclass for a Certificate.
+
+    :ivar id: its id in the database.
+    :vartype id: int
+    :ivar key: the Name of the associated Key.
+    :vartype key: :any:`FormalName`
+    :ivar name: its Name.
+    :vartype name: :any:`FormalName`
+    :ivar data: the content.
+    :vartype data: bytes
+    :ivar is_default: whether this is the default Identity.
+    :vartype is_default: bool
+    """
     id: int
     key: FormalName
     name: FormalName
@@ -37,6 +51,20 @@ class Certificate:
 
 
 class Key(Mapping[FormalName, Certificate]):
+    """
+    A Key. It behaves like an immutable ``dict`` from :any:`FormalName` to :any:`Certificate`.
+
+    :ivar row_id: its id in the database.
+    :vartype row_id: int
+    :ivar identity: the Name of the associated Identity.
+    :vartype identity: :any:`FormalName`.
+    :ivar name: its Name.
+    :vartype name: :any:`FormalName`
+    :ivar key_bits: the key bits of the public key.
+    :vartype key_bits: bytes
+    :ivar is_default: whether this is the default Identity.
+    :vartype is_default: bool
+    """
     row_id: int
     identity: FormalName
     name: FormalName
@@ -78,20 +106,42 @@ class Key(Mapping[FormalName, Certificate]):
         cursor.close()
 
     def del_cert(self, name: NonStrictName):
+        """
+        Delete a specific Certificare.
+
+        :param name: the Name of the Key to delete.
+        :type name: :any:`NonStrictName`
+        """
         return self.pib.del_certificate(name)
 
     def has_default_cert(self) -> bool:
+        """
+        Whether it has a default Certificate.
+
+        :return: ``True`` if there is one.
+        """
         cursor = self.pib.conn.execute('SELECT id FROM certificates WHERE is_default=1 AND key_id=?', (self.row_id,))
         ret = cursor.fetchone() is not None
         cursor.close()
         return ret
 
     def set_default_cert(self, name: NonStrictName):
+        """
+        Set the default Certificate.
+
+        :param name: the Name of the new default Certificate.
+        :type name: :any:`NonStrictName`
+        """
         name = Name.to_bytes(name)
         self.pib.conn.execute('UPDATE certificates SET is_default=1 WHERE certificate_name=?', (name,))
         self.pib.conn.commit()
 
     def default_cert(self) -> Certificate:
+        """
+        Get the default Key.
+
+        :return: the default Key.
+        """
         sql = ('SELECT id, certificate_name, certificate_data, is_default '
                'FROM certificates WHERE is_default=1 AND key_id=?')
         cursor = self.pib.conn.execute(sql, (self.row_id,))
@@ -104,6 +154,16 @@ class Key(Mapping[FormalName, Certificate]):
 
 
 class Identity(Mapping[FormalName, Key]):
+    """
+    An Identity. It behaves like an immutable ``dict`` from :any:`FormalName` to :any:`Key`.
+
+    :ivar row_id: its id in the database.
+    :vartype row_id: int
+    :ivar name: its Name.
+    :vartype name: :any:`FormalName`
+    :ivar is_default: whether this is the default Identity.
+    :vartype is_default: bool
+    """
     row_id: int
     name: FormalName
     is_default: bool
@@ -141,23 +201,51 @@ class Identity(Mapping[FormalName, Key]):
         cursor.close()
 
     def del_key(self, name: NonStrictName):
+        """
+        Delete a specific Key.
+
+        :param name: the Name of the Key to delete.
+        :type name: :any:`NonStrictName`
+        """
         return self.pib.del_key(name)
 
-    def new_key(self) -> Key:
-        return self.pib.new_key(self.name)
+    def new_key(self, key_type: str) -> Key:
+        """
+        Create a new key with default arguments.
+
+        :param key_type: the type of the Key. Can be ``ec`` or ``rsa``.
+        :return: the new Key.
+        """
+        return self.pib.new_key(self.name, key_type=key_type)
 
     def has_default_key(self) -> bool:
+        """
+        Whether it has a default Key.
+
+        :return: ``True`` if there is one.
+        """
         cursor = self.pib.conn.execute('SELECT id FROM keys WHERE is_default=1 AND identity_id=?', (self.row_id,))
         ret = cursor.fetchone() is not None
         cursor.close()
         return ret
 
     def set_default_key(self, name: NonStrictName):
+        """
+        Set the default Key.
+
+        :param name: the Name of the new default Key.
+        :type name: :any:`NonStrictName`
+        """
         name = Name.to_bytes(name)
         self.pib.conn.execute('UPDATE keys SET is_default=1 WHERE key_name=?', (name,))
         self.pib.conn.commit()
 
     def default_key(self) -> Key:
+        """
+        Get the default Key.
+
+        :return: the default Key.
+        """
         sql = 'SELECT id, key_name, key_bits, is_default FROM keys WHERE is_default=1 AND identity_id=?'
         cursor = self.pib.conn.execute(sql, (self.row_id,))
         data = cursor.fetchone()
@@ -169,12 +257,23 @@ class Identity(Mapping[FormalName, Key]):
 
 
 class KeychainSqlite3(Keychain):
-    # __getitem__ will be called extra times, but there is no need to optimize for performance
+    r"""
+    Store public infomation in a Sqlite3 database and private keys in a TPM.
+
+    :ivar path: the path to the database. The default path is ``~/.ndn/pib.db``.
+    :vartype path: str
+    :ivar tpm: an instance of TPM.
+    :vartype tpm: :class:`Tpm`
+    :ivar tpm_locator: a URI string describing the location of TPM.
+    :vartype tpm_locator: str
+    """
     tpm: Tpm
+    path: str
     tpm_locator: str
     _signer_cache: dict
 
     def __init__(self, path: str, tpm: Tpm):
+        self.path = path
         self.conn = sqlite3.connect(path)
         cursor = self.conn.execute('SELECT tpm_locator FROM tpmInfo')
         self.tpm_locator = cursor.fetchone()[0]
@@ -208,17 +307,32 @@ class KeychainSqlite3(Keychain):
         return Identity(self, row_id, Name.from_bytes(identity), is_default != 0)
 
     def has_default_identity(self) -> bool:
+        """
+        Whether there is a default Identity.
+        :return: ``True`` if there is one.
+        """
         cursor = self.conn.execute('SELECT id FROM identities WHERE is_default=1')
         ret = cursor.fetchone() is not None
         cursor.close()
         return ret
 
     def set_default_identity(self, name: NonStrictName):
+        """
+        Set the default Identity.
+
+        :param name: the Name of the new default Identity.
+        :type name: :any:`NonStrictName`
+        """
         name = Name.to_bytes(name)
         self.conn.execute('UPDATE identities SET is_default=1 WHERE identity=?', (name,))
         self.conn.commit()
 
     def default_identity(self) -> Identity:
+        """
+        Get the default Identity.
+
+        :return: the default Identity.
+        """
         cursor = self.conn.execute('SELECT id, identity, is_default FROM identities WHERE is_default=1')
         data = cursor.fetchone()
         if not data:
@@ -228,6 +342,13 @@ class KeychainSqlite3(Keychain):
         return Identity(self, row_id, Name.from_bytes(identity), is_default != 0)
 
     def new_identity(self, name: NonStrictName) -> Identity:
+        """
+        Create a new Identity.
+
+        :param name: the Name of the new Identity.
+        :type name: :any:`NonStrictName`
+        :return: the Identity created.
+        """
         name = Name.to_bytes(name)
         if name not in self:
             self.conn.execute('INSERT INTO identities (identity) VALUES (?)', (name,))
@@ -239,6 +360,13 @@ class KeychainSqlite3(Keychain):
         return self[name]
 
     def touch_identity(self, id_name: NonStrictName) -> Identity:
+        """
+        Get an Identity with specific name. Create a new one if it does not exist.
+
+        :param id_name: the Name of Identity.
+        :type id_name: :any:`NonStrictName`
+        :return: the specified Identity.
+        """
         name = Name.to_bytes(id_name)
         if name not in self:
             self.conn.execute('INSERT INTO identities (identity) VALUES (?)', (name,))
@@ -249,9 +377,18 @@ class KeychainSqlite3(Keychain):
         return self[name]
 
     def shutdown(self):
+        """
+        Close the connection.
+        """
         self.conn.close()
 
     def del_identity(self, name: NonStrictName):
+        """
+        Delete a specific Identity.
+
+        :param name: the Identity Name.
+        :type name: :any:`NonStrictName`
+        """
         name = Name.to_bytes(name)
         for key_name in self[name]:
             self.tpm.delete_key(key_name)
@@ -285,6 +422,12 @@ class KeychainSqlite3(Keychain):
         return signer
 
     def del_key(self, name: NonStrictName):
+        """
+        Delete a specific Key.
+
+        :param name: the Key Name.
+        :type name: :any:`NonStrictName`
+        """
         formal_name = Name.normalize(name)
         name = Name.to_bytes(name)
         self.conn.execute('DELETE FROM keys WHERE key_name=?', (name,))
@@ -293,12 +436,39 @@ class KeychainSqlite3(Keychain):
         self._signer_cache = {}
 
     def del_cert(self, name: NonStrictName):
+        """
+        Delete a specific Certificate.
+
+        :param name: the Certificate Name.
+        :type name: :any:`NonStrictName`
+        """
         name = Name.to_bytes(name)
         self.conn.execute('DELETE FROM certificates WHERE certificate_name=?', (name,))
         self.conn.commit()
         self._signer_cache = {}
 
     def new_key(self, id_name: NonStrictName, key_type: str = 'ec', **kwargs) -> Key:
+        """
+        Generate a new key for a specific Identity.
+
+        :param id_name: the Name of Identity.
+        :type id_name: :any:`NonStrictName`
+        :param key_type: the type of key. Can be one of the following:
+
+            + ``ec``: ECDSA key.
+            + ``rsa``: RSA key.
+
+        :param kwargs: keyword arguments.
+
+        :Keyword Arguments:
+
+            + **key_size** (:class:`int`) - key size in bit.
+            + **key_id** (Union[:any:`BinaryStr`, :class:`str`]) - a one-Component ID of the Key.
+            + **key_id_type** (:class:`str`) - the method to generate the ID if *key_id* is not specified.
+              Can be ``random`` or ``sha256``.
+
+        :return: the new Key.
+        """
         name = Name.normalize(id_name)
         if name not in self:
             raise KeyError(f'Identity {Name.to_str(id_name)} does not exist')

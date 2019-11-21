@@ -22,6 +22,7 @@ Table Of Contents
    src/contribute_support
    src/future
    src/authors
+   src/changelog
 
 
 Indices and tables

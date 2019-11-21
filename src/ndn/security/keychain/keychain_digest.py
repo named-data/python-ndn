@@ -22,6 +22,9 @@ from ..signer.sha256_digest_signer import DigestSha256Signer
 
 
 class KeychainDigest(Keychain):
+    """
+    A signer which has no Identity and always returns a SHA-256 digest signer.
+    """
     def get_signer(self, sign_args: Dict[str, Any]):
         if sign_args.pop('no_signature', False):
             return None
