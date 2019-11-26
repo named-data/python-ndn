@@ -33,7 +33,7 @@ setup(
         'Topic :: Internet',
         'Topic :: System :: Networking',
 
-        'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
+        'License :: OSI Approved :: Apache Software License',
 
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
