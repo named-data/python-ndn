@@ -137,9 +137,9 @@ class Key(Mapping[FormalName, Certificate]):
 
     def default_cert(self) -> Certificate:
         """
-        Get the default Key.
+        Get the default Certificate.
 
-        :return: the default Key.
+        :return: the default Certificate.
         """
         sql = ('SELECT id, certificate_name, certificate_data, is_default '
                'FROM certificates WHERE is_default=1 AND key_id=?')
