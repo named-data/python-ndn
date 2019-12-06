@@ -401,3 +401,25 @@ class NDNApp:
             logging.warning('Drop unvalidated Interest: %s' % name)
             return
         node.callback(name, param, app_param)
+
+    @staticmethod
+    def get_original_packet_value(packet_name: FormalName):
+        """
+        Get a pointer to the Value of original Interest or Data packet.
+
+        .. warning::
+
+            Please only call this with a Name returned by :any:`express_interest`,
+            or the Name parameter of a Route. It is undefined behaviour otherwise.
+
+        This is only useful for repo, where you need to keep a Data packet with original signature.
+        Please remember to add the Type and Value field if necessary.
+
+        :param packet_name: the Name get from :any:`express_interest` or a Route.
+        :type packet_name: :any:`FormalName`
+        :return: the Value part of the original packet, TL excluded.
+        :rtype: bytes
+        """
+        assert isinstance(packet_name, list)
+        assert isinstance(packet_name[0], memoryview)
+        return packet_name[0].obj
