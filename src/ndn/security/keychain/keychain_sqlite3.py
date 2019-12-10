@@ -352,6 +352,7 @@ class KeychainSqlite3(Keychain):
         if name not in self:
             self.conn.execute('INSERT INTO identities (identity) VALUES (?)', (name,))
             self.conn.commit()
+            self.new_key(name)
         else:
             raise KeyError(f'Identity {Name.to_str(name)} already exists')
         if not self.has_default_identity():
