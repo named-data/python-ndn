@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import asyncio as aio
 from pygtrie import Trie
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from .encoding import InterestParam, FormalName, Data
 from .types import InterestNack, Validator, Route
 
@@ -46,7 +46,7 @@ class InterestTreeNode:
             future.set_exception(InterestNack(nack_reason))
         return True
 
-    def satisfy(self, data: Data, is_prefix: bool) -> bool:
+    def satisfy(self, data, is_prefix: bool) -> bool:
         exact_match_interest = False
         for future, _, can_be_prefix, _ in self.pending_list:
             if can_be_prefix or not is_prefix:
@@ -71,3 +71,4 @@ class InterestTreeNode:
 class PrefixTreeNode:
     callback: Route = None
     validator: Optional[Validator] = None
+    extra_param: Dict = None

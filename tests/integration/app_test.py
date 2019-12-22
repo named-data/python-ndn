@@ -184,3 +184,17 @@ class TestInvalidInterest(NDNAppTestSuite):
         @self.app.route('/not', validator=self.validator)
         def on_interest(_name, _param, _app_param):
             raise ValueError('This test fails')
+
+
+class TestRoute2(NDNAppTestSuite):
+    async def face_proc(self, face: DummyFace):
+        await face.ignore_output(0)
+        await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+        await face.consume_output(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
+
+    async def app_main(self):
+        @self.app.route('/not', raw_packet=True, sig_ptrs=True)
+        def on_interest(name, _param, _app_param, raw_packet, sig_ptrs):
+            assert raw_packet == b'\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05'
+            assert not sig_ptrs.signature_info
+            self.app.put_data(name, b'test', no_signature=True)

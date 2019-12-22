@@ -18,7 +18,7 @@
 import struct
 import logging
 import asyncio as aio
-from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
+from typing import Optional, Any, Awaitable, Coroutine, Tuple, List, Dict
 from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
@@ -47,7 +47,7 @@ class NDNApp:
     _prefix_tree: NameTrie = None
     int_validator: Validator = None
     data_validator: Validator = None
-    _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator]]]
+    _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator], Dict]]
 
     def __init__(self, face=None, keychain=None):
         config = read_client_conf() if not face or not keychain else {}
@@ -81,7 +81,7 @@ class NDNApp:
                 logging.warning('Unable to decode received packet')
                 return
             logging.debug('Interest received %s' % Name.to_str(name))
-            await self._on_interest(name, param, app_param, sig)
+            await self._on_interest(name, param, app_param, sig, raw_packet=data)
         elif typ == TypeNumber.DATA:
             try:
                 name, meta_info, content, sig = parse_data(data, with_tl=False)
@@ -89,7 +89,7 @@ class NDNApp:
                 logging.warning('Unable to decode received packet')
                 return
             logging.debug('Data received %s' % Name.to_str(name))
-            await self._on_data(name, meta_info, content, sig)
+            await self._on_data(name, meta_info, content, sig, raw_packet=data)
         elif typ == LpTypeNumber.LP_PACKET:
             try:
                 nack_reason, interest = parse_network_nack(data, with_tl=False)
@@ -206,7 +206,7 @@ class NDNApp:
                              node: InterestTreeNode, validator: Validator):
         lifetime = 100 if lifetime is None else lifetime
         try:
-            name, meta_info, content, sig = await aio.wait_for(future, timeout=lifetime/1000.0)
+            name, meta_info, content, sig, raw_packet = await aio.wait_for(future, timeout=lifetime/1000.0)
         except aio.TimeoutError:
             if node.timeout(future):
                 del self._int_tree[name]
@@ -227,8 +227,8 @@ class NDNApp:
         :param after_start: the coroutine to start after connection to NFD is established.
         """
         async def starting_task():
-            for name, route, validator in self._autoreg_routes:
-                await self.register(name, route, validator)
+            for name, route, validator, kwargs in self._autoreg_routes:
+                await self.register(name, route, validator, **kwargs)
             if after_start:
                 await after_start
 
@@ -279,7 +279,7 @@ class NDNApp:
         logging.debug('Face is down now')
         return ret
 
-    def route(self, name: NonStrictName, validator: Optional[Validator] = None):
+    def route(self, name: NonStrictName, validator: Optional[Validator] = None, **kwargs):
         """
         A decorator used to register a permanent route for a specific prefix.
 
@@ -312,13 +312,13 @@ class NDNApp:
         name = Name.normalize(name)
 
         def decorator(func: Route):
-            self._autoreg_routes.append((name, func, validator))
+            self._autoreg_routes.append((name, func, validator, kwargs))
             if self.face.running:
-                aio.ensure_future(self.register(name, func, validator))
+                aio.ensure_future(self.register(name, func, validator, **kwargs))
             return func
         return decorator
 
-    async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None):
+    async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None, **kwargs):
         """
         Register a route for a specific prefix dynamically.
 
@@ -338,6 +338,7 @@ class NDNApp:
         if node.callback:
             raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
         node.callback = func
+        node.extra_param = kwargs
         if validator:
             node.validator = validator
         try:
@@ -373,16 +374,16 @@ class NDNApp:
                 del self._int_tree[name]
 
     async def _on_data(self, name: FormalName, meta_info: MetaInfo,
-                       content: Optional[BinaryStr], sig: SignaturePtrs):
+                       content: Optional[BinaryStr], sig: SignaturePtrs, raw_packet):
         clean_list = []
         for prefix, node in self._int_tree.prefixes(name):
-            if node.satisfy((name, meta_info, content, sig), prefix != name):
+            if node.satisfy((name, meta_info, content, sig, raw_packet), prefix != name):
                 clean_list.append(prefix)
         for prefix in clean_list:
             del self._int_tree[prefix]
 
     async def _on_interest(self, name: FormalName, param: InterestParam,
-                           app_param: Optional[BinaryStr], sig: SignaturePtrs):
+                           app_param: Optional[BinaryStr], sig: SignaturePtrs, raw_packet: BinaryStr):
         trie_step = self._prefix_tree.longest_prefix(name)
         if not trie_step:
             logging.warning('No route: %s' % name)
@@ -400,7 +401,15 @@ class NDNApp:
         if not valid:
             logging.warning('Drop unvalidated Interest: %s' % name)
             return
-        node.callback(name, param, app_param)
+        if node.extra_param:
+            kwargs = {}
+            if node.extra_param['raw_packet']:
+                kwargs['raw_packet'] = raw_packet
+            if node.extra_param['sig_ptrs']:
+                kwargs['sig_ptrs'] = sig
+            node.callback(name, param, app_param, **kwargs)
+        else:
+            node.callback(name, param, app_param)
 
     @staticmethod
     def get_original_packet_value(packet_name: FormalName):
