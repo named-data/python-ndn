@@ -342,7 +342,8 @@ class KeychainSqlite3(Keychain):
 
     def new_identity(self, name: NonStrictName) -> Identity:
         """
-        Create a new Identity.
+        Create a new Identity without a default Key.
+        This is used to control the Keychain in a fine-grained way.
 
         :param name: the Name of the new Identity.
         :type name: :any:`NonStrictName`
@@ -361,6 +362,7 @@ class KeychainSqlite3(Keychain):
     def touch_identity(self, id_name: NonStrictName) -> Identity:
         """
         Get an Identity with specific name. Create a new one if it does not exist.
+        The newly created one will automatically have a default ECC Key and self-signed Certificate.
 
         :param id_name: the Name of Identity.
         :type id_name: :any:`NonStrictName`
