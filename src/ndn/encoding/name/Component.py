@@ -60,6 +60,22 @@ TYPE_VERSION = 0x23
 TYPE_TIMESTAMP = 0x24
 TYPE_SEQUENCE_NUM = 0x25
 
+ALTERNATE_URI_TYPE = {
+    TYPE_SEGMENT: 'seg={}',
+    TYPE_BYTE_OFFSET: 'off={}',
+    TYPE_VERSION: 'v={}',
+    TYPE_TIMESTAMP: 't={}',
+    TYPE_SEQUENCE_NUM: 'seq={}'
+}
+
+ALTERNATE_URI_STR = {
+    'seg': TYPE_SEGMENT,
+    'off': TYPE_BYTE_OFFSET,
+    'v': TYPE_VERSION,
+    't': TYPE_TIMESTAMP,
+    'seq': TYPE_SEQUENCE_NUM,
+}
+
 
 def from_bytes(val: BinaryStr, typ: int = TYPE_GENERIC) -> bytearray:
     """
@@ -133,6 +149,8 @@ def from_str(val: str) -> bytearray:
                 return from_bytes(bytearray.fromhex(val[type_offset + 1:]), TYPE_IMPLICIT_SHA256)
             elif typ_str == 'params-sha256':
                 return from_bytes(bytearray.fromhex(val[type_offset + 1:]), TYPE_PARAMETERS_SHA256)
+            elif typ_str in ALTERNATE_URI_STR:
+                return from_number(int(val[type_offset + 1:]), ALTERNATE_URI_STR[typ_str])
             # General case
             else:
                 typ = int(typ_str)
@@ -281,6 +299,8 @@ def to_str(component: BinaryStr) -> str:
         return f"sha256digest={component[offset:].hex()}"
     elif typ == TYPE_PARAMETERS_SHA256:
         return f"params-sha256={component[offset:].hex()}"
+    elif typ in ALTERNATE_URI_TYPE:
+        return ALTERNATE_URI_TYPE[typ].format(int.from_bytes(component[offset:], 'big'))
     else:
         ret = ""
         if typ != TYPE_GENERIC:

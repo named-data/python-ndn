@@ -151,6 +151,18 @@ class TestComponent:
         assert Component.get_value(comp) == b'\x00\x37\xbb\x0d\x76\xed\x4c\x60'
         assert Component.to_number(comp) == timeval
 
+        assert Component.to_str(Component.from_segment(13)) == 'seg=13'
+        assert Component.to_str(Component.from_byte_offset(13)) == 'off=13'
+        assert Component.to_str(Component.from_sequence_num(13)) == 'seq=13'
+        assert Component.to_str(Component.from_version(13)) == 'v=13'
+        assert Component.to_str(Component.from_timestamp(timeval)) == 't=15686790223318112'
+
+        assert Component.from_str('seg=13') == b'!\x01\r'
+        assert Component.from_str('off=13') == b'\x22\x01\r'
+        assert Component.from_str('seq=13') == b'%\x01\r'
+        assert Component.from_str('v=13') == b'#\x01\r'
+        assert Component.from_str('t=15686790223318112') == b'$\x08\x007\xbb\rv\xedL`'
+
 
 class TestName:
     @staticmethod
