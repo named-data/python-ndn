@@ -18,7 +18,7 @@
 import asyncio as aio
 from pygtrie import Trie
 from typing import List, Optional, Tuple, Dict
-from .encoding import InterestParam, FormalName, Data
+from .encoding import InterestParam, FormalName
 from .types import InterestNack, Validator, Route
 
 

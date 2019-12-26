@@ -193,8 +193,25 @@ class TestRoute2(NDNAppTestSuite):
         await face.consume_output(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
 
     async def app_main(self):
-        @self.app.route('/not', raw_packet=True, sig_ptrs=True)
+        @self.app.route('/not', need_raw_packet=True, need_sig_ptrs=True)
         def on_interest(name, _param, _app_param, raw_packet, sig_ptrs):
             assert raw_packet == b'\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05'
             assert not sig_ptrs.signature_info
             self.app.put_data(name, b'test', no_signature=True)
+
+
+class TestConsumerRawPacket(NDNAppTestSuite):
+    async def face_proc(self, face: DummyFace):
+        await face.consume_output(b'\x050\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
+                                  b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x12\x00\x0c\x02\x17p')
+        await face.input_packet(b'\x06B\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
+                                b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
+                                b'\x15\rHello, world!')
+
+    async def app_main(self):
+        name = f'/example/testApp/randomData/{Component.TYPE_TIMESTAMP}=%00%00%01%6d%a4%f3%ff%6d'
+        _, _, _, raw = await self.app.express_interest(
+            name, must_be_fresh=True, can_be_prefix=False, lifetime=6000, nonce=None, need_raw_packet=True)
+        assert (raw == b'\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
+                       b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
+                       b'\x15\rHello, world!')

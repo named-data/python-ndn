@@ -18,7 +18,7 @@
 import struct
 import logging
 import asyncio as aio
-from typing import Optional, Any, Awaitable, Coroutine, Tuple, List, Dict
+from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
 from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
@@ -47,7 +47,7 @@ class NDNApp:
     _prefix_tree: NameTrie = None
     int_validator: Validator = None
     data_validator: Validator = None
-    _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator], Dict]]
+    _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator], bool, bool]]
 
     def __init__(self, face=None, keychain=None):
         config = read_client_conf() if not face or not keychain else {}
@@ -152,6 +152,7 @@ class NDNApp:
                          name: NonStrictName,
                          app_param: Optional[BinaryStr] = None,
                          validator: Optional[Validator] = None,
+                         need_raw_packet: bool = False,
                          **kwargs) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
         r"""
         Express an Interest packet.
@@ -166,8 +167,11 @@ class NDNApp:
         :type app_param: Optional[:any:`BinaryStr`]
         :param validator: the Validator used to verify the Data received.
         :type validator: Optional[:any:`Validator`]
+        :param need_raw_packet: if True, return the raw Data packet without TL.
+        :type need_raw_packet: bool
         :param kwargs: :ref:`label-keyword-arguments`.
         :return: A tuple of (Name, MetaInfo, Content) after ``await``.
+            If need_raw_packet is True, return a tuple (Name, MetaInfo, Content, RawPacket).
         :rtype: Coroutine[Any, None, Tuple[:any:`FormalName`, :any:`MetaInfo`, Optional[:any:`BinaryStr`]]]
 
         The following exception is raised by ``express_interest``:
@@ -200,10 +204,10 @@ class NDNApp:
         node = self._int_tree.setdefault(final_name, InterestTreeNode())
         node.append_interest(future, interest_param)
         self.face.send(interest)
-        return self._wait_for_data(future, interest_param.lifetime, final_name, node, validator)
+        return self._wait_for_data(future, interest_param.lifetime, final_name, node, validator, need_raw_packet)
 
     async def _wait_for_data(self, future: aio.Future, lifetime: int, name: FormalName,
-                             node: InterestTreeNode, validator: Validator):
+                             node: InterestTreeNode, validator: Validator, need_raw_packet: bool):
         lifetime = 100 if lifetime is None else lifetime
         try:
             name, meta_info, content, sig, raw_packet = await aio.wait_for(future, timeout=lifetime/1000.0)
@@ -216,7 +220,10 @@ class NDNApp:
         if validator is None:
             validator = self.data_validator
         if await validator(name, sig):
-            return name, meta_info, content
+            if need_raw_packet:
+                return name, meta_info, content, raw_packet
+            else:
+                return name, meta_info, content
         else:
             raise ValidationFailure(name, meta_info, content)
 
@@ -227,8 +234,8 @@ class NDNApp:
         :param after_start: the coroutine to start after connection to NFD is established.
         """
         async def starting_task():
-            for name, route, validator, kwargs in self._autoreg_routes:
-                await self.register(name, route, validator, **kwargs)
+            for name, route, validator, need_raw_packet, need_sig_ptrs in self._autoreg_routes:
+                await self.register(name, route, validator, need_raw_packet, need_sig_ptrs)
             if after_start:
                 await after_start
 
@@ -279,7 +286,8 @@ class NDNApp:
         logging.debug('Face is down now')
         return ret
 
-    def route(self, name: NonStrictName, validator: Optional[Validator] = None, **kwargs):
+    def route(self, name: NonStrictName, validator: Optional[Validator] = None,
+              need_raw_packet: bool = False, need_sig_ptrs: bool = False):
         """
         A decorator used to register a permanent route for a specific prefix.
 
@@ -299,6 +307,12 @@ class NDNApp:
             Otherwise NDNApp will try to validate the Interest with the validator.
             Interests which fail to be validated will be dropped without raising any exception.
         :type validator: Optional[:any:`Validator`]
+        :param need_raw_packet: if True, pass the raw Interest packet without TL to the callback as a keyword argument
+            ``raw_packet``.
+        :type need_raw_packet: bool
+        :param need_sig_ptrs: if True, pass the Signature pointers to the callback as a keyword argument
+            ``sig_ptrs``.
+        :type need_sig_ptrs: bool
 
         :examples:
             .. code-block:: python3
@@ -312,13 +326,14 @@ class NDNApp:
         name = Name.normalize(name)
 
         def decorator(func: Route):
-            self._autoreg_routes.append((name, func, validator, kwargs))
+            self._autoreg_routes.append((name, func, validator, need_raw_packet, need_sig_ptrs))
             if self.face.running:
-                aio.ensure_future(self.register(name, func, validator, **kwargs))
+                aio.ensure_future(self.register(name, func, validator, need_raw_packet, need_sig_ptrs))
             return func
         return decorator
 
-    async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None, **kwargs):
+    async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None,
+                       need_raw_packet: bool = False, need_sig_ptrs: bool = False):
         """
         Register a route for a specific prefix dynamically.
 
@@ -329,6 +344,12 @@ class NDNApp:
         :param validator: the Validator used to validate coming Interests.
         :type validator: Optional[:any:`Validator`]
         :return: ``True`` if the registration succeeded.
+        :param need_raw_packet: if True, pass the raw Interest packet without TL to the callback as a keyword argument
+            ``raw_packet``.
+        :type need_raw_packet: bool
+        :param need_sig_ptrs: if True, pass the Signature pointers to the callback as a keyword argument
+            ``sig_ptrs``.
+        :type need_sig_ptrs: bool
 
         :raises ValueError: the prefix is already registered.
         :raises NetworkError: the face to NFD is down now.
@@ -338,7 +359,7 @@ class NDNApp:
         if node.callback:
             raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
         node.callback = func
-        node.extra_param = kwargs
+        node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
         if validator:
             node.validator = validator
         try:
@@ -403,9 +424,9 @@ class NDNApp:
             return
         if node.extra_param:
             kwargs = {}
-            if node.extra_param['raw_packet']:
+            if node.extra_param.get('raw_packet', False):
                 kwargs['raw_packet'] = raw_packet
-            if node.extra_param['sig_ptrs']:
+            if node.extra_param.get('sig_ptrs', False):
                 kwargs['sig_ptrs'] = sig
             node.callback(name, param, app_param, **kwargs)
         else:
