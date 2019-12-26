@@ -150,7 +150,7 @@ class Field(metaclass=abc.ABCMeta):
     def encoded_length(self, val, markers: dict) -> int:
         r"""
         Preprocess value and get encoded length of this field.
-        The function may use ``markers[f'{self.name}##encoded_length']`` to store the length without TL.
+        The function may use ``markers[f'{self.name}##encoded_length']`` to store the length with TL.
         Other marker variables starting with ``f'{self.name}##'`` may also be used.
         Generally, marker variables are only used to store temporary values and avoid duplicated calculation.
         One field should not access to another field's marker by its name.
@@ -161,7 +161,7 @@ class Field(metaclass=abc.ABCMeta):
 
         :param val: value of this field
         :param markers: encoding marker variables
-        :return: encoded length without TL.
+        :return: encoded length with TL.
             It is expected as the exact length when encoding this field.
             The only exception is ``SignatureValueField`` (invisible to application developer).
         """
@@ -176,7 +176,7 @@ class Field(metaclass=abc.ABCMeta):
         :param markers: encoding marker variables
         :param wire: buffer to encode
         :param offset: offset of this field in wire
-        :return: encoded length without TL.
+        :return: encoded length with TL.
             It is expected to be the same as :meth:`encoded_length` returns.
         """
         pass
