@@ -23,7 +23,7 @@ setup(
         "Documentation": "https://python-ndn.readthedocs.io/",
         "Source Code": "https://github.com/zjkmxy/python-ndn",
     },
-    license='LGPLv3',
+    license='Apache License 2.0',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         'Development Status :: 4 - Beta',
