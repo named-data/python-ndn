@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019 Xinyu Ma
+# Copyright (C) 2019-2020 Xinyu Ma
 #
 # This file is part of python-ndn.
 #
