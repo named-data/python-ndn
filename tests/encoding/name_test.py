@@ -199,6 +199,7 @@ class TestName:
         assert Name.to_str(Name.from_str('/hello//world')) == '/hello//world'
         assert Name.to_str(Name.from_str('/hello/./world')) == '/hello/./world'
         assert Name.to_str(Name.from_str('/hello/../world')) == '/hello/../world'
+        assert Name.to_str(Name.from_str('//')) == '//'
 
     @staticmethod
     def test_compare():

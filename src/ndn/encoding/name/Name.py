@@ -81,7 +81,10 @@ def to_str(name: NonStrictName) -> str:
         '/%CE%A3%CF%80%CF%85%CF%81%CE%AF%CE%B4%CF%89%CE%BD'
     """
     name = normalize(name)
-    return '/' + '/'.join(Component.to_str(comp) for comp in name)
+    ret = '/' + '/'.join(Component.to_str(comp) for comp in name)
+    if name and name[-1] == b'\x08\x00':
+        ret += '/'
+    return ret
 
 
 def from_bytes(buf: BinaryStr) -> FormalName:
