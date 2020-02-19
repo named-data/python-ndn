@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Master -- (latest)
+0.2b2 (2020-02-18)
 ++++++++++++++++++
 
 * Switch to Apache License 2.0.
