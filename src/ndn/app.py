@@ -239,7 +239,12 @@ class NDNApp:
             if after_start:
                 await after_start
 
-        await self.face.open()
+        try:
+            await self.face.open()
+        except (FileNotFoundError, ConnectionError, OSError, PermissionError):
+            if after_start:
+                after_start.close()
+            raise
         task = aio.ensure_future(starting_task())
         logging.debug('Connected to NFD node, start running...')
         await self.face.run()
