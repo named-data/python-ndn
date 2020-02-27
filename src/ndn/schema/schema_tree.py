@@ -64,7 +64,10 @@ class Node:
         key_lst = norm_pattern(key)
         cur = self
         for k in key_lst:
-            cur = cur._get(k)
+            try:
+                cur = cur._get(k)
+            except KeyError:
+                cur = cur._set(k, Node(cur))
         return cur
 
     def __setitem__(self, key: str, value):
@@ -107,7 +110,7 @@ class Node:
         else:
             pos = 0
         while pos < len(name):
-            nxt = cur._match_step(name[pos], env, policies)
+            nxt = cur._match_step(bytes(name[pos]), env, policies)
             if not nxt:
                 break
             else:
@@ -131,23 +134,25 @@ class Node:
         if not isinstance(value, typ):
             raise TypeError(f'The policy {value} is not of type {typ}')
         self.policies[typ] = value
+        value.node = self
 
     # ====== Functions on registration  ======
 
-    def attach(self, app: NDNApp, prefix: NonStrictName):
+    async def attach(self, app: NDNApp, prefix: NonStrictName):
         prefix = Name.normalize(prefix)
         self.app = app
-        return self.on_register(self, app, prefix)
+        # TODO: We do not always want to register all name spaces
+        return await self.on_register(self, app, prefix)
 
-    def detach(self, app: NDNApp):
+    async def detach(self, app: NDNApp):
         raise NotImplementedError('TODO: Not supported yet. Please reset NDNApp.')
 
-    def on_register(self, root, app: NDNApp, prefix: FormalName):
+    async def on_register(self, root, app: NDNApp, prefix: FormalName):
         self.prefix = prefix
         self.app = app
         if self.matches:
             # If there is a match, have to register
-            return app.register(prefix, root._on_interest_root, root._int_validator, True)
+            return await app.register(prefix, root._on_interest_root, root._int_validator, True)
         else:
             for comp, chd in self.children.items():
                 if not chd.on_register(root, app, prefix + comp):
@@ -226,7 +231,7 @@ class Node:
         else:
             signer = None
         # Express interest
-        data = await match.root.app.express_interest(match.name, app_param, validator, True,
+        data = await match.root.app.express_interest(match.name, app_param, validator, need_raw_packet=True,
                                                      interest_param=param, signer=signer)
         data_name, meta_info, content, data_raw = data
         return await match.on_data(data_name, meta_info, content, data_raw)
@@ -287,7 +292,7 @@ class MatchedNode:
         pos = None
         cur = self.node
         for i, comp in enumerate(suffix):
-            nxt = cur._match_step(comp, env, policies)
+            nxt = cur._match_step(bytes(comp), env, policies)
             if not nxt:
                 pos = i
                 break
@@ -307,7 +312,8 @@ class MatchedNode:
         if self.pos == name_len:
             match = self.finer_match(data_name[name_len:])
         else:
-            match = self
+            match = MatchedNode(root=self.root, node=self.node, name=data_name, pos=self.pos,
+                                env=self.env, policies=self.policies)
         return match.node.on_data(match, meta_info, content, raw_packet)
 
     def express(self, app_param: Optional[BinaryStr] = None, **kwargs):
