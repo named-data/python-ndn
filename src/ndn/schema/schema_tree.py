@@ -17,6 +17,13 @@ class NodeExistsError(Exception):
         self.pattern = pattern
 
 
+class LocalResourceNotExistError(Exception):
+    name: FormalName
+
+    def __init__(self, name: FormalName):
+        self.name = name
+
+
 class Node:
     # Properties of nodes
     policies: Dict[Type[policy.Policy], policy.Policy]
@@ -98,6 +105,8 @@ class Node:
             return None
 
     def match(self, name: NonStrictName):
+        if self.parent is not None:
+            raise ValueError('Node.match() should be called from root')
         env = {}
         policies = {}
         cur = self
@@ -142,23 +151,25 @@ class Node:
     async def attach(self, app: NDNApp, prefix: NonStrictName):
         prefix = Name.normalize(prefix)
         self.app = app
-        # TODO: We do not always want to register all name spaces
-        return await self.on_register(self, app, prefix)
+        return await self.on_register(self, app, prefix, cached=False)
 
     async def detach(self, app: NDNApp):
         raise NotImplementedError('TODO: Not supported yet. Please reset NDNApp.')
 
-    async def on_register(self, root, app: NDNApp, prefix: FormalName):
-        self.prefix = prefix
-        self.app = app
-        if self.matches:
-            # If there is a match, have to register
+    async def on_register(self, root, app: NDNApp, prefix: FormalName, cached: bool):
+        # If there is a register policy
+        if policy.Register in self.policies:
             return await app.register(prefix, root._on_interest_root, root._int_validator, True)
-        else:
-            for comp, chd in self.children.items():
-                if not await chd.on_register(root, app, prefix + [comp]):
-                    return False
-            return True
+        # If it is cached with a match or being leaf
+        cached = cached or policy.Cache in self.policies
+        if cached:
+            if self.matches or not self.children:
+                return await app.register(prefix, root._on_interest_root, root._int_validator, True)
+        # O/w enumerate its children
+        for comp, chd in self.children.items():
+            if not await chd.on_register(root, app, prefix + [comp], cached=cached):
+                return False
+        return True
 
     async def _int_validator(self, name: FormalName, sig_ptrs: SignaturePtrs) -> bool:
         match = self.match(name)
@@ -203,13 +214,19 @@ class MatchedNode:
     env: Dict[str, Any]
     policies: Dict[Type[policy.Policy], policy.Policy]
 
-    def finer_match(self, suffix: NonStrictName):
+    def finer_match(self, new_name: FormalName):
+        name_len = len(self.name)
+        if self.pos < name_len:
+            # match = self.finer_match(data_name[name_len:])
+            return MatchedNode(root=self.root, node=self.node, name=new_name, pos=self.pos,
+                               env=self.env, policies=self.policies)
+
         env = self.env.copy()
         policies = self.policies.copy()
-        suffix = Name.normalize(suffix)
         pos = None
         cur = self.node
-        for i, comp in enumerate(suffix):
+        for i in range(name_len, len(new_name)):
+            comp = new_name[i]
             nxt = cur._match_step(bytes(comp), env, policies)
             if not nxt:
                 pos = i
@@ -217,11 +234,9 @@ class MatchedNode:
             else:
                 cur = nxt
         if pos is None:
-            pos = self.pos + len(suffix)
-        else:
-            pos = self.pos + pos
+            pos = len(new_name)
         policies.update(cur.policies)
-        return MatchedNode(root=self.root, node=cur, name=self.name+suffix, pos=pos, env=env, policies=policies)
+        return MatchedNode(root=self.root, node=cur, name=new_name, pos=pos, env=env, policies=policies)
 
     async def on_interest(self, param: InterestParam, app_param: Optional[BinaryStr], raw_packet: BinaryStr):
         # Cache search
@@ -242,24 +257,19 @@ class MatchedNode:
         # Process Interest
         await self.node.process_int(self, param, app_param, raw_packet)
 
-    async def on_data(self, data_name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
-        name_len = len(self.name)
-        if self.pos == name_len:
-            match = self.finer_match(data_name[name_len:])
-        else:
-            match = MatchedNode(root=self.root, node=self.node, name=data_name, pos=self.pos,
-                                env=self.env, policies=self.policies)
+    async def on_data(self, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
         # Cache save
-        cache_policy = match.policies.get(policy.Cache, None)
-        if cache_policy and isinstance(cache_policy, policy.Cache):
-            aio.ensure_future(cache_policy.save(match, match.name, raw_packet))
+        if policy.LocalOnly not in self.policies:
+            cache_policy = self.policies.get(policy.Cache, None)
+            if cache_policy and isinstance(cache_policy, policy.Cache):
+                aio.ensure_future(cache_policy.save(self, self.name, raw_packet))
         # Decrypt content
         if content is not None:
-            ac_policy = match.policies.get(policy.DataEncryption, None)
+            ac_policy = self.policies.get(policy.DataEncryption, None)
             if ac_policy and isinstance(ac_policy, policy.DataEncryption):
-                content = await ac_policy.decrypt(match, content)
+                content = await ac_policy.decrypt(self, content)
         # Process Data
-        return await match.node.process_data(match, meta_info, content, raw_packet)
+        return await self.node.process_data(self, meta_info, content, raw_packet)
 
     async def express(self, app_param: Optional[BinaryStr] = None, **kwargs):
         if 'nonce' not in kwargs:
@@ -273,7 +283,11 @@ class MatchedNode:
             if data_raw is not None:
                 with_tl = (data_raw[0] == TypeNumber.DATA)
                 data_name, meta_info, content, _ = parse_data(data_raw, with_tl=with_tl)
-                return await self.on_data(data_name, meta_info, content, data_raw)
+                return await self.finer_match(data_name).on_data(meta_info, content, data_raw)
+        # Local only?
+        local_policy = self.policies.get(policy.LocalOnly, None)
+        if local_policy:
+            raise LocalResourceNotExistError(self.name)
         # Encrypt app_param
         if app_param is not None:
             ac_policy = self.policies.get(policy.InterestEncryption, None)
@@ -297,7 +311,7 @@ class MatchedNode:
         data = await self.root.app.express_interest(self.name, app_param, validator, need_raw_packet=True,
                                                     interest_param=param, signer=signer)
         data_name, meta_info, content, data_raw = data
-        return await self.on_data(data_name, meta_info, content, data_raw)
+        return await self.finer_match(data_name).on_data(meta_info, content, data_raw)
 
     def need(self, **kwargs):
         return self.node.need(self, **kwargs)

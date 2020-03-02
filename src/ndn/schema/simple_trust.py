@@ -5,7 +5,7 @@ from Cryptodome.Signature import DSS, pkcs1_15
 from Cryptodome.Hash import SHA256
 from ..encoding import SignaturePtrs, FormalName, Name, SignatureType
 from ..types import Validator, NetworkError, InterestTimeout, InterestNack, ValidationFailure
-from .schema_tree import MatchedNode, Node
+from .schema_tree import Node
 from . import policy
 
 
@@ -20,14 +20,7 @@ class SignedBy(policy.DataValidator, policy.InterestValidator):
 
     def get_validator(self, match) -> Validator:
         def validator(name: FormalName, sig_ptrs: SignaturePtrs):
-            nonlocal match
-            name_len = len(match.name)
-            if match.pos == name_len:
-                match = match.finer_match(name[name_len:])
-            else:
-                match = MatchedNode(root=match.root, node=match.node, name=name, pos=match.pos,
-                                    env=match.env, policies=match.policies)
-            return self.validate(match, sig_ptrs)
+            return self.validate(match.finer_match(name), sig_ptrs)
         return validator
 
     async def validate(self, match, sig_ptrs: SignaturePtrs) -> bool:
