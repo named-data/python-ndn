@@ -1,8 +1,8 @@
 import abc
 from typing import Optional
-from ndn.encoding import SignaturePtrs, FormalName, InterestParam, BinaryStr
-from ndn.encoding.signer import Signer
-from ndn.types import Validator
+from ..encoding import SignaturePtrs, FormalName, InterestParam, BinaryStr
+from ..encoding.signer import Signer
+from ..types import Validator
 
 
 class Policy:
@@ -28,7 +28,7 @@ class InterestValidator(Policy, metaclass=abc.ABCMeta):
 
 class DataValidator(Policy, metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    async def get_validator(self, match) -> Validator:
+    def get_validator(self, match) -> Validator:
         pass
 
 

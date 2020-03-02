@@ -1,12 +1,12 @@
 import asyncio as aio
 from typing import Dict, Any, Type, Optional
 from dataclasses import dataclass
-from ndn.encoding import is_binary_str, FormalName, NonStrictName, Name, Component, \
-    SignaturePtrs, InterestParam, BinaryStr, MetaInfo, parse_data
-from ndn.app import NDNApp
-from ndn.security import sha256_digest_checker, DigestSha256Signer
-from ndn.utils import gen_nonce
-from .util import norm_pattern
+from ..encoding import is_binary_str, FormalName, NonStrictName, Name, Component, \
+    SignaturePtrs, InterestParam, BinaryStr, MetaInfo, parse_data, TypeNumber
+from ..app import NDNApp
+from ..security import sha256_digest_checker, DigestSha256Signer
+from ..utils import gen_nonce
+from .util import norm_pattern, make_tl
 from . import policy
 
 
@@ -118,6 +118,7 @@ class Node:
                 pos += 1
         if pos is None:
             pos = len(name)
+        policies.update(cur.policies)
         return MatchedNode(root=self, node=cur, name=name, pos=pos, env=env, policies=policies)
 
     # ====== Functions operating on policies ======
@@ -155,11 +156,9 @@ class Node:
             return await app.register(prefix, root._on_interest_root, root._int_validator, True)
         else:
             for comp, chd in self.children.items():
-                if not chd.on_register(root, app, prefix + comp):
+                if not await chd.on_register(root, app, prefix + [comp]):
                     return False
             return True
-
-    # ====== Functions on Interest processing  ======
 
     async def _int_validator(self, name: FormalName, sig_ptrs: SignaturePtrs) -> bool:
         match = self.match(name)
@@ -174,106 +173,25 @@ class Node:
     def _on_interest_root(self, name: FormalName, param: InterestParam,
                           app_param: Optional[BinaryStr], raw_packet: BinaryStr):
         match = self.match(name)
-        match.on_interest(param, app_param, raw_packet)
+        aio.ensure_future(match.on_interest(param, app_param, raw_packet))
 
-    async def on_interest(self, match, param: InterestParam, app_param: Optional[BinaryStr], raw_packet: BinaryStr):
-        # Cache search
-        cache_policy = match.policies.get(policy.Cache, None)
-        if cache_policy and isinstance(cache_policy, policy.Cache):
-            data_raw = await cache_policy.search(match, match.name, param)
-            if data_raw is not None:
-                match.root.app.put_raw_packet(data_raw)
-                return
-        # By design, we do not cache Interest
-        # Decrypt app_param
-        if app_param:
-            ac_policy = match.policies.get(policy.InterestEncryption, None)
-            if ac_policy and isinstance(ac_policy, policy.InterestEncryption):
-                app_param = await ac_policy.decrypt(match, app_param)
-        # Process Interest
-        await self.process_int(match, param, app_param, raw_packet)
+    # ====== Functions on Interest & Data processing (For overriding)  ======
 
     async def process_int(self, match, param: InterestParam, app_param: Optional[BinaryStr], raw_packet: BinaryStr):
         # Override this function to customize the processing
         pass
 
-    # ====== Functions on Data processing  ======
-
     async def process_data(self, match, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
         # Override this function to customize the processing
         return content
 
-    async def express(self, match, param: InterestParam, app_param: Optional[BinaryStr]):
-        # Cache search
-        cache_policy = match.policies.get(policy.Cache, None)
-        if cache_policy and isinstance(cache_policy, policy.Cache):
-            data_raw = await cache_policy.search(match, match.name, param)
-            if data_raw is not None:
-                data_name, meta_info, content, _ = parse_data(data_raw, with_tl=False)
-                return await self.on_data(match, meta_info, content, data_raw)
-        # Encrypt app_param
-        if app_param is not None:
-            ac_policy = match.policies.get(policy.InterestEncryption, None)
-            if ac_policy and isinstance(ac_policy, policy.InterestEncryption):
-                app_param = await ac_policy.encrypt(match, app_param)
-        # Get validator
-        validate_policy = match.policies.get(policy.DataValidator, None)
-        if validate_policy and isinstance(validate_policy, policy.DataValidator):
-            validator = validate_policy.get_validator(match)
-        else:
-            validator = sha256_digest_checker  # Change this if possible
-        # Get signer
-        signer_policy = match.policies.get(policy.InterestSigning, None)
-        if signer_policy and isinstance(signer_policy, policy.InterestSigning):
-            signer = signer_policy.get_signer(match)
-        elif app_param is not None:
-            signer = DigestSha256Signer()
-        else:
-            signer = None
-        # Express interest
-        data = await match.root.app.express_interest(match.name, app_param, validator, need_raw_packet=True,
-                                                     interest_param=param, signer=signer)
-        data_name, meta_info, content, data_raw = data
-        return await match.on_data(data_name, meta_info, content, data_raw)
+    async def need(self, match, **kwargs):
+        # Override this function to customize the processing
+        return await match.express(**kwargs)
 
-    async def on_data(self, match, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
-        # Cache save
-        cache_policy = match.policies.get(policy.Cache, None)
-        if cache_policy and isinstance(cache_policy, policy.Cache):
-            aio.ensure_future(cache_policy.save(match, match.name, raw_packet))
-        # Decrypt content
-        if content is not None:
-            ac_policy = match.policies.get(policy.DataEncryption, None)
-            if ac_policy and isinstance(ac_policy, policy.DataEncryption):
-                content = await ac_policy.decrypt(match, content)
-        # Process Data
-        return await self.process_data(match, meta_info, content, raw_packet)
-
-    async def put_data(self, match, meta_info: MetaInfo, content: Optional[BinaryStr], send_packet: bool = False):
-        data_name = match.name
-        # Encrypt content
-        if content is not None:
-            ac_policy = match.policies.get(policy.DataEncryption, None)
-            if ac_policy and isinstance(ac_policy, policy.DataEncryption):
-                content = await ac_policy.encrypt(match, content)
-                data_name = ac_policy.get_encrypted_name(match)
-        # Get signer
-        signer_policy = match.policies.get(policy.DataSigning, None)
-        if signer_policy and isinstance(signer_policy, policy.DataSigning):
-            signer = signer_policy.get_signer(match)
-        elif content is not None:
-            signer = DigestSha256Signer()
-        else:
-            signer = None
-        # Prepare Data packet
-        raw_packet = match.root.app.prepare_data(data_name, content, meta_info=meta_info, signer=signer)
-        # Cache save
-        cache_policy = match.policies.get(policy.Cache, None)
-        if cache_policy and isinstance(cache_policy, policy.Cache):
-            aio.ensure_future(cache_policy.save(match, match.name, raw_packet))
-        # face.put
-        if send_packet:
-            match.root.app.put_raw_packet(raw_packet)
+    async def provide(self, match, content, **kwargs):
+        # Override this function to customize the processing
+        return await match.put_data(content, **kwargs)
 
 
 @dataclass
@@ -302,29 +220,117 @@ class MatchedNode:
             pos = self.pos + len(suffix)
         else:
             pos = self.pos + pos
+        policies.update(cur.policies)
         return MatchedNode(root=self.root, node=cur, name=self.name+suffix, pos=pos, env=env, policies=policies)
 
-    def on_interest(self, param: InterestParam, app_param: Optional[BinaryStr], raw_packet: BinaryStr):
-        aio.ensure_future(self.node.on_interest(self, param, app_param, raw_packet))
+    async def on_interest(self, param: InterestParam, app_param: Optional[BinaryStr], raw_packet: BinaryStr):
+        # Cache search
+        cache_policy = self.policies.get(policy.Cache, None)
+        if cache_policy and isinstance(cache_policy, policy.Cache):
+            data_raw = await cache_policy.search(self, self.name, param)
+            if data_raw is not None:
+                if data_raw[0] != TypeNumber.DATA:
+                    data_raw = make_tl(data_raw)
+                self.root.app.put_raw_packet(data_raw)
+                return
+        # By design, we do not cache Interest
+        # Decrypt app_param
+        if app_param:
+            ac_policy = self.policies.get(policy.InterestEncryption, None)
+            if ac_policy and isinstance(ac_policy, policy.InterestEncryption):
+                app_param = await ac_policy.decrypt(self, app_param)
+        # Process Interest
+        await self.node.process_int(self, param, app_param, raw_packet)
 
-    def on_data(self, data_name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
+    async def on_data(self, data_name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
         name_len = len(self.name)
         if self.pos == name_len:
             match = self.finer_match(data_name[name_len:])
         else:
             match = MatchedNode(root=self.root, node=self.node, name=data_name, pos=self.pos,
                                 env=self.env, policies=self.policies)
-        return match.node.on_data(match, meta_info, content, raw_packet)
+        # Cache save
+        cache_policy = match.policies.get(policy.Cache, None)
+        if cache_policy and isinstance(cache_policy, policy.Cache):
+            aio.ensure_future(cache_policy.save(match, match.name, raw_packet))
+        # Decrypt content
+        if content is not None:
+            ac_policy = match.policies.get(policy.DataEncryption, None)
+            if ac_policy and isinstance(ac_policy, policy.DataEncryption):
+                content = await ac_policy.decrypt(match, content)
+        # Process Data
+        return await match.node.process_data(match, meta_info, content, raw_packet)
 
-    def express(self, app_param: Optional[BinaryStr] = None, **kwargs):
+    async def express(self, app_param: Optional[BinaryStr] = None, **kwargs):
         if 'nonce' not in kwargs:
             kwargs['nonce'] = gen_nonce()
-        interest_param = InterestParam.from_dict(kwargs)
-        return self.node.express(self, interest_param, app_param)
+        param = InterestParam.from_dict(kwargs)
 
-    def put_data(self, content: Optional[BinaryStr] = None, send_packet: bool = False, **kwargs):
+        # Cache search
+        cache_policy = self.policies.get(policy.Cache, None)
+        if cache_policy and isinstance(cache_policy, policy.Cache):
+            data_raw = await cache_policy.search(self, self.name, param)
+            if data_raw is not None:
+                with_tl = (data_raw[0] == TypeNumber.DATA)
+                data_name, meta_info, content, _ = parse_data(data_raw, with_tl=with_tl)
+                return await self.on_data(data_name, meta_info, content, data_raw)
+        # Encrypt app_param
+        if app_param is not None:
+            ac_policy = self.policies.get(policy.InterestEncryption, None)
+            if ac_policy and isinstance(ac_policy, policy.InterestEncryption):
+                app_param = await ac_policy.encrypt(self, app_param)
+        # Get validator TODO: How can we pass information out?
+        validate_policy = self.policies.get(policy.DataValidator, None)
+        if validate_policy and isinstance(validate_policy, policy.DataValidator):
+            validator = validate_policy.get_validator(self)
+        else:
+            validator = sha256_digest_checker  # Change this if possible
+        # Get signer
+        signer_policy = self.policies.get(policy.InterestSigning, None)
+        if signer_policy and isinstance(signer_policy, policy.InterestSigning):
+            signer = signer_policy.get_signer(self)
+        elif app_param is not None:
+            signer = DigestSha256Signer()
+        else:
+            signer = None
+        # Express interest
+        data = await self.root.app.express_interest(self.name, app_param, validator, need_raw_packet=True,
+                                                    interest_param=param, signer=signer)
+        data_name, meta_info, content, data_raw = data
+        return await self.on_data(data_name, meta_info, content, data_raw)
+
+    def need(self, **kwargs):
+        return self.node.need(self, **kwargs)
+
+    def provide(self, content, **kwargs):
+        return self.node.provide(self, content, **kwargs)
+
+    async def put_data(self, content: Optional[BinaryStr] = None, send_packet: bool = False, **kwargs):
         meta_info = MetaInfo.from_dict(kwargs)
-        return self.node.put_data(self, meta_info, content, send_packet)
+        data_name = self.name
+        # Encrypt content
+        if content is not None:
+            ac_policy = self.policies.get(policy.DataEncryption, None)
+            if ac_policy and isinstance(ac_policy, policy.DataEncryption):
+                content = await ac_policy.encrypt(self, content)
+                data_name = ac_policy.get_encrypted_name(self)
+        # Get signer
+        signer_policy = self.policies.get(policy.DataSigning, None)
+        if signer_policy and isinstance(signer_policy, policy.DataSigning):
+            signer = signer_policy.get_signer(self)
+        elif content is not None:
+            signer = DigestSha256Signer()
+        else:
+            signer = None
+        # Prepare Data packet
+        raw_packet = self.root.app.prepare_data(data_name, content, meta_info=meta_info, signer=signer)
+        # Cache save
+        cache_policy = self.policies.get(policy.Cache, None)
+        if cache_policy and isinstance(cache_policy, policy.Cache):
+            aio.ensure_future(cache_policy.save(self, self.name, raw_packet))
+        # face.put
+        if send_packet:
+            self.root.app.put_raw_packet(raw_packet)
 
     def app(self) -> NDNApp:
         return self.root.app
