@@ -130,6 +130,8 @@ class Node:
         policies.update(cur.policies)
         return MatchedNode(root=self, node=cur, name=name, pos=pos, env=env, policies=policies)
 
+    # TODO: Apply
+
     # ====== Functions operating on policies ======
 
     def get_policy(self, typ: Type[policy.Policy]):
@@ -153,8 +155,8 @@ class Node:
         self.app = app
         return await self.on_register(self, app, prefix, cached=False)
 
-    async def detach(self, app: NDNApp):
-        raise NotImplementedError('TODO: Not supported yet. Please reset NDNApp.')
+    # async def detach(self, app: NDNApp):
+    #     raise NotImplementedError('TODO: Not supported yet. Please reset NDNApp.')
 
     async def on_register(self, root, app: NDNApp, prefix: FormalName, cached: bool):
         # If there is a register policy
@@ -194,7 +196,13 @@ class Node:
 
     async def process_data(self, match, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
         # Override this function to customize the processing
-        return content
+        meta_data = {
+            **match.env,
+            'content_type': meta_info.content_type,
+            'freshness_period': meta_info.freshness_period,
+            'final_block_id': meta_info.final_block_id
+        }
+        return content, meta_data
 
     async def need(self, match, **kwargs):
         # Override this function to customize the processing

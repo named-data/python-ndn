@@ -38,7 +38,7 @@ class SignedBy(policy.DataValidator, policy.InterestValidator):
             return False
         # Get key_bits
         try:
-            key_bits = await key_match.need(must_be_fresh=True, can_be_prefix=True)
+            key_bits, _ = await key_match.need(must_be_fresh=True, can_be_prefix=True)
         except (NetworkError, InterestNack, InterestTimeout) as e:
             logging.info(f'{Name.to_str(match.name)} => Unable to fetch the key {Name.to_str(key_name)} due to {e}')
             return False
