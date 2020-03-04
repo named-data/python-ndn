@@ -1,3 +1,4 @@
+import logging
 from ..encoding import FormalName, Name, BinaryStr, InterestParam
 from ..name_tree import NameTrie
 from .schema_tree import MatchedNode
@@ -12,9 +13,11 @@ class MemoryCache:
         try:
             return next(self.data.itervalues(prefix=name, shallow=True))
         except KeyError:
+            logging.info(f'Cache miss: {Name.to_str(name)}')
             return None
 
     async def save(self, name: FormalName, packet: BinaryStr):
+        logging.info(f'Cache save: {Name.to_str(name)}')
         self.data[name] = bytes(packet)
 
 

@@ -25,6 +25,9 @@ class SignedBy(policy.DataValidator, policy.InterestValidator):
 
     async def validate(self, match, sig_ptrs: SignaturePtrs) -> bool:
         # Check key name
+        if sig_ptrs.signature_info is None or sig_ptrs.signature_info.key_locator is None:
+            logging.info(f'{Name.to_str(match.name)} => Not signed')
+            return False
         key_name = sig_ptrs.signature_info.key_locator.name
         if not key_name:
             logging.info(f'{Name.to_str(match.name)} => Not signed')

@@ -1,7 +1,7 @@
 # TODO: Change these names
 from .schema_tree import Node
 from .util import norm_pattern
-from ..encoding import Name, Component, TlvModel, NameField
+from ..encoding import Name, Component, TlvModel, NameField, ContentType
 from ..types import InterestTimeout
 from ..utils import timestamp
 
@@ -76,7 +76,7 @@ class SegmentedNode(Node):
             subname[-1] = Component.from_segment(i)
             submatch = match.finer_match(subname)
             kwargs['final_block_id'] = final_block_id
-            submatch.provide(content[i*self.segment_size:(i+1)*self.segment_size], **kwargs)
+            await submatch.provide(content[i*self.segment_size:(i+1)*self.segment_size], **kwargs)
 
     async def process_int(self, match, param, app_param, raw_packet):
         if match.pos == len(match.name):
@@ -90,18 +90,35 @@ class RDRNode(Node):
 
     class MetaData(Node):
         VERSION_PATTERN = norm_pattern('<v:timestamp>')[0]
+        FRESHNESS_PERIOD = 10
 
         def __init__(self, parent=None):
             super().__init__(parent)
             self._set(self.VERSION_PATTERN, Node(self))
 
+        def make_metadata(self, match):
+            metadata = RDRNode.MetaDataValue()
+            metadata.name = match.name[:-1] + [Component.from_version(self.parent.timestamp)]
+            return metadata.encode()
+
         async def process_int(self, match, param, app_param, raw_packet):
             if match.pos == len(match.name) and self.parent.timestamp is not None and param.can_be_prefix:
-                metadata = RDRNode.MetaDataValue()
-                metadata.name = match.name[:-1] + [Component.from_version(self.parent.timestamp)]
                 metaname = match.name + [Component.from_version(timestamp())]
                 submatch = match.finer_match(metaname)
-                await submatch.put_data(metadata.encode(), send_packet=True, freshness_period=10)
+                await submatch.put_data(self.make_metadata(match), send_packet=True,
+                                        freshness_period=self.FRESHNESS_PERIOD)
+
+        async def need(self, match, **kwargs):
+            if self.parent.timestamp is None:
+                return await super().need(match, **kwargs)
+            else:
+                meta_info = {
+                    **match.env,
+                    'content_type': ContentType.BLOB,
+                    'freshness_period': self.FRESHNESS_PERIOD,
+                    'final_block_id': None
+                }
+                return self.make_metadata(match), meta_info
 
     def __init__(self, parent=None, **kwargs):
         super().__init__(parent)
@@ -113,7 +130,7 @@ class RDRNode(Node):
         submatch = match.finer_match(match.name + [Component.from_str('32=metadata')])
         lifetime = kwargs.get('lifetime', None)
         meta_int_param = {'lifetime': lifetime} if lifetime else {}
-        metadata_val = await submatch.need(must_be_fresh=True, can_be_prefix=True, **meta_int_param)
+        metadata_val, _ = await submatch.need(must_be_fresh=True, can_be_prefix=True, **meta_int_param)
         metadata = RDRNode.MetaDataValue.parse(metadata_val, ignore_critical=True)
 
         submatch = match.finer_match(metadata.name)
@@ -122,4 +139,5 @@ class RDRNode(Node):
     async def provide(self, match, content, **kwargs):
         self.timestamp = timestamp()
         submatch = match.finer_match(match.name + [Component.from_version(self.timestamp)])
-        submatch.provide(content, **kwargs)
+        await submatch.provide(content, **kwargs)
+

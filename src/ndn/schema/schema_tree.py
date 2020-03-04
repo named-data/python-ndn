@@ -270,7 +270,9 @@ class MatchedNode:
         if policy.LocalOnly not in self.policies:
             cache_policy = self.policies.get(policy.Cache, None)
             if cache_policy and isinstance(cache_policy, policy.Cache):
-                aio.ensure_future(cache_policy.save(self, self.name, raw_packet))
+                # aio.ensure_future(cache_policy.save(self, self.name, raw_packet))
+                # self.name may change after this time point, so we have to wait until its finish
+                await cache_policy.save(self, self.name, raw_packet)
         # Decrypt content
         if content is not None:
             ac_policy = self.policies.get(policy.DataEncryption, None)
@@ -340,16 +342,15 @@ class MatchedNode:
         signer_policy = self.policies.get(policy.DataSigning, None)
         if signer_policy and isinstance(signer_policy, policy.DataSigning):
             signer = signer_policy.get_signer(self)
-        elif content is not None:
-            signer = DigestSha256Signer()
         else:
-            signer = None
+            signer = self.root.app.keychain.get_signer(kwargs)
         # Prepare Data packet
         raw_packet = self.root.app.prepare_data(data_name, content, meta_info=meta_info, signer=signer)
         # Cache save
         cache_policy = self.policies.get(policy.Cache, None)
         if cache_policy and isinstance(cache_policy, policy.Cache):
-            aio.ensure_future(cache_policy.save(self, self.name, raw_packet))
+            # aio.ensure_future(cache_policy.save(self, self.name, raw_packet))
+            await cache_policy.save(self, self.name, raw_packet)
         # face.put
         if send_packet:
             self.root.app.put_raw_packet(raw_packet)

@@ -36,6 +36,6 @@ def make_tl(raw_data: BinaryStr):
     siz_len = get_tl_num_size(siz)
     buf = bytearray(siz + siz_len + 1)
     buf[0] = TypeNumber.DATA
-    offset = write_tl_num(siz, buf, 1)
+    offset = 1 + write_tl_num(siz, buf, 1)
     buf[offset:] = raw_data
-    return raw_data
+    return buf
