@@ -237,13 +237,20 @@ class NDNApp:
             for name, route, validator, need_raw_packet, need_sig_ptrs in self._autoreg_routes:
                 await self.register(name, route, validator, need_raw_packet, need_sig_ptrs)
             if after_start:
-                await after_start
+                try:
+                    await after_start
+                except Exception:
+                    self.face.shutdown()
+                    raise
 
         try:
             await self.face.open()
         except (FileNotFoundError, ConnectionError, OSError, PermissionError):
             if after_start:
-                after_start.close()
+                if isinstance(after_start, Coroutine):
+                    after_start.close()
+                elif isinstance(after_start, aio.Task) or isinstance(after_start, aio.Future):
+                    after_start.cancel()
             raise
         task = aio.ensure_future(starting_task())
         logging.debug('Connected to NFD node, start running...')
