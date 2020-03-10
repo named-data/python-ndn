@@ -61,8 +61,7 @@ class InterestEncryption(Encryption, metaclass=abc.ABCMeta):
 
 
 class DataEncryption(Encryption, metaclass=abc.ABCMeta):
-    def get_encrypted_name(self, match) -> FormalName:
-        return match.name
+    pass
 
 
 class LocalOnly(Policy):

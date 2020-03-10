@@ -337,7 +337,6 @@ class MatchedNode:
             ac_policy = self.policies.get(policy.DataEncryption, None)
             if ac_policy and isinstance(ac_policy, policy.DataEncryption):
                 content = await ac_policy.encrypt(self, content)
-                data_name = ac_policy.get_encrypted_name(self)
         # Get signer
         signer_policy = self.policies.get(policy.DataSigning, None)
         if signer_policy and isinstance(signer_policy, policy.DataSigning):
