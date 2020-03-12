@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import io
 import abc
 import asyncio as aio
 from typing import Optional, Callable, Coroutine, Any
@@ -58,9 +59,11 @@ class StreamFace(Face, metaclass=abc.ABCMeta):
     async def run(self):
         while self.running:
             try:
-                typ = await read_tl_num_from_stream(self.reader)
-                siz = await read_tl_num_from_stream(self.reader)
-                buf = await self.reader.readexactly(siz)
+                bio = io.BytesIO()
+                typ = await read_tl_num_from_stream(self.reader, bio)
+                siz = await read_tl_num_from_stream(self.reader, bio)
+                bio.write(await self.reader.readexactly(siz))
+                buf = bio.getvalue()
                 aio.ensure_future(self.callback(typ, buf))
             except aio.IncompleteReadError:
                 self.shutdown()

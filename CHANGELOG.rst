@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Master -- (latest)
+++++++++++++++++++
+* Fix RuntimeWarning for hanging coroutine when main_loop raises an exception.
+* Fix the issue when after_start throws an exception, the application gets stuck.
+* Set raw_packet of express_interest and on_interest to be the whole packet with TL fields.
+
 0.2b2 (2020-02-18)
 ++++++++++++++++++
 

@@ -76,7 +76,7 @@ class NDNApp:
         logging.debug('Packet received %s, %s' % (typ, bytes(data)))
         if typ == TypeNumber.INTEREST:
             try:
-                name, param, app_param, sig = parse_interest(data, with_tl=False)
+                name, param, app_param, sig = parse_interest(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
                 logging.warning('Unable to decode received packet')
                 return
@@ -84,7 +84,7 @@ class NDNApp:
             await self._on_interest(name, param, app_param, sig, raw_packet=data)
         elif typ == TypeNumber.DATA:
             try:
-                name, meta_info, content, sig = parse_data(data, with_tl=False)
+                name, meta_info, content, sig = parse_data(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
                 logging.warning('Unable to decode received packet')
                 return
@@ -92,7 +92,7 @@ class NDNApp:
             await self._on_data(name, meta_info, content, sig, raw_packet=data)
         elif typ == LpTypeNumber.LP_PACKET:
             try:
-                nack_reason, interest = parse_network_nack(data, with_tl=False)
+                nack_reason, interest = parse_network_nack(data, with_tl=True)
                 name, _, _, _ = parse_interest(interest, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
                 logging.warning('Unable to decode received packet')
@@ -167,7 +167,7 @@ class NDNApp:
         :type app_param: Optional[:any:`BinaryStr`]
         :param validator: the Validator used to verify the Data received.
         :type validator: Optional[:any:`Validator`]
-        :param need_raw_packet: if True, return the raw Data packet without TL.
+        :param need_raw_packet: if True, return the raw Data packet with TL.
         :type need_raw_packet: bool
         :param kwargs: :ref:`label-keyword-arguments`.
         :return: A tuple of (Name, MetaInfo, Content) after ``await``.
@@ -319,7 +319,7 @@ class NDNApp:
             Otherwise NDNApp will try to validate the Interest with the validator.
             Interests which fail to be validated will be dropped without raising any exception.
         :type validator: Optional[:any:`Validator`]
-        :param need_raw_packet: if True, pass the raw Interest packet without TL to the callback as a keyword argument
+        :param need_raw_packet: if True, pass the raw Interest packet to the callback as a keyword argument
             ``raw_packet``.
         :type need_raw_packet: bool
         :param need_sig_ptrs: if True, pass the Signature pointers to the callback as a keyword argument
@@ -356,7 +356,7 @@ class NDNApp:
         :param validator: the Validator used to validate coming Interests.
         :type validator: Optional[:any:`Validator`]
         :return: ``True`` if the registration succeeded.
-        :param need_raw_packet: if True, pass the raw Interest packet without TL to the callback as a keyword argument
+        :param need_raw_packet: if True, pass the raw Interest packet to the callback as a keyword argument
             ``raw_packet``.
         :type need_raw_packet: bool
         :param need_sig_ptrs: if True, pass the Signature pointers to the callback as a keyword argument
@@ -443,25 +443,3 @@ class NDNApp:
             node.callback(name, param, app_param, **kwargs)
         else:
             node.callback(name, param, app_param)
-
-    @staticmethod
-    def get_original_packet_value(packet_name: FormalName):
-        """
-        Get a pointer to the Value of original Interest or Data packet.
-
-        .. warning::
-
-            Please only call this with a Name returned by :any:`express_interest`,
-            or the Name parameter of a Route. It is undefined behaviour otherwise.
-
-        This is only useful for repo, where you need to keep a Data packet with original signature.
-        Please remember to add the Type and Value field if necessary.
-
-        :param packet_name: the Name get from :any:`express_interest` or a Route.
-        :type packet_name: :any:`FormalName`
-        :return: the Value part of the original packet, TL excluded.
-        :rtype: bytes
-        """
-        assert isinstance(packet_name, list)
-        assert isinstance(packet_name[0], memoryview)
-        return packet_name[0].obj

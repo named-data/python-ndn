@@ -68,4 +68,4 @@ class DummyFace(Face):
         siz, siz_len = parse_tl_num(packet, typ_len)
         offset = typ_len + siz_len
         assert len(packet) == offset + siz
-        await self.callback(typ, packet[offset:])
+        await self.callback(typ, packet)

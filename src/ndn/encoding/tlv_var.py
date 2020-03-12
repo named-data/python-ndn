@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import io
 import struct
 import asyncio as aio
 from .tlv_type import BinaryStr, VarBinaryStr
@@ -100,25 +101,30 @@ def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
         return struct.unpack('!Q', buf[offset+1:offset+9])[0], 9
 
 
-async def read_tl_num_from_stream(reader: aio.StreamReader) -> int:
+async def read_tl_num_from_stream(reader: aio.StreamReader, bio: io.BytesIO) -> int:
     """
     Read a Type or Length variable from a StreamReader.
 
     :param reader: the StreamReader.
+    :param bio: the BytesIO to write whatever is read from the stream.
     :return: the value read.
     """
     buf = await reader.readexactly(1)
+    bio.write(buf)
     num = buf[0]
     if num <= 0xFC:
         return num
     elif num == 0xFD:
         buf = await reader.readexactly(2)
+        bio.write(buf)
         return struct.unpack('!H', buf)[0]
     elif num == 0xFE:
         buf = await reader.readexactly(4)
+        bio.write(buf)
         return struct.unpack('!I', buf)[0]
     else:
         buf = await reader.readexactly(8)
+        bio.write(buf)
         return struct.unpack('!Q', buf)[0]
 
 
