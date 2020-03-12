@@ -30,12 +30,3 @@ def norm_pattern(name: str) -> NamePattern:
             ret[i] = (0, type_val, content)
     return ret
 
-
-def make_tl(raw_data: BinaryStr):
-    siz = len(raw_data)
-    siz_len = get_tl_num_size(siz)
-    buf = bytearray(siz + siz_len + 1)
-    buf[0] = TypeNumber.DATA
-    offset = 1 + write_tl_num(siz, buf, 1)
-    buf[offset:] = raw_data
-    return buf

@@ -6,7 +6,7 @@ from ..encoding import is_binary_str, FormalName, NonStrictName, Name, Component
 from ..app import NDNApp
 from ..security import sha256_digest_checker, DigestSha256Signer
 from ..utils import gen_nonce
-from .util import norm_pattern, make_tl
+from .util import norm_pattern
 from . import policy
 
 
@@ -252,8 +252,6 @@ class MatchedNode:
         if cache_policy and isinstance(cache_policy, policy.Cache):
             data_raw = await cache_policy.search(self, self.name, param)
             if data_raw is not None:
-                if data_raw[0] != TypeNumber.DATA:
-                    data_raw = make_tl(data_raw)
                 self.root.app.put_raw_packet(data_raw)
                 return
         # By design, we do not cache Interest
