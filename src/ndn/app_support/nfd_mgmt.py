@@ -166,6 +166,10 @@ class FibEntry(TlvModel):
     next_hop_records = RepeatedField(ModelField(0x81, NextHopRecord))
 
 
+class FibStatus(TlvModel):
+    entries = RepeatedField(ModelField(0x80, FibEntry))
+
+
 class StrategyChoice(TlvModel):
     name = NameField()
     strategy = ModelField(0x6b, Strategy)
