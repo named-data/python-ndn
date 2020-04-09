@@ -156,6 +156,16 @@ class RibStatus(TlvModel):
     entries = RepeatedField(ModelField(0x80, RibEntry))
 
 
+class NextHopRecord(TlvModel):
+    face_id = UintField(0x69)
+    cost = UintField(0x6a)
+
+
+class FibEntry(TlvModel):
+    name = NameField()
+    next_hop_records = RepeatedField(ModelField(0x81, NextHopRecord))
+
+
 class StrategyChoice(TlvModel):
     name = NameField()
     strategy = ModelField(0x6b, Strategy)
@@ -163,6 +173,14 @@ class StrategyChoice(TlvModel):
 
 class StrategyChoiceMsg(TlvModel):
     strategy_choices = RepeatedField(ModelField(0x80, StrategyChoice))
+
+
+class CsInfo(TlvModel):
+    capacity = UintField(0x83)
+    flags = UintField(0x6c)
+    n_cs_entries = UintField(0x87)
+    n_hits = UintField(0x81)
+    n_misses = UintField(0x82)
 
 
 def make_command(module, command, **kwargs):
