@@ -57,7 +57,7 @@ def read_client_conf():
 
     path = get_path()
     ret = {
-        'transport': 'unix:///var/run/nfd.sock' if sys.platform == 'darwin' else 'unix:///run/nfd.sock',
+        'transport': 'unix:///run/nfd.sock' if sys.platform == 'linux' else 'unix:///var/run/nfd.sock',
         'pib': 'pib-sqlite3',
         'tpm': 'tpm-osxkeychain' if sys.platform == 'darwin' else 'tpm-file'
     }
