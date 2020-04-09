@@ -73,7 +73,7 @@ class StreamFace(Face, metaclass=abc.ABCMeta):
 
 
 class UnixFace(StreamFace):
-    path: str = '/var/run/nfd.sock'
+    path: str = '/run/nfd.sock'
 
     def __init__(self, path: str = ''):
         super().__init__()

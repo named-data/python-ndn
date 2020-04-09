@@ -1,6 +1,10 @@
 Changelog
 =========
 
+Master -- (latest)
+++++++++++++++++++
+* Change the default sock file path from ``/var/run/nfd.sock`` to ``/run/nfd.sock`` on Linux.
+
 0.2b2-1 (2020-03-23)
 ++++++++++++++++++++
 * Fix RuntimeWarning for hanging coroutine when main_loop raises an exception.
