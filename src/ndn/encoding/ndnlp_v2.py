@@ -16,12 +16,13 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from typing import Optional
-from .tlv_type import BinaryStr
+from .tlv_type import BinaryStr, VarBinaryStr, NonStrictName
 from .tlv_var import parse_and_check_tl
-from .tlv_model import TlvModel, UintField, BytesField, ModelField
+from .tlv_model import TlvModel, UintField, BytesField, ModelField, NameField, BoolField
+from .ndn_format_0_3 import InterestParam, TypeNumber, Links, Delegation
 
 
-__all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack']
+__all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack', 'make_network_nack']
 
 
 class LpTypeNumber:
@@ -62,6 +63,22 @@ class LpPacketValue(TlvModel):
     fragment = BytesField(LpTypeNumber.FRAGMENT)
 
 
+class LpPacket(TlvModel):
+    lp_packet = ModelField(LpTypeNumber.LP_PACKET, LpPacketValue)
+
+
+class NackInterestValue(TlvModel):
+    name = NameField()
+    can_be_prefix = BoolField(TypeNumber.CAN_BE_PREFIX, default=False)
+    must_be_fresh = BoolField(TypeNumber.MUST_BE_FRESH, default=False)
+    forwarding_hint = ModelField(TypeNumber.FORWARDING_HINT, Links)
+    nonce = UintField(TypeNumber.NONCE, fixed_len=4)
+
+
+class NackInterestPacket(TlvModel):
+    nack_interest = ModelField(TypeNumber.INTEREST, NackInterestValue)
+
+
 def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):
     if with_tl:
         wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
@@ -72,3 +89,29 @@ def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int],
         return ret.nack.nack_reason, ret.fragment
     else:
         return None, None
+
+
+def make_network_nack(name: NonStrictName, interest_param: InterestParam, nack_reason: int) -> VarBinaryStr:
+    nack_interest = NackInterestPacket()
+    nack_interest.nack_interest = NackInterestValue()
+    nack_interest.nack_interest.name = name
+    nack_interest.nack_interest.can_be_prefix = interest_param.can_be_prefix
+    nack_interest.nack_interest.must_be_fresh = interest_param.must_be_fresh
+    nack_interest.nack_interest.nonce = interest_param.nonce
+
+    if interest_param.forwarding_hint:
+        nack_interest.nack_interest.forwarding_hint = Links()
+        for preference, delegation in interest_param.forwarding_hint:
+            cur = Delegation()
+            cur.preference = preference
+            cur.delegation = delegation
+            nack_interest.nack_interest.forwarding_hint.delegations.append(cur)
+
+    encoded_interest = nack_interest.encode()
+
+    lp_packet = LpPacket()
+    lp_packet.lp_packet = LpPacketValue()
+    lp_packet.lp_packet.nack = NetworkNack()
+    lp_packet.lp_packet.nack.nack_reason = nack_reason
+    lp_packet.lp_packet.fragment = encoded_interest
+    return lp_packet.encode()
