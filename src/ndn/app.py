@@ -366,6 +366,9 @@ class NDNApp:
         :raises ValueError: the prefix is already registered.
         :raises NetworkError: the face to NFD is down now.
         """
+        if not self.face.running:
+            self._autoreg_routes.append((name, func, validator, need_raw_packet, need_sig_ptrs))
+            return
         name = Name.normalize(name)
         node = self._prefix_tree.setdefault(name, PrefixTreeNode())
         if node.callback:
