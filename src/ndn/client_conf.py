@@ -39,7 +39,7 @@ def read_client_conf():
         if os.path.exists(path):
             return path
 
-    def resolve_loaction(value):
+    def resolve_location(value):
         nonlocal path
         sp = value.split(':')
         if len(sp) == 1:
@@ -48,7 +48,7 @@ def read_client_conf():
         else:
             schema, loc = sp
         if not loc or not os.path.exists(loc):
-            if loc:
+            if loc and (path is not None):
                 loc = os.path.join(os.path.dirname(path), loc)
             if not loc or not os.path.exists(loc):
                 loc = '~/.ndn/ndnsec-key-file' if schema == 'tpm-file' else '~/.ndn'
@@ -67,13 +67,18 @@ def read_client_conf():
         with open(path) as f:
             text += f.read()
         parser.read_string(text)
-        for key in ['transport', 'pib', 'tpm']:
+        for key in ret.keys():
             try:
                 ret[key] = parser['DEFAULT'][key]
             except KeyError:
                 pass
+    for key in ret.keys():
+        try:
+            ret[key] = os.environ[f'NDN_CLIENT_{key.upper()}']
+        except KeyError:
+            pass
     for key in ['pib', 'tpm']:
-        ret[key] = resolve_loaction(ret[key])
+        ret[key] = resolve_location(ret[key])
     return ret
 
 
