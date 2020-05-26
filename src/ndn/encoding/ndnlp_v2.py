@@ -67,18 +67,6 @@ class LpPacket(TlvModel):
     lp_packet = ModelField(LpTypeNumber.LP_PACKET, LpPacketValue)
 
 
-class NackInterestValue(TlvModel):
-    name = NameField()
-    can_be_prefix = BoolField(TypeNumber.CAN_BE_PREFIX, default=False)
-    must_be_fresh = BoolField(TypeNumber.MUST_BE_FRESH, default=False)
-    forwarding_hint = ModelField(TypeNumber.FORWARDING_HINT, Links)
-    nonce = UintField(TypeNumber.NONCE, fixed_len=4)
-
-
-class NackInterestPacket(TlvModel):
-    nack_interest = ModelField(TypeNumber.INTEREST, NackInterestValue)
-
-
 def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):
     if with_tl:
         wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
@@ -91,24 +79,7 @@ def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int],
         return None, None
 
 
-def make_network_nack(name: NonStrictName, interest_param: InterestParam, nack_reason: int) -> VarBinaryStr:
-    nack_interest = NackInterestPacket()
-    nack_interest.nack_interest = NackInterestValue()
-    nack_interest.nack_interest.name = name
-    nack_interest.nack_interest.can_be_prefix = interest_param.can_be_prefix
-    nack_interest.nack_interest.must_be_fresh = interest_param.must_be_fresh
-    nack_interest.nack_interest.nonce = interest_param.nonce
-
-    if interest_param.forwarding_hint:
-        nack_interest.nack_interest.forwarding_hint = Links()
-        for preference, delegation in interest_param.forwarding_hint:
-            cur = Delegation()
-            cur.preference = preference
-            cur.delegation = delegation
-            nack_interest.nack_interest.forwarding_hint.delegations.append(cur)
-
-    encoded_interest = nack_interest.encode()
-
+def make_network_nack(encoded_interest: BinaryStr, nack_reason: int) -> VarBinaryStr:
     lp_packet = LpPacket()
     lp_packet.lp_packet = LpPacketValue()
     lp_packet.lp_packet.nack = NetworkNack()

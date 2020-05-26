@@ -15,7 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from ndn.encoding import parse_network_nack, parse_interest, make_network_nack, NackReason, Name, InterestParam
+from ndn.encoding import parse_network_nack, parse_interest, make_network_nack, make_interest,\
+    NackReason, Name, InterestParam
 
 
 class TestNetworkNack:
@@ -33,9 +34,9 @@ class TestNetworkNack:
 
     @staticmethod
     def test2():
-        lp_packet = make_network_nack('/localhost/nfd/faces/events',
-                                      InterestParam(must_be_fresh=True, can_be_prefix=True),
-                                      NackReason.NO_ROUTE)
-        assert lp_packet == (b"\x64\x32\xfd\x03\x20\x05\xfd\x03\x21\x01\x96"
-                             b"\x50\x27\x05\x25\x07\x1f\x08\tlocalhost\x08\x03nfd\x08\x05faces\x08\x06events"
-                             b"\x21\x00\x12\x00")
+        interest = make_interest('/localhost/nfd/faces/events',
+                                 InterestParam(must_be_fresh=True, can_be_prefix=True))
+        lp_packet = make_network_nack(interest, NackReason.NO_ROUTE)
+        assert lp_packet == (b"\x64\x36\xfd\x03\x20\x05\xfd\x03\x21\x01\x96"
+                             b"\x50\x2b\x05\x29\x07\x1f\x08\tlocalhost\x08\x03nfd\x08\x05faces\x08\x06events"
+                             b"\x21\x00\x12\x00\x0c\x02\x0f\xa0")
