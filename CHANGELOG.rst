@@ -1,9 +1,12 @@
 Changelog
 =========
 
-Master -- (latest)
+0.2b2-2 (2020-05-26)
 ++++++++++++++++++
 * Change the default sock file path from ``/var/run/nfd.sock`` to ``/run/nfd.sock`` on Linux.
+* Add FIB and CS management data structures
+* Add ``make_network_nack``
+* Recognize ``NDN_CLIENT_*`` environment variables
 
 0.2b2-1 (2020-03-23)
 ++++++++++++++++++++
