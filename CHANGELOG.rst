@@ -1,8 +1,12 @@
 Changelog
 =========
 
-0.2b2-2 (2020-05-26)
+Master -- (latest)
 ++++++++++++++++++
+* Fix the bug that registering multiple prefices at the same time leads to 403 error.
+
+0.2b2-2 (2020-05-26)
+++++++++++++++++++++
 * Change the default sock file path from ``/var/run/nfd.sock`` to ``/run/nfd.sock`` on Linux.
 * Add FIB and CS management data structures
 * Add ``make_network_nack``

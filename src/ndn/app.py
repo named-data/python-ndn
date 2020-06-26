@@ -48,6 +48,7 @@ class NDNApp:
     int_validator: Validator = None
     data_validator: Validator = None
     _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator], bool, bool]]
+    _prefix_register_semaphore: aio.Semaphore = None
 
     def __init__(self, face=None, keychain=None):
         config = read_client_conf() if not face or not keychain else {}
@@ -65,6 +66,7 @@ class NDNApp:
         self.data_validator = sha256_digest_checker
         self.int_validator = sha256_digest_checker
         self._autoreg_routes = []
+        self._prefix_register_semaphore = aio.Semaphore(1)
 
     async def _receive(self, typ: int, data: BinaryStr):
         """
@@ -374,20 +376,23 @@ class NDNApp:
         node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
         if validator:
             node.validator = validator
-        try:
-            _, _, reply = await self.express_interest(make_command('rib', 'register', name=name), lifetime=1000)
-            ret = parse_response(reply)
-            if ret['status_code'] != 200:
-                logging.error(f'Registration for {Name.to_str(name)} failed: '
-                              f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+
+        # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
+        async with self._prefix_register_semaphore:
+            try:
+                _, _, reply = await self.express_interest(make_command('rib', 'register', name=name), lifetime=1000)
+                ret = parse_response(reply)
+                if ret['status_code'] != 200:
+                    logging.error(f'Registration for {Name.to_str(name)} failed: '
+                                  f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                    return False
+                else:
+                    logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
+                                  f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                    return True
+            except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
+                logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
                 return False
-            else:
-                logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
-                              f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
-                return True
-        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
-            logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
-            return False
 
     async def unregister(self, name: NonStrictName):
         """
