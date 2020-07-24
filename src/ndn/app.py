@@ -18,6 +18,7 @@
 import struct
 import logging
 import asyncio as aio
+import inspect
 from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
 from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
@@ -445,6 +446,12 @@ class NDNApp:
                 kwargs['raw_packet'] = raw_packet
             if node.extra_param.get('sig_ptrs', False):
                 kwargs['sig_ptrs'] = sig
-            node.callback(name, param, app_param, **kwargs)
+            if inspect.iscoroutinefunction(node.callback):
+                await node.callback(name, param, app_param, **kwargs)
+            else:
+                node.callback(name, param, app_param, **kwargs)
         else:
-            node.callback(name, param, app_param)
+            if inspect.iscoroutinefunction(node.callback):
+                await node.callback(name, param, app_param)
+            else:
+                node.callback(name, param, app_param)

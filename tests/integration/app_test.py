@@ -146,6 +146,18 @@ class TestRoute(NDNAppTestSuite):
             self.app.put_data(name, b'test', no_signature=True)
 
 
+class TestAsyncRoute(NDNAppTestSuite):
+    async def face_proc(self, face: DummyFace):
+        await face.ignore_output(0)
+        await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+        await face.consume_output(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
+
+    async def app_main(self):
+        @self.app.route('/not')
+        async def on_interest(name, _param, _app_param):
+            self.app.put_data(name, b'test', no_signature=True)
+
+
 class TestNoValidationNeededInterest(NDNAppTestSuite):
     counter = 0
 
