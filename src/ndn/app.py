@@ -447,11 +447,11 @@ class NDNApp:
             if node.extra_param.get('sig_ptrs', False):
                 kwargs['sig_ptrs'] = sig
             if inspect.iscoroutinefunction(node.callback):
-                await node.callback(name, param, app_param, **kwargs)
+                aio.ensure_future(node.callback(name, param, app_param))
             else:
                 node.callback(name, param, app_param, **kwargs)
         else:
             if inspect.iscoroutinefunction(node.callback):
-                await node.callback(name, param, app_param)
+                aio.ensure_future(node.callback(name, param, app_param))
             else:
                 node.callback(name, param, app_param)
