@@ -25,6 +25,7 @@ from .tlv_var import parse_and_check_tl, shrink_length
 from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     SignatureValueField, OffsetMarker, BytesField, ModelField, NameField, \
     ProcedureArgument, RepeatedField
+from ..utils import timestamp, gen_nonce
 
 
 __all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'SignatureInfo', 'Delegation',
@@ -177,6 +178,8 @@ class InterestPacketValue(TlvModel):
         signer = self._signer.get_arg(markers)
         if signer is not None:
             signer.write_signature_info(self.signature_info)
+            self.signature_info.signature_time = timestamp()    # need timestamp for signed interest
+            self.signature_info.signature_nonce = gen_nonce()
         app_param = self.application_parameters
         if (signer is not None) and (app_param is None):
             app_param = b''
