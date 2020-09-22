@@ -2,9 +2,25 @@ from typing import Union, List, Tuple
 from ..encoding import Name, Component, BinaryStr, get_tl_num_size, TypeNumber, write_tl_num
 
 NamePattern = List[Union[BinaryStr, Tuple[int, int, str]]]
+r"""
+NamePattern is a list containing mixed name components and varaible patterns.
+A variable pattern is a capturing pattern that matches with exactly one name component.
+It is a tuple containing 3 variables:
+
+- The 1st element is reserved and always 0. This is a quick and dirty solution in this PoC implementation
+  It will be used if we want to support multiple name components matching patterns.
+- The 2nd element is the TLV type of the name component to be matched.
+- The 3rd element is the name of the pattern variable.
+"""
 
 
 def norm_pattern(name: str) -> NamePattern:
+    """
+    This function returns a normalized name pattern from a string, just like normalizing a name.
+
+    :param name: the name pattern string.
+    :return: normalized name pattern.
+    """
     ret = Name.normalize(name)[:]
     for i, comp in enumerate(ret):
         comp_type = Component.get_type(comp)

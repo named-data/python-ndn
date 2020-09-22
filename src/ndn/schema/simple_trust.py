@@ -13,6 +13,42 @@ Checker = Callable[[Dict[str, Any], Dict[str, Any]], bool]
 
 
 class SignedBy(policy.DataValidator, policy.InterestValidator):
+    r"""
+    SignedBy policy represents the trust schema,
+    specifying the key used to signed the Interest or Data packet.
+    It does the follows:
+
+    - Match the key used to sign the packet in the static tree.
+      The real key must match the node specified by ``key``.
+      Otherwise, the validation fails.
+    - Call the checker ``subject_to`` with two matching variable dict.
+      Fail if the checker returns ``False``.
+    - Call the ``need`` function of the matched key node to get the public key.
+      Fail if the key cannot be fetched.
+    - Verify the signature.
+
+    .. note::
+
+        Theoretically, SignedBy should also give the signer used to sign outgoing packets.
+        However, this function is missing in current implementation.
+
+    For example,
+
+    .. code-block:: python3
+
+        # This checker checks the Author of Data is the same as the Author of the key.
+        def check_author(data_env, key_env):
+            return data_env['Author'] == key_env['Author']
+
+        root = Node()
+        root['/author/<Author>/KEY/<KeyID>/self/<CertID>'] = Node()
+        root['/blog/<Author>/<Category>/<Date>'] = Node()
+        # The Data "/blog/<Author>/<Category>/<Date>" should be signed by
+        # the key "/author/<Author>/KEY/<KeyID>" with the same author.
+        root['/blog/<Author>/<Category>/<Date>'].set_policy(
+            policy.DataValidator,
+            SignedBy(root['/author/<Author>/KEY/<KeyID>'], subject_to=check_author))
+    """
     def __init__(self, key: Node, subject_to: Checker = None):
         super().__init__()
         self.key = key

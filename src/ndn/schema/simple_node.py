@@ -7,6 +7,11 @@ from ..utils import timestamp
 
 
 class LocalResource(Node):
+    """
+    LocalResource is a custom node that preloads some data.
+    When need() is called, it returns the loaded data directly.
+    This node type does not interact with the network.
+    """
     def __init__(self, parent=None, data=None):
         super().__init__(parent)
         self.data = data
@@ -24,6 +29,17 @@ class LocalResource(Node):
 
 
 class SegmentedNode(Node):
+    """
+    SegmentedNode represents a segmented object.
+    The segmented object is composed with multiple Data packets,
+    whose name have a suffix "/seg=seg_no" attached to the object's name.
+    The ``provide`` function handles segmentation, and the ``need`` function handles reassembly.
+
+    .. note::
+
+        Currently, the fetching pipeline is a simple one-by-one pipeline.
+        where only one Interest will be in-flight at one time.
+    """
     SEGMENT_PATTERN = norm_pattern('<seg:seg_no>')[0]
     SEGMENT_SIZE = 4400
 
@@ -85,6 +101,10 @@ class SegmentedNode(Node):
 
 
 class RDRNode(Node):
+    """
+    RDRNode represents a versioned and segmented object whose encoding follows the RDR protocol.
+    Its ``provide`` function generates the metadata packet, and ``need`` function handles version discovery.
+    """
     class MetaDataValue(TlvModel):
         name = NameField()
 
