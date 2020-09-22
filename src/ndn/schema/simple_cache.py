@@ -23,7 +23,7 @@ class MemoryCache:
         try:
             return next(self.data.itervalues(prefix=name, shallow=True))
         except KeyError:
-            logging.info(f'Cache miss: {Name.to_str(name)}')
+            logging.debug(f'Cache miss: {Name.to_str(name)}')
             return None
 
     async def save(self, name: FormalName, packet: BinaryStr):
@@ -33,7 +33,7 @@ class MemoryCache:
         :param name: the Data name.
         :param packet: the raw Data packet.
         """
-        logging.info(f'Cache save: {Name.to_str(name)}')
+        logging.debug(f'Cache save: {Name.to_str(name)}')
         self.data[name] = bytes(packet)
 
 
