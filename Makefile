@@ -1,8 +1,8 @@
 test:
-	venv/bin/pytest tests
+	pytest tests
 
 test-cov:
-	venv/bin/pytest tests --cov=src --cov-report term-missing
+	pytest tests --cov=src --cov-report term-missing
 
 upload:
 	rm -rf dist
