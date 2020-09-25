@@ -14,14 +14,14 @@ setup(
     name='python-ndn',
     version=version,
     description='An NDN client library with AsyncIO support in Python 3',
-    url='https://github.com/zjkmxy/python-ndn',
+    url='https://github.com/named-data/python-ndn',
     author='Xinyu Ma',
     author_email='ma.xinyu.26a@kyoto-u.jp',
     download_url='https://pypi.python.org/pypi/python-ndn',
     project_urls={
-        "Bug Tracker": "https://github.com/zjkmxy/python-ndn/issues",
+        "Bug Tracker": "https://github.com/named-data/python-ndn/issues",
         "Documentation": "https://python-ndn.readthedocs.io/",
-        "Source Code": "https://github.com/zjkmxy/python-ndn",
+        "Source Code": "https://github.com/named-data/python-ndn",
     },
     license='Apache License 2.0',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers

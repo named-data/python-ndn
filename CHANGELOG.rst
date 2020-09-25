@@ -3,6 +3,7 @@ Changelog
 
 Master -- (latest)
 ++++++++++++++++++
+* Transfer the repo to ``named-data/python-ndn``.
 
 0.3a1 (2020-09-24)
 ++++++++++++++++++

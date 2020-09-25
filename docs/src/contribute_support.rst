@@ -9,5 +9,5 @@ Contribute and Support
 - Write unit tests. There is no need to cover all code, but please cover as much as you can.
 - Add your name to ``AUTHORS.rst``.
 
-.. _GitHub: https://github.com/zjkmxy/python-ndn
+.. _GitHub: https://github.com/named-data/python-ndn
 .. _PEP8: https://www.python.org/dev/peps/pep-0008/

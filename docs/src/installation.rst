@@ -8,7 +8,7 @@ Install the latest release with pip::
 
 Install the latest development version::
 
-    $ pip install -U git+https://github.com/zjkmxy/python-ndn.git
+    $ pip install -U git+https://github.com/named-data/python-ndn.git
 
 Instructions for developer
 --------------------------
