@@ -15,6 +15,6 @@ FROM ghcr.io/zjkmxy/nfd-codespace:0.7.0
 # RUN su vscode -c "source /usr/local/share/nvm/nvm.sh && npm install -g <your-package-here>" 2>&1
 
 RUN pip3 --disable-pip-version-check --no-cache-dir install rstcheck sphinx-rtd-theme sphinx-autodoc-typehints \
-   && rm -rf /tmp/pip-tmp
+   readthedocs-sphinx-ext && rm -rf /tmp/pip-tmp
 
 RUN ndnsec-keygen /test | ndnsec-install-cert -
