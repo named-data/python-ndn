@@ -3,7 +3,12 @@ Changelog
 
 Master -- (latest)
 ++++++++++++++++++
+
+0.3a1 (2020-09-24)
+++++++++++++++++++
 * Fix the bug that registering multiple prefices at the same time leads to 403 error.
+* Add Name Tree Schema.
+* Add ``.devcontainer`` for VSCode Remote Containers and GitHub Codespaces.
 
 0.2b2-2 (2020-05-26)
 ++++++++++++++++++++
