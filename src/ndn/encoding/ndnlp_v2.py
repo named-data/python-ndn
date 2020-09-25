@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 Xinyu Ma
+# Copyright (C) 2019-2020 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -16,10 +16,9 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from typing import Optional
-from .tlv_type import BinaryStr, VarBinaryStr, NonStrictName
+from .tlv_type import BinaryStr, VarBinaryStr
 from .tlv_var import parse_and_check_tl
-from .tlv_model import TlvModel, UintField, BytesField, ModelField, NameField, BoolField
-from .ndn_format_0_3 import InterestParam, TypeNumber, Links, Delegation
+from .tlv_model import TlvModel, UintField, BytesField, ModelField
 
 
 __all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack', 'make_network_nack']

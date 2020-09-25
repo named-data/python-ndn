@@ -48,6 +48,6 @@ setup(
     install_requires=requirements,
     python_requires=">=3.6",
     extras_require={
-        "dev":  ["pytest>=5.3.5", "pytest-cov>=2.8.1"],
+        "dev":  ["pytest>=5.3.5", "pytest-cov>=2.8.1", "flake8>=3.7.9"],
     }
 )

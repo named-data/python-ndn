@@ -2,7 +2,7 @@ Contribute and Support
 ======================
 
 - Please submit any changes via `GitHub`_ pull requests.
-- If you use any existing code, please make sure it is compatible to *LGPL v3*
+- If you use any existing code, please make sure it is compatible to *Apache v2*
 - Ensure that your code complies to `PEP8`_.
 - Ensure that your code works with *Python 3.6* and *PyPy 7.1.1*.
 - Please contact the author first if your changes are not back compatible or import new dependencies.

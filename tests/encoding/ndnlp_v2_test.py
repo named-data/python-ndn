@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 Xinyu Ma
+# Copyright (C) 2019-2020 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -40,4 +40,3 @@ class TestNetworkNack:
         assert lp_packet == (b"\x64\x36\xfd\x03\x20\x05\xfd\x03\x21\x01\x96"
                              b"\x50\x2b\x05\x29\x07\x1f\x08\tlocalhost\x08\x03nfd\x08\x05faces\x08\x06events"
                              b"\x21\x00\x12\x00\x0c\x02\x0f\xa0")
-

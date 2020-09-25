@@ -19,7 +19,7 @@ from ndn import __version__
 # -- Project information -----------------------------------------------------
 
 project = 'python-ndn'
-copyright = '2019, Xinyu Ma'
+copyright = '2019-2020, The python-ndn authors'
 author = 'Xinyu Ma'
 
 # The full version, including alpha/beta/rc tags

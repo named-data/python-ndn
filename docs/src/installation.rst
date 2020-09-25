@@ -19,8 +19,7 @@ Setup python3.6 virtual environment with editable installation:
 
     python3.6 -m venv venv
     . venv/bin/activate
-    pip3 install -e .
-    pip3 install pytest pytest-cov flake8
+    pip3 install -e .[dev]
 
 Run all tests:
 
