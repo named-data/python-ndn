@@ -39,7 +39,7 @@ async def main():
         print(f'Usage: {sys.argv[0]} <name> [<file-path>]')
         exit(0)
 
-    # Make static tree
+    # Make schema tree
     root = Node()
     root['/<IDName>/KEY/<KeyID>/self/<CertID>'] = Node()
     root['/file/<FileName>'] = RDRNode()

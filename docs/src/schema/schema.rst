@@ -3,46 +3,31 @@
 
 .. warning::
 
-  Name Tree Schema is experimental and capricious.
+  Name Tree Schema (NTSchema) is experimental and capricious.
 
 Introduction
 ------------
 
-The :mod:`ndn.security` package provides an implementation of Name Tree Schema.
+The :mod:`ndn.schema` package provides an implementation of Name Tree Schema, an application framework that
+organizes application functionalities by the applciation namespace.
+Modularized NDN libraries can be developed based on it, and
+application developers can use those libraries as building blocks.
 
+WIP
 
-CNL Static Namespace Tree
--------------------------
+Examples
+--------
 
-.. automodule:: ndn.schema.schema_tree
-  :members:
+.. toctree::
 
-Utils
------
+    1 - File Sharing <ex1>
 
-.. automodule:: ndn.schema.util
-  :members:
+Reference
+---------
 
-Custom Nodes
-------------
+.. toctree::
 
-.. automodule:: ndn.schema.simple_node
-  :members:
-
-Policy Types
-------------
-
-.. automodule:: ndn.schema.policy
-  :members:
-
-Trust Policies
---------------
-
-.. automodule:: ndn.schema.simple_trust
-  :members:
-
-Cache Policies
---------------
-
-.. automodule:: ndn.schema.simple_cache
-  :members:
+    Namespace Schema Tree <schema_tree>
+    Utils <utils>
+    Custom Nodes <custom_node>
+    Policies <policies>
