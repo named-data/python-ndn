@@ -13,13 +13,13 @@ Install the latest development version::
 Instructions for developer
 --------------------------
 
-Setup python3.6 virtual environment with editable installation:
+Setup python3 virtual environment with editable installation:
 
 .. code-block:: bash
 
-    python3.6 -m venv venv
+    python3 -m venv venv
     . venv/bin/activate
-    pip3 install -e .[dev]
+    pip3 install -e ".[dev]"
 
 Run all tests:
 
@@ -33,12 +33,14 @@ Run static analysis:
 
     make lint
 
-Please use python 3.7 or 3.8 to generate the documentation.
+Please use python 3.8+ to generate the documentation.
 
 .. code-block:: bash
 
-    pip install Sphinx sphinx-autodoc-typehints readthedocs-sphinx-ext \
+    pip3 install Sphinx sphinx-autodoc-typehints readthedocs-sphinx-ext \
         sphinx-rtd-theme pycryptodomex pygtrie
 
     cd docs && make html
     open _build/html/index.html
+
+VSCode users can also use the development container obtained from the `.devcontainer` folder.
