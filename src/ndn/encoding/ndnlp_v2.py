@@ -18,10 +18,10 @@
 from typing import Optional
 from .tlv_type import BinaryStr, VarBinaryStr
 from .tlv_var import parse_and_check_tl
-from .tlv_model import TlvModel, UintField, BytesField, ModelField
+from .tlv_model import TlvModel, UintField, BytesField, ModelField, BoolField
 
 
-__all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack', 'make_network_nack']
+__all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack', 'make_network_nack', 'parse_lp_packet']
 
 
 class LpTypeNumber:
@@ -56,14 +56,48 @@ class NetworkNack(TlvModel):
     nack_reason = UintField(LpTypeNumber.NACK_REASON)
 
 
+class CachePolicy(TlvModel):
+    cache_policy_type = UintField(LpTypeNumber.CACHE_POLITY_TYPE)
+
+
 class LpPacketValue(TlvModel):
+    frag_index = UintField(LpTypeNumber.FRAG_INDEX)
+    frag_count = UintField(LpTypeNumber.FRAG_COUNT)
+    pit_token = BytesField(LpTypeNumber.PIT_TOKEN)
     nack = ModelField(LpTypeNumber.NACK, NetworkNack)
+    next_hop_face_id = UintField(LpTypeNumber.NEXT_HOP_FACE_ID)
+    incoming_face_id = UintField(LpTypeNumber.INCOMING_FACE_ID)
+    cache_policy = ModelField(LpTypeNumber.NACK, NetworkNack)
+    congestion_mark = UintField(LpTypeNumber.CONGESTION_MARK)
+    tx_sequence = BytesField(LpTypeNumber.TX_SEQUENCE)
+    ack = BytesField(LpTypeNumber.ACK)
+    non_discovery = BoolField(LpTypeNumber.NON_DISCOVERY)
+    prefix_announcement = BytesField(LpTypeNumber.PREFIX_ANNOUNCEMENT)
 
     fragment = BytesField(LpTypeNumber.FRAGMENT)
 
 
 class LpPacket(TlvModel):
     lp_packet = ModelField(LpTypeNumber.LP_PACKET, LpPacketValue)
+
+
+def parse_lp_packet(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):
+    """
+    Parse an LpPacket, return NackReason (if exists) and the fragment.
+
+    :param wire: an LpPacket.
+    :param with_tl: if `wire` has the TL fields.
+    :return: a tuple of NackReason and Fragment.
+    """
+    if with_tl:
+        wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
+    markers = {}
+    ret = LpPacketValue.parse(wire, markers, ignore_critical=True)
+
+    if ret.nack is not None:
+        return ret.nack.nack_reason, ret.fragment
+    else:
+        return None, ret.fragment
 
 
 def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):

@@ -21,8 +21,8 @@ import asyncio as aio
 from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
 from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
-    parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
-    make_data, InterestParam, make_interest, FormalName, SignaturePtrs
+    parse_tl_num, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
+    make_data, InterestParam, make_interest, FormalName, SignaturePtrs, parse_lp_packet
 from .security import Keychain, sha256_digest_checker, params_sha256_checker
 from .transport.stream_socket import Face
 from .app_support.nfd_mgmt import make_command, parse_response
@@ -73,36 +73,47 @@ class NDNApp:
         Pipeline when a packet is received.
 
         :param typ: the Type.
-        :param data: the Value of the packet without TL.
+        :param data: the Value of the packet with TL.
         """
         logging.debug('Packet received %s, %s' % (typ, bytes(data)))
-        if typ == TypeNumber.INTEREST:
+        if typ == LpTypeNumber.LP_PACKET:
             try:
-                name, param, app_param, sig = parse_interest(data, with_tl=True)
+                nack_reason, fragment = parse_lp_packet(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
                 logging.warning('Unable to decode received packet')
                 return
-            logging.debug('Interest received %s' % Name.to_str(name))
-            await self._on_interest(name, param, app_param, sig, raw_packet=data)
-        elif typ == TypeNumber.DATA:
+            data = fragment
+            typ, _ = parse_tl_num(data)
+        else:
+            nack_reason = None
+
+        if nack_reason is not None:
             try:
-                name, meta_info, content, sig = parse_data(data, with_tl=True)
+                name, _, _, _ = parse_interest(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode received packet')
-                return
-            logging.debug('Data received %s' % Name.to_str(name))
-            await self._on_data(name, meta_info, content, sig, raw_packet=data)
-        elif typ == LpTypeNumber.LP_PACKET:
-            try:
-                nack_reason, interest = parse_network_nack(data, with_tl=True)
-                name, _, _, _ = parse_interest(interest, with_tl=True)
-            except (DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode received packet')
+                logging.warning('Unable to decode the fragment of LpPacket')
                 return
             logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
             self._on_nack(name, nack_reason)
         else:
-            logging.warning('Unable to decode received packet')
+            if typ == TypeNumber.INTEREST:
+                try:
+                    name, param, app_param, sig = parse_interest(data, with_tl=True)
+                except (DecodeError, TypeError, ValueError, struct.error):
+                    logging.warning('Unable to decode received packet')
+                    return
+                logging.debug('Interest received %s' % Name.to_str(name))
+                await self._on_interest(name, param, app_param, sig, raw_packet=data)
+            elif typ == TypeNumber.DATA:
+                try:
+                    name, meta_info, content, sig = parse_data(data, with_tl=True)
+                except (DecodeError, TypeError, ValueError, struct.error):
+                    logging.warning('Unable to decode received packet')
+                    return
+                logging.debug('Data received %s' % Name.to_str(name))
+                await self._on_data(name, meta_info, content, sig, raw_packet=data)
+            else:
+                logging.warning('Unable to decode received packet')
 
     def put_raw_packet(self, data: BinaryStr):
         r"""
