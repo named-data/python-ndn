@@ -18,8 +18,7 @@
 from typing import Optional
 from .tlv_type import BinaryStr, VarBinaryStr
 from .tlv_var import parse_and_check_tl
-from .tlv_model import TlvModel, UintField, BytesField, ModelField, BoolField
-
+from .tlv_model import TlvModel, UintField, BytesField, ModelField, BoolField, DecodeError
 
 __all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack', 'make_network_nack', 'parse_lp_packet']
 
@@ -36,8 +35,8 @@ class LpTypeNumber:
     NACK_REASON = 0x0321
     NEXT_HOP_FACE_ID = 0x0330
     INCOMING_FACE_ID = 0x0331
-    CACHE_POLITY = 0x0334
-    CACHE_POLITY_TYPE = 0x0335
+    CACHE_POLICY = 0x0334
+    CACHE_POLICY_TYPE = 0x0335
     CONGESTION_MARK = 0x0340
     ACK = 0x0344
     TX_SEQUENCE = 0x0348
@@ -57,7 +56,7 @@ class NetworkNack(TlvModel):
 
 
 class CachePolicy(TlvModel):
-    cache_policy_type = UintField(LpTypeNumber.CACHE_POLITY_TYPE)
+    cache_policy_type = UintField(LpTypeNumber.CACHE_POLICY_TYPE)
 
 
 class LpPacketValue(TlvModel):
@@ -67,7 +66,7 @@ class LpPacketValue(TlvModel):
     nack = ModelField(LpTypeNumber.NACK, NetworkNack)
     next_hop_face_id = UintField(LpTypeNumber.NEXT_HOP_FACE_ID)
     incoming_face_id = UintField(LpTypeNumber.INCOMING_FACE_ID)
-    cache_policy = ModelField(LpTypeNumber.NACK, NetworkNack)
+    cache_policy = ModelField(LpTypeNumber.CACHE_POLICY, CachePolicy)
     congestion_mark = UintField(LpTypeNumber.CONGESTION_MARK)
     tx_sequence = BytesField(LpTypeNumber.TX_SEQUENCE)
     ack = BytesField(LpTypeNumber.ACK)
@@ -93,6 +92,9 @@ def parse_lp_packet(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Op
         wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
     markers = {}
     ret = LpPacketValue.parse(wire, markers, ignore_critical=True)
+
+    if ret.frag_index is not None or ret.frag_count is not None:
+        raise DecodeError('NDNLP fragmentation is not implemented yet.')
 
     if ret.nack is not None:
         return ret.nack.nack_reason, ret.fragment
