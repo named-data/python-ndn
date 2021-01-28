@@ -357,15 +357,17 @@ class NDNApp:
             return func
         return decorator
 
-    async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None,
-                       need_raw_packet: bool = False, need_sig_ptrs: bool = False):
+    async def register(self, name: NonStrictName, func: Optional[Route], validator: Optional[Validator] = None,
+                       need_raw_packet: bool = False, need_sig_ptrs: bool = False) -> bool:
         """
         Register a route for a specific prefix dynamically.
 
         :param name: the Name prefix for this route.
         :type name: :any:`NonStrictName`
         :param func: the onInterest function for the specified route.
-        :type func: Callable[[:any:`FormalName`, :any:`InterestParam`, Optional[:any:`BinaryStr`]], ``None``]
+            If ``None``, the NDNApp will only send the register command to forwarder,
+            without setting any callback function.
+        :type func: Optional[Callable[[:any:`FormalName`, :any:`InterestParam`, Optional[:any:`BinaryStr`]], ``None``]]
         :param validator: the Validator used to validate coming Interests.
         :type validator: Optional[:any:`Validator`]
         :return: ``True`` if the registration succeeded.
@@ -380,13 +382,14 @@ class NDNApp:
         :raises NetworkError: the face to NFD is down now.
         """
         name = Name.normalize(name)
-        node = self._prefix_tree.setdefault(name, PrefixTreeNode())
-        if node.callback:
-            raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
-        node.callback = func
-        node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
-        if validator:
-            node.validator = validator
+        if func is not None:
+            node = self._prefix_tree.setdefault(name, PrefixTreeNode())
+            if node.callback:
+                raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
+            node.callback = func
+            node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
+            if validator:
+                node.validator = validator
 
         # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
         async with self._prefix_register_semaphore:
@@ -405,7 +408,7 @@ class NDNApp:
                 logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
                 return False
 
-    async def unregister(self, name: NonStrictName):
+    async def unregister(self, name: NonStrictName) -> bool:
         """
         Unregister a route for a specific prefix.
 
@@ -414,7 +417,47 @@ class NDNApp:
         """
         name = Name.normalize(name)
         del self._prefix_tree[name]
-        await self.express_interest(make_command('rib', 'unregister', name=name), lifetime=1000)
+        try:
+            await self.express_interest(make_command('rib', 'unregister', name=name), lifetime=1000)
+            return True
+        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure):
+            return False
+
+    def set_interest_filter(self, name: NonStrictName, func: Route,
+                                  validator: Optional[Validator] = None, need_raw_packet: bool = False,
+                                  need_sig_ptrs: bool = False):
+        """
+        Set the callback function for an Interest prefix without sending a register command to the forwarder.
+
+        .. note::
+            All callbacks registered by ``set_interest_filter`` are removed when disconnected from
+            the the forwarder, and will not be added back after reconnection.
+            This behaviour is the same as ``register``.
+            Therefore, it is strongly recommended to use ``route`` for static routes.
+        """
+        name = Name.normalize(name)
+        node = self._prefix_tree.setdefault(name, PrefixTreeNode())
+        if node.callback:
+            raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
+        node.callback = func
+        node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
+        if validator:
+            node.validator = validator
+
+    def unset_interest_filter(self, name: NonStrictName):
+        """
+        Remove the callback function for an Interest prefix without sending an unregister command.
+
+        .. note::
+            ``unregister`` will only remove the callback if the callback's name matches exactly
+            the route's name.
+            This is because there may be one route whose name is the prefix of another.
+            To avoid cancelling unexpected routes, neither ``unregister`` nor ``unset_interest_filter``
+            behaves in a cascading manner.
+            Please remove callbacks manually.
+        """
+        name = Name.normalize(name)
+        del self._prefix_tree[name]
 
     def _on_nack(self, name: FormalName, nack_reason: int):
         node = self._int_tree[name]
@@ -438,6 +481,9 @@ class NDNApp:
             logging.warning('No route: %s' % name)
             return
         node = trie_step.value
+        if node.callback is None:
+            logging.warning('No callback: %s' % name)
+            return
         if app_param is not None or sig.signature_info is not None:
             if not await params_sha256_checker(name, sig):
                 logging.warning('Drop malformed Interest: %s' % name)
