@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 Xinyu Ma
+# Copyright (C) 2019-2020 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -21,8 +21,8 @@ import asyncio as aio
 from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
 from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
-    parse_network_nack, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
-    make_data, InterestParam, make_interest, FormalName, SignaturePtrs
+    parse_tl_num, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
+    make_data, InterestParam, make_interest, FormalName, SignaturePtrs, parse_lp_packet
 from .security import Keychain, sha256_digest_checker, params_sha256_checker
 from .transport.stream_socket import Face
 from .app_support.nfd_mgmt import make_command, parse_response
@@ -48,6 +48,7 @@ class NDNApp:
     int_validator: Validator = None
     data_validator: Validator = None
     _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator], bool, bool]]
+    _prefix_register_semaphore: aio.Semaphore = None
 
     def __init__(self, face=None, keychain=None):
         config = read_client_conf() if not face or not keychain else {}
@@ -65,42 +66,54 @@ class NDNApp:
         self.data_validator = sha256_digest_checker
         self.int_validator = sha256_digest_checker
         self._autoreg_routes = []
+        self._prefix_register_semaphore = aio.Semaphore(1)
 
     async def _receive(self, typ: int, data: BinaryStr):
         """
         Pipeline when a packet is received.
 
         :param typ: the Type.
-        :param data: the Value of the packet without TL.
+        :param data: the Value of the packet with TL.
         """
         logging.debug('Packet received %s, %s' % (typ, bytes(data)))
-        if typ == TypeNumber.INTEREST:
+        if typ == LpTypeNumber.LP_PACKET:
             try:
-                name, param, app_param, sig = parse_interest(data, with_tl=True)
+                nack_reason, fragment = parse_lp_packet(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
                 logging.warning('Unable to decode received packet')
                 return
-            logging.debug('Interest received %s' % Name.to_str(name))
-            await self._on_interest(name, param, app_param, sig, raw_packet=data)
-        elif typ == TypeNumber.DATA:
+            data = fragment
+            typ, _ = parse_tl_num(data)
+        else:
+            nack_reason = None
+
+        if nack_reason is not None:
             try:
-                name, meta_info, content, sig = parse_data(data, with_tl=True)
+                name, _, _, _ = parse_interest(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode received packet')
-                return
-            logging.debug('Data received %s' % Name.to_str(name))
-            await self._on_data(name, meta_info, content, sig, raw_packet=data)
-        elif typ == LpTypeNumber.LP_PACKET:
-            try:
-                nack_reason, interest = parse_network_nack(data, with_tl=True)
-                name, _, _, _ = parse_interest(interest, with_tl=True)
-            except (DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode received packet')
+                logging.warning('Unable to decode the fragment of LpPacket')
                 return
             logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
             self._on_nack(name, nack_reason)
         else:
-            logging.warning('Unable to decode received packet')
+            if typ == TypeNumber.INTEREST:
+                try:
+                    name, param, app_param, sig = parse_interest(data, with_tl=True)
+                except (DecodeError, TypeError, ValueError, struct.error):
+                    logging.warning('Unable to decode received packet')
+                    return
+                logging.debug('Interest received %s' % Name.to_str(name))
+                await self._on_interest(name, param, app_param, sig, raw_packet=data)
+            elif typ == TypeNumber.DATA:
+                try:
+                    name, meta_info, content, sig = parse_data(data, with_tl=True)
+                except (DecodeError, TypeError, ValueError, struct.error):
+                    logging.warning('Unable to decode received packet')
+                    return
+                logging.debug('Data received %s' % Name.to_str(name))
+                await self._on_data(name, meta_info, content, sig, raw_packet=data)
+            else:
+                logging.warning('Unable to decode received packet')
 
     def put_raw_packet(self, data: BinaryStr):
         r"""
@@ -344,15 +357,17 @@ class NDNApp:
             return func
         return decorator
 
-    async def register(self, name: NonStrictName, func: Route, validator: Optional[Validator] = None,
-                       need_raw_packet: bool = False, need_sig_ptrs: bool = False):
+    async def register(self, name: NonStrictName, func: Optional[Route], validator: Optional[Validator] = None,
+                       need_raw_packet: bool = False, need_sig_ptrs: bool = False) -> bool:
         """
         Register a route for a specific prefix dynamically.
 
         :param name: the Name prefix for this route.
         :type name: :any:`NonStrictName`
         :param func: the onInterest function for the specified route.
-        :type func: Callable[[:any:`FormalName`, :any:`InterestParam`, Optional[:any:`BinaryStr`]], ``None``]
+            If ``None``, the NDNApp will only send the register command to forwarder,
+            without setting any callback function.
+        :type func: Optional[Callable[[:any:`FormalName`, :any:`InterestParam`, Optional[:any:`BinaryStr`]], ``None``]]
         :param validator: the Validator used to validate coming Interests.
         :type validator: Optional[:any:`Validator`]
         :return: ``True`` if the registration succeeded.
@@ -367,29 +382,33 @@ class NDNApp:
         :raises NetworkError: the face to NFD is down now.
         """
         name = Name.normalize(name)
-        node = self._prefix_tree.setdefault(name, PrefixTreeNode())
-        if node.callback:
-            raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
-        node.callback = func
-        node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
-        if validator:
-            node.validator = validator
-        try:
-            _, _, reply = await self.express_interest(make_command('rib', 'register', name=name), lifetime=1000)
-            ret = parse_response(reply)
-            if ret['status_code'] != 200:
-                logging.error(f'Registration for {Name.to_str(name)} failed: '
-                              f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
-                return False
-            else:
-                logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
-                              f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
-                return True
-        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
-            logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
-            return False
+        if func is not None:
+            node = self._prefix_tree.setdefault(name, PrefixTreeNode())
+            if node.callback:
+                raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
+            node.callback = func
+            node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
+            if validator:
+                node.validator = validator
 
-    async def unregister(self, name: NonStrictName):
+        # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
+        async with self._prefix_register_semaphore:
+            try:
+                _, _, reply = await self.express_interest(make_command('rib', 'register', name=name), lifetime=1000)
+                ret = parse_response(reply)
+                if ret['status_code'] != 200:
+                    logging.error(f'Registration for {Name.to_str(name)} failed: '
+                                  f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                    return False
+                else:
+                    logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
+                                  f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                    return True
+            except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
+                logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
+                return False
+
+    async def unregister(self, name: NonStrictName) -> bool:
         """
         Unregister a route for a specific prefix.
 
@@ -398,7 +417,47 @@ class NDNApp:
         """
         name = Name.normalize(name)
         del self._prefix_tree[name]
-        await self.express_interest(make_command('rib', 'unregister', name=name), lifetime=1000)
+        try:
+            await self.express_interest(make_command('rib', 'unregister', name=name), lifetime=1000)
+            return True
+        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure):
+            return False
+
+    def set_interest_filter(self, name: NonStrictName, func: Route,
+                                  validator: Optional[Validator] = None, need_raw_packet: bool = False,
+                                  need_sig_ptrs: bool = False):
+        """
+        Set the callback function for an Interest prefix without sending a register command to the forwarder.
+
+        .. note::
+            All callbacks registered by ``set_interest_filter`` are removed when disconnected from
+            the the forwarder, and will not be added back after reconnection.
+            This behaviour is the same as ``register``.
+            Therefore, it is strongly recommended to use ``route`` for static routes.
+        """
+        name = Name.normalize(name)
+        node = self._prefix_tree.setdefault(name, PrefixTreeNode())
+        if node.callback:
+            raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
+        node.callback = func
+        node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
+        if validator:
+            node.validator = validator
+
+    def unset_interest_filter(self, name: NonStrictName):
+        """
+        Remove the callback function for an Interest prefix without sending an unregister command.
+
+        .. note::
+            ``unregister`` will only remove the callback if the callback's name matches exactly
+            the route's name.
+            This is because there may be one route whose name is the prefix of another.
+            To avoid cancelling unexpected routes, neither ``unregister`` nor ``unset_interest_filter``
+            behaves in a cascading manner.
+            Please remove callbacks manually.
+        """
+        name = Name.normalize(name)
+        del self._prefix_tree[name]
 
     def _on_nack(self, name: FormalName, nack_reason: int):
         node = self._int_tree[name]
@@ -422,6 +481,9 @@ class NDNApp:
             logging.warning('No route: %s' % name)
             return
         node = trie_step.value
+        if node.callback is None:
+            logging.warning('No callback: %s' % name)
+            return
         if app_param is not None or sig.signature_info is not None:
             if not await params_sha256_checker(name, sig):
                 logging.warning('Drop malformed Interest: %s' % name)

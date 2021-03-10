@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 Xinyu Ma
+# Copyright (C) 2019-2020 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -215,3 +215,18 @@ class TestConsumerRawPacket(NDNAppTestSuite):
         assert (raw == b'\x06\x42\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
                        b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
                        b'\x15\rHello, world!')
+
+
+class TestCongestionMark(NDNAppTestSuite):
+    async def face_proc(self, face: DummyFace):
+        await face.ignore_output(0)
+        await face.input_packet(b'\x64\x1e\xfd\x03\x40\x01\x01\x50\x17'
+                                b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+        await face.consume_output(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
+
+    async def app_main(self):
+        @self.app.route('/not', need_raw_packet=True, need_sig_ptrs=True)
+        def on_interest(name, _param, _app_param, raw_packet, sig_ptrs):
+            assert raw_packet == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05'
+            assert not sig_ptrs.signature_info
+            self.app.put_data(name, b'test', no_signature=True)
