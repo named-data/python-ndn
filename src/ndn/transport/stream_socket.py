@@ -65,7 +65,7 @@ class StreamFace(Face, metaclass=abc.ABCMeta):
                 bio.write(await self.reader.readexactly(siz))
                 buf = bio.getvalue()
                 aio.ensure_future(self.callback(typ, buf))
-            except aio.IncompleteReadError:
+            except (aio.IncompleteReadError, ConnectionResetError):
                 self.shutdown()
 
     def send(self, data: bytes):

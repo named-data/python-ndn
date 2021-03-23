@@ -290,6 +290,8 @@ class NDNApp:
         A non-async wrapper of :meth:`main_loop`.
 
         :param after_start: the coroutine to start after connection to NFD is established.
+        :return: ``True`` if the connection is shutdown not by ``Ctrl+C``.
+            For example, manually or by the other side.
 
         :examples:
             .. code-block:: python3

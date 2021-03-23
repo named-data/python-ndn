@@ -43,6 +43,14 @@ class InterestTimeout(Exception):
 class InterestCanceled(Exception):
     """
     Raised when an Interest is cancelled due to the loss of connection to NFD.
+
+    .. note::
+        A very large packet may cause NFD shutting down the connection.
+        More specifically,
+
+        - The face is shutdown.
+        - All pending Interests are cancelled with this exception.
+        - ``App.run_forever()`` returns ``True``.
     """
     pass
 
