@@ -213,7 +213,7 @@ class NDNApp:
                 kwargs['nonce'] = gen_nonce()
             interest_param = InterestParam.from_dict(kwargs)
         interest, final_name = make_interest(name, interest_param, app_param, signer=signer, need_final_name=True)
-        future = aio.get_event_loop().create_future()
+        future = aio.get_running_loop().create_future()
         node = self._int_tree.setdefault(final_name, InterestTreeNode())
         node.append_interest(future, interest_param)
         self.face.send(interest)
@@ -240,11 +240,13 @@ class NDNApp:
         else:
             raise ValidationFailure(name, meta_info, content)
 
-    async def main_loop(self, after_start: Awaitable = None):
+    async def main_loop(self, after_start: Awaitable = None) -> bool:
         """
         The main loop of NDNApp.
 
         :param after_start: the coroutine to start after connection to NFD is established.
+        :return: ``True`` if the connection is shutdown not by ``Ctrl+C``.
+            For example, manually or by the other side.
         """
         async def starting_task():
             for name, route, validator, need_raw_packet, need_sig_ptrs in self._autoreg_routes:
@@ -265,12 +267,19 @@ class NDNApp:
                 elif isinstance(after_start, aio.Task) or isinstance(after_start, aio.Future):
                     after_start.cancel()
             raise
-        task = aio.ensure_future(starting_task())
+        task = aio.create_task(starting_task())
         logging.debug('Connected to NFD node, start running...')
-        await self.face.run()
-        self.face.shutdown()
+        try:
+            await self.face.run()
+            ret = True
+        except aio.CancelledError:
+            logging.info('Shutting down')
+            ret = False
+        finally:
+            self.face.shutdown()
         self._clean_up()
         await task
+        return ret
 
     def _clean_up(self):
         for node in self._int_tree.itervalues():
@@ -285,13 +294,11 @@ class NDNApp:
         logging.info('Manually shutdown')
         self.face.shutdown()
 
-    def run_forever(self, after_start: Awaitable = None) -> bool:
+    def run_forever(self, after_start: Awaitable = None):
         """
         A non-async wrapper of :meth:`main_loop`.
 
         :param after_start: the coroutine to start after connection to NFD is established.
-        :return: ``True`` if the connection is shutdown not by ``Ctrl+C``.
-            For example, manually or by the other side.
 
         :examples:
             .. code-block:: python3
@@ -301,17 +308,10 @@ class NDNApp:
                 if __name__ == '__main__':
                     app.run_forever(after_start=main())
         """
-        task = self.main_loop(after_start)
         try:
-            aio.get_event_loop().run_until_complete(task)
-            ret = True
+            aio.run(self.main_loop(after_start))
         except KeyboardInterrupt:
-            logging.info('Receiving Ctrl+C, shutdown')
-            ret = False
-        finally:
-            self.face.shutdown()
-        logging.debug('Face is down now')
-        return ret
+            logging.info('Receiving Ctrl+C, exit')
 
     def route(self, name: NonStrictName, validator: Optional[Validator] = None,
               need_raw_packet: bool = False, need_sig_ptrs: bool = False):
@@ -355,7 +355,7 @@ class NDNApp:
         def decorator(func: Route):
             self._autoreg_routes.append((name, func, validator, need_raw_packet, need_sig_ptrs))
             if self.face.running:
-                aio.ensure_future(self.register(name, func, validator, need_raw_packet, need_sig_ptrs))
+                aio.create_task(self.register(name, func, validator, need_raw_packet, need_sig_ptrs))
             return func
         return decorator
 

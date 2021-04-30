@@ -29,11 +29,15 @@ class NDNAppTestSuite:
     app = None
 
     def test_main(self):
+        aio.run(self.comain())
+
+    async def comain(self):
         face = DummyFace(self.face_proc)
         keychain = KeychainDigest()
         self.app = NDNApp(face, keychain)
         face.app = self.app
-        self.app.run_forever(after_start=self.app_main())
+        await self.app.main_loop(self.app_main())
+        # self.app.run_forever(after_start=self.app_main())
 
     @abc.abstractmethod
     async def face_proc(self, face: DummyFace):
@@ -118,7 +122,7 @@ class TestInterestCanBePrefix(NDNAppTestSuite):
                                   b'\x05\x0c\x07\x05\x08\x03not\x21\x00\x0c\x01\x05'
                                   b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
         await face.input_packet(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
-        await aio.sleep(0.007)
+        await aio.sleep(0.1)
 
     async def app_main(self):
         future1 = self.app.express_interest('/not', nonce=None, lifetime=5, can_be_prefix=False)

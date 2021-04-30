@@ -285,7 +285,7 @@ class Node:
     def _on_interest_root(self, name: FormalName, param: InterestParam,
                           app_param: Optional[BinaryStr], raw_packet: BinaryStr):
         match = self.match(name)
-        aio.ensure_future(match.on_interest(param, app_param, raw_packet))
+        aio.create_task(match.on_interest(param, app_param, raw_packet))
 
     # ====== Functions on Interest & Data processing (For overriding)  ======
 

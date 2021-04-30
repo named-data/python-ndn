@@ -64,7 +64,7 @@ class StreamFace(Face, metaclass=abc.ABCMeta):
                 siz = await read_tl_num_from_stream(self.reader, bio)
                 bio.write(await self.reader.readexactly(siz))
                 buf = bio.getvalue()
-                aio.ensure_future(self.callback(typ, buf))
+                aio.create_task(self.callback(typ, buf))
             except (aio.IncompleteReadError, ConnectionResetError):
                 self.shutdown()
 

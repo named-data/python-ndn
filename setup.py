@@ -9,7 +9,7 @@ with io.open("src/ndn/__init__.py", "rt", encoding="utf8") as f:
     version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
 
-requirements = ['pycryptodomex >= 3.9.9', 'pygtrie >= 2.3.3', 'dataclasses >= 0.6']
+requirements = ['pycryptodomex >= 3.10.1', 'pygtrie >= 2.4.2']
 setup(
     name='python-ndn',
     version=version,
@@ -35,7 +35,6 @@ setup(
 
         'License :: OSI Approved :: Apache Software License',
 
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
@@ -47,7 +46,7 @@ setup(
     package_dir={'': 'src'},
 
     install_requires=requirements,
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     extras_require={
         "dev":  ["pytest>=5.3.5", "pytest-cov>=2.8.1", "flake8>=3.7.9"],
     }

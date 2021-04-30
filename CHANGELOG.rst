@@ -1,9 +1,17 @@
 Changelog
 =========
 
-Master -- (latest)
-++++++++++++++++++
+0.3a1-2 (2021-04-29)
+++++++++++++++++++++
+* Handle ConnectionResetError.
+* Drop Python 3.6 support.
+
+0.3a1-1 (2021-01-31)
+++++++++++++++++++++
 * Transfer the repo to ``named-data/python-ndn``.
+* Fix cocoapy to make it work on MacOS 11 Big Sur.
+* Add more supports to NDNLPv2 (CongestionMark).
+* Add dispatcher and set_interest_filter.
 
 0.3a1 (2020-09-24)
 ++++++++++++++++++
