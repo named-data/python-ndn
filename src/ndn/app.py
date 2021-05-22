@@ -66,7 +66,6 @@ class NDNApp:
         self.data_validator = sha256_digest_checker
         self.int_validator = sha256_digest_checker
         self._autoreg_routes = []
-        self._prefix_register_semaphore = aio.Semaphore(1)
 
     async def _receive(self, typ: int, data: BinaryStr):
         """
@@ -248,6 +247,8 @@ class NDNApp:
         :return: ``True`` if the connection is shutdown not by ``Ctrl+C``.
             For example, manually or by the other side.
         """
+        self._prefix_register_semaphore = aio.Semaphore(1)
+
         async def starting_task():
             for name, route, validator, need_raw_packet, need_sig_ptrs in self._autoreg_routes:
                 await self.register(name, route, validator, need_raw_packet, need_sig_ptrs)
