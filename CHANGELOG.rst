@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.3a1-3 (2021-05-22)
+++++++++++++++++++++
+* Support Unix socket on Windows 10.
+* Fix semaphore running in a different event loop bug.
+
 0.3a1-2 (2021-04-29)
 ++++++++++++++++++++
 * Handle ConnectionResetError.
