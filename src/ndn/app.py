@@ -212,10 +212,20 @@ class NDNApp:
                 kwargs['nonce'] = gen_nonce()
             interest_param = InterestParam.from_dict(kwargs)
         interest, final_name = make_interest(name, interest_param, app_param, signer=signer, need_final_name=True)
+        return self.express_raw_interest(final_name, interest_param, interest, validator, need_raw_packet)
+
+    def express_raw_interest(self,
+                             final_name: NonStrictName,
+                             interest_param: InterestParam,
+                             raw_interest: BinaryStr,
+                             validator: Optional[Validator] = None,
+                             need_raw_packet: bool = False
+                             ) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
+        final_name = Name.normalize(final_name)
         future = aio.get_running_loop().create_future()
         node = self._int_tree.setdefault(final_name, InterestTreeNode())
         node.append_interest(future, interest_param)
-        self.face.send(interest)
+        self.face.send(raw_interest)
         return self._wait_for_data(future, interest_param.lifetime, final_name, node, validator, need_raw_packet)
 
     async def _wait_for_data(self, future: aio.Future, lifetime: int, name: FormalName,
@@ -386,13 +396,7 @@ class NDNApp:
         """
         name = Name.normalize(name)
         if func is not None:
-            node = self._prefix_tree.setdefault(name, PrefixTreeNode())
-            if node.callback:
-                raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
-            node.callback = func
-            node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
-            if validator:
-                node.validator = validator
+            self.set_interest_filter(name, func, validator, need_raw_packet, need_sig_ptrs)
 
         # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
         async with self._prefix_register_semaphore:
@@ -427,8 +431,8 @@ class NDNApp:
             return False
 
     def set_interest_filter(self, name: NonStrictName, func: Route,
-                                  validator: Optional[Validator] = None, need_raw_packet: bool = False,
-                                  need_sig_ptrs: bool = False):
+                            validator: Optional[Validator] = None, need_raw_packet: bool = False,
+                            need_sig_ptrs: bool = False):
         """
         Set the callback function for an Interest prefix without sending a register command to the forwarder.
 
