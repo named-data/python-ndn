@@ -15,12 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import asyncio as aio
 from Cryptodome.Util.asn1 import DerSequence
-from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import ECC
-from Cryptodome.Signature import DSS
-from ndn.encoding import make_data, MetaInfo, parse_data
-from ndn.security import Sha256WithEcdsaSigner, Sha256WithRsaSigner, HmacSha256Signer
+from ndn.encoding import make_data, MetaInfo, parse_data, Name
+from ndn.security import Sha256WithEcdsaSigner, Sha256WithRsaSigner, HmacSha256Signer, \
+    EccChecker, RsaChecker, HmacChecker
 
 
 class TestSha256WithEcdsaSigner:
@@ -34,13 +34,8 @@ class TestSha256WithEcdsaSigner:
         _, _, _, sig_ptrs = parse_data(pkt)
         # Test its format is ASN.1 der format
         DerSequence().decode(bytes(sig_ptrs.signature_value_buf))
-        verifier = DSS.new(pub_key, 'fips-186-3', 'der')
-        h = SHA256.new()
-        for content in sig_ptrs.signature_covered_part:
-            h.update(content)
-        # verify() throws ValueError if it fails, the return value is undefined
-        # So do not assert its value
-        verifier.verify(h, bytes(sig_ptrs.signature_value_buf))
+        validator = EccChecker.from_key("/K/KEY/x", bytes(pub_key.export_key(format='DER')))
+        assert aio.run(validator(Name.from_str("/test"), sig_ptrs))
 
 
 class TestSha256WithHmacSigner:
@@ -77,6 +72,9 @@ class TestSha256WithHmacSigner:
                               '140015085355434345535321'
                               '160d1b01041c08070608046b657931'
                               '172019868e7183998df373332f3dd1c9c950fc29d734c07977791d8396fa3b91fd36')
+        _, _, _, sig_ptrs = parse_data(data)
+        validator = HmacChecker.from_key('key1', key)
+        assert aio.run(validator(Name.from_str('/ndn/abc'), sig_ptrs))
 
 
 class TestSha256WithRsaSigner:
@@ -176,3 +174,6 @@ class TestSha256WithRsaSigner:
                               '3c0d8ccfe23f12ecf5212a34b94eb62f822cda1f09e0f949640319cd026fb1ab'
                               '85282e30a8fe3899bc86d86696e11e157b74f88c0efd9823369dab63262f5d7a'
                               'abb372a3aaf43307331a2796e913e3d36150f6a387b4c97c19a493bb4513af3f')
+        validator = RsaChecker.from_key('/testname/KEY/123', key)
+        _, _, _, sig_ptrs = parse_data(data)
+        assert aio.run(validator(Name.from_str('/ndn/abc'), sig_ptrs))

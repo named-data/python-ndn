@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from typing import Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..utils import timestamp
 from ..encoding import Component, Name, ModelField, TlvModel, ContentType, BytesField,\
     SignatureInfo, TypeNumber, RepeatedField, IncludeBase, MetaInfo, VarBinaryStr,\
@@ -78,18 +78,23 @@ class SafeBag(TlvModel):
     encrypted_key_bag = BytesField(SecurityV2TypeNumber.ENCRYPTED_KEY_BAG)
 
 
-def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
+def parse_certificate(wire) -> CertificateV2Value:
+    wire = parse_and_check_tl(wire, TypeNumber.DATA)
+    return CertificateV2Value.parse(wire)
+
+
+def new_cert(key_name, issuer_id_component, pub_key, signer, start_time, end_time) -> Tuple[FormalName, VarBinaryStr]:
     cert_val = CertificateV2Value()
-    cert_name = Name.normalize(key_name) + [SELF_COMPONENT, Component.from_version(timestamp())]
+    cert_name = Name.normalize(key_name) + [issuer_id_component, Component.from_version(timestamp())]
     cert_val.name = cert_name
     cert_val.content = pub_key
     cert_val.meta_info = MetaInfo(content_type=ContentType.KEY, freshness_period=3600000)
     cert_val.signature_info = CertificateV2SignatureInfo()
     cert_val.signature_info.validity_period = ValidityPeriod()
-    cert_val.signature_info.validity_period.not_before = b'19700101T000000'
-    end_time = datetime.utcnow()
-    not_after = (f'{end_time.year+20:04}{end_time.month:02}{end_time.day:02}T'
-                 f'{end_time.hour:02}{end_time.minute:02}{end_time.second:02}').encode()
+    cur_time = start_time
+    not_before = cur_time.strftime('%Y%m%dT%H%M%S').encode()
+    cert_val.signature_info.validity_period.not_before = not_before
+    not_after = end_time.strftime('%Y%m%dT%H%M%S').encode()
     cert_val.signature_info.validity_period.not_after = not_after
 
     markers = {}
@@ -101,10 +106,19 @@ def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
     buf = bytearray(type_len + size_len + len(value) - shrink_size)
     write_tl_num(TypeNumber.DATA, buf)
     write_tl_num(len(value) - shrink_size, buf, type_len)
-    buf[type_len+size_len:] = memoryview(value)[0:len(value)-shrink_size]
+    buf[type_len + size_len:] = memoryview(value)[0:len(value) - shrink_size]
     return cert_name, buf
 
 
-def parse_certificate(wire) -> CertificateV2Value:
-    wire = parse_and_check_tl(wire, TypeNumber.DATA)
-    return CertificateV2Value.parse(wire)
+def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
+    end_time = datetime.utcnow()
+    end_time.replace(year=end_time.year + 20)
+    return new_cert(key_name, SELF_COMPONENT, pub_key, signer,
+                    datetime.fromisoformat('1970-01-01T00:00:00'), end_time)
+
+
+def derive_cert(key_name, issuer_id, pub_key, signer, start_time, expire_sec):
+    end_time = start_time + timedelta(seconds=expire_sec)
+    if isinstance(issuer_id, str):
+        issuer_id = Component.from_str(issuer_id)
+    return new_cert(key_name, issuer_id, pub_key, signer, start_time, end_time)
