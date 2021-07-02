@@ -17,12 +17,10 @@
 # -----------------------------------------------------------------------------
 import io
 import abc
-import sys
 import asyncio as aio
 from typing import Optional, Callable, Coroutine, Any
 from ..encoding.tlv_var import read_tl_num_from_stream
-if sys.platform.startswith('win32'):
-    from .windows import open_unix_connection
+from ..platform import Platform
 
 
 class Face(metaclass=abc.ABCMeta):
@@ -84,10 +82,7 @@ class UnixFace(StreamFace):
             self.path = path
 
     async def open(self):
-        if sys.platform.startswith('win32'):
-            self.reader, self.writer = await open_unix_connection(self.path)
-        else:
-            self.reader, self.writer = await aio.open_unix_connection(self.path)
+        self.reader, self.writer = await Platform().open_unix_connection(self.path)
         self.running = True
 
 

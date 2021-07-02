@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 from typing import Optional
 from ..encoding import NonStrictName, Name, BinaryStr, InterestParam, FormalName
-from ..types import Validator, Route
+from ..types import Route
 from ..name_tree import NameTrie, PrefixTreeNode
 
 

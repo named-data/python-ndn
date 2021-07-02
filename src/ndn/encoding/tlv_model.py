@@ -683,7 +683,7 @@ class TlvModel(metaclass=TlvModelMeta):
         ret = 0
         for field in self._encoded_fields:
             ret += field.encoded_length(field.get_value(self), markers)
-        markers[f'##encoded_length'] = ret
+        markers['##encoded_length'] = ret
         return ret
 
     def encode(self,
@@ -706,8 +706,8 @@ class TlvModel(metaclass=TlvModelMeta):
         """
         if markers is None:
             markers = {}
-        if f'##encoded_length' in markers:
-            length = markers[f'##encoded_length']
+        if '##encoded_length' in markers:
+            length = markers['##encoded_length']
         else:
             length = self.encoded_length(markers)
         if wire is None:

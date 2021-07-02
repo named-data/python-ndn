@@ -85,8 +85,8 @@ def read_client_conf():
 
 
 def default_keychain(pib: str, tpm: str) -> Keychain:
-    pib_schema, pib_loc = pib.split(':')
-    tpm_schema, tpm_loc = tpm.split(':')
+    pib_schema, pib_loc = pib.split(':', 1)
+    tpm_schema, tpm_loc = tpm.split(':', 1)
     if tpm_schema == 'tpm-file':
         tpm = TpmFile(tpm_loc)
     elif tpm_schema == 'tpm-osxkeychain':

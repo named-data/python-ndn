@@ -16,5 +16,5 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import sys
-if sys.platform == 'darwin':
+if sys.platform == 'win32':
     from ...platform.windows import Cng

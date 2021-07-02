@@ -64,3 +64,7 @@ class Platform(abc.ABC):
     @abc.abstractmethod
     def default_tpm_paths(self) -> List[str]:
         pass
+
+    @abc.abstractmethod
+    async def open_unix_connection(self, path=None):
+        pass

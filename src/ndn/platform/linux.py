@@ -16,6 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import os
+import asyncio as aio
 from .general import Platform
 
 
@@ -40,3 +41,6 @@ class Linux(Platform):
 
     def default_tpm_paths(self):
         return [os.path.expanduser(r'~/.ndn/ndnsec-key-file')]
+
+    async def open_unix_connection(self, path=None):
+        return await aio.open_unix_connection(path)

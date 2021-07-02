@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import os
 import sys
+import asyncio as aio
 from ctypes import cdll, c_void_p, c_ubyte, POINTER, c_int32, c_ulong, c_uint16
 from .general import Platform
 if sys.platform == 'darwin':
@@ -133,3 +134,6 @@ class Darwin(Platform):
 
     def default_tpm_paths(self):
         return [os.path.expanduser(r'~/.ndn/ndnsec-key-file')]
+
+    async def open_unix_connection(self, path=None):
+        return await aio.open_unix_connection(path)
