@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
+# Copyright (C) 2019-2021 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -15,8 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import os
 import sys
 from ctypes import cdll, c_void_p, c_ubyte, POINTER, c_int32, c_ulong, c_uint16
+from .general import Platform
 if sys.platform == 'darwin':
     from ..contrib.cocoapy import cf, CFIndex, CFRange, CFAllocatorRef
 
@@ -108,3 +110,26 @@ class ReleaseGuard:
             if v:
                 cf.CFRelease(v)
         return False
+
+
+class Darwin(Platform):
+    def client_conf_paths(self):
+        return [os.path.expanduser('~/.ndn/client.conf'),
+                '/usr/local/etc/ndn/client.conf',
+                '/opt/local/etc/ndn/client.conf',
+                '/etc/ndn/client.conf']
+
+    def default_transport(self):
+        return 'unix:///var/run/nfd.sock'
+
+    def default_pib_schema(self):
+        return 'pib-sqlite3'
+
+    def default_pib_paths(self):
+        return [os.path.expanduser(r'~/.ndn')]
+
+    def default_tpm_schema(self):
+        return 'tpm-osxkeychain'
+
+    def default_tpm_paths(self):
+        return [os.path.expanduser(r'~/.ndn/ndnsec-key-file')]

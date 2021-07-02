@@ -13,7 +13,11 @@ Install the latest development version::
 Instructions for developer
 --------------------------
 
-Setup python3 virtual environment with editable installation:
+For development, pipenv is recommended::
+
+    $ pipenv install --dev
+
+To setup a traditional python3 virtual environment with editable installation:
 
 .. code-block:: bash
 
@@ -25,13 +29,13 @@ Run all tests:
 
 .. code-block:: bash
 
-    make test
+    pipenv run test
 
 Run static analysis:
 
 .. code-block:: bash
 
-    make lint
+    pipenv run make lint
 
 Please use python 3.8+ to generate the documentation.
 

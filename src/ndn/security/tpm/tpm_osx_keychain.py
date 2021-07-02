@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
+# Copyright (C) 2019-2021 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -25,7 +25,7 @@ from ...encoding import Signer, NonStrictName, Name, SignatureType, KeyLocator, 
 from .tpm import Tpm
 if sys.platform == 'darwin':
     from ...contrib.cocoapy import cf, CFSTR, ObjCInstance, cfstring_to_string, cfnumber_to_number, kCFNumberIntType
-    from ..osx import OsxSec, ReleaseGuard
+    from ...platform.osx import OsxSec, ReleaseGuard
 
 
 class OsxSigner(Signer):

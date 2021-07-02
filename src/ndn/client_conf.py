@@ -18,6 +18,7 @@
 import os
 import sys
 from configparser import ConfigParser
+from .platform import Platform
 from .security import TpmFile, Keychain, KeychainSqlite3
 from .transport.stream_socket import Face, UnixFace, TcpFace
 if sys.platform == 'darwin':
@@ -25,21 +26,15 @@ if sys.platform == 'darwin':
 
 
 def read_client_conf():
-    def get_path():
-        path = os.path.expanduser('~/.ndn/client.conf')
-        if os.path.exists(path):
-            return path
-        path = '/usr/local/etc/ndn/client.conf'
-        if os.path.exists(path):
-            return path
-        path = '/opt/local/etc/ndn/client.conf'
-        if os.path.exists(path):
-            return path
-        path = '/etc/ndn/client.conf'
-        if os.path.exists(path):
-            return path
+    def get_path() -> str:
+        paths = Platform().client_conf_paths()
+        for p_str in paths:
+            p = os.path.expandvars(p_str)
+            if os.path.exists(p):
+                return p
+        return ''
 
-    def resolve_location(value):
+    def resolve_location(item: str, value: str) -> str:
         nonlocal path
         sp = value.split(':')
         if len(sp) == 1:
@@ -51,15 +46,22 @@ def read_client_conf():
             if loc and (path is not None):
                 loc = os.path.join(os.path.dirname(path), loc)
             if not loc or not os.path.exists(loc):
-                loc = '~/.ndn/ndnsec-key-file' if schema == 'tpm-file' else '~/.ndn'
-                loc = os.path.expanduser(loc)
+                if item == 'pib':
+                    paths = Platform().default_pib_paths()
+                else:
+                    paths = Platform().default_tpm_paths()
+                for p_str in paths:
+                    p = os.path.expandvars(p_str)
+                    if os.path.exists(p):
+                        loc = p
+                        break
         return ':'.join((schema, loc))
 
     path = get_path()
     ret = {
-        'transport': 'unix:///run/nfd.sock' if sys.platform == 'linux' else 'unix:///var/run/nfd.sock',
-        'pib': 'pib-sqlite3',
-        'tpm': 'tpm-osxkeychain' if sys.platform == 'darwin' else 'tpm-file'
+        'transport': Platform().default_transport(),
+        'pib': Platform().default_pib_schema(),
+        'tpm': Platform().default_tpm_schema()
     }
     if path:
         parser = ConfigParser()
@@ -78,7 +80,7 @@ def read_client_conf():
         except KeyError:
             pass
     for key in ['pib', 'tpm']:
-        ret[key] = resolve_location(ret[key])
+        ret[key] = resolve_location(key, ret[key])
     return ret
 
 
