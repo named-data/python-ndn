@@ -82,6 +82,7 @@ class TpmOsxKeychain(Tpm):
     def _get_key(key_name: NonStrictName):
         sec = OsxSec()
         with ReleaseGuard() as g:
+            # TODO: what about name convension?
             logging.debug('Get OSX Key %s' % Name.to_str(key_name))
             g.key_label = CFSTR(Name.to_str(key_name))
             g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 6, cf.kCFTypeDictionaryKeyCallBacks, None))

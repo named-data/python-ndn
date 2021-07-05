@@ -35,6 +35,30 @@ NULL = 0
 class Cng:
     __instance = None
 
+    STATUS_UNSUCCESSFUL = c.c_long(0xC0000001).value  # -0x3FFFFFFF
+    NTE_BAD_KEYSET = c.c_long(0x80090016).value
+    NCRYPT_OVERWRITE_KEY_FLAG = c.c_long(0x00000080)
+    BCRYPT_SHA256_ALGORITHM = c.c_wchar_p('SHA256')
+    BCRYPT_ECDSA_P256_ALGORITHM = c.c_wchar_p('ECDSA_P256')
+    BCRYPT_ECDSA_P384_ALGORITHM = c.c_wchar_p('ECDSA_P384')
+    BCRYPT_ECDSA_P521_ALGORITHM = c.c_wchar_p('ECDSA_P521')
+    NCRYPT_ECDSA_P256_ALGORITHM = BCRYPT_ECDSA_P256_ALGORITHM
+    NCRYPT_ECDSA_P384_ALGORITHM = BCRYPT_ECDSA_P384_ALGORITHM
+    NCRYPT_ECDSA_P521_ALGORITHM = BCRYPT_ECDSA_P521_ALGORITHM
+    BCRYPT_OBJECT_LENGTH = c.c_wchar_p('ObjectLength')
+    BCRYPT_HASH_LENGTH = c.c_wchar_p('HashDigestLength')
+    MS_PLATFORM_KEY_STORAGE_PROVIDER = c.c_wchar_p('Microsoft Platform Crypto Provider')
+    MS_KEY_STORAGE_PROVIDER = c.c_wchar_p('Microsoft Software Key Storage Provider')
+    BCRYPT_ECCPUBLIC_BLOB = c.c_wchar_p('ECCPUBLICBLOB')
+    BCRYPT_ECCPRIVATE_BLOB = c.c_wchar_p('ECCPRIVATEBLOB')
+
+    class BcryptEcckeyBlob(c.Structure):
+        _fields_ = [("dw_magic", c.c_ulong), ("cb_key", c.c_ulong)]
+
+    @staticmethod
+    def nt_success(status):
+        return status >= 0
+
     def __new__(cls):
         if Cng.__instance is None:
             Cng.__instance = object.__new__(cls)
@@ -45,8 +69,6 @@ class Cng:
             return
         self.bcrypt = c.windll.bcrypt
         self.ncrypt = c.windll.ncrypt
-
-        # TODO: Finish Windows 10 CNG
 
 
 class Win32(Platform):
@@ -140,3 +162,30 @@ class Win32(Platform):
         transport, _ = await Win32._create_unix_connection(loop, lambda: protocol, path)
         writer = aio.StreamWriter(transport, protocol, reader, loop)
         return reader, writer
+
+
+class ReleaseGuard:
+    def __init__(self):
+        self.__dict__['_list'] = []
+
+    def __getattr__(self, idx):
+        return self._list[idx]
+
+    def __setattr__(self, idx, value):
+        self._list[idx] = value
+
+    def __iadd__(self, defer):
+        self._list.append(defer)
+        return self
+
+    def __enter__(self):
+        if len(self._list) > 0:
+            raise RuntimeError('Re-enter a ReleaseGuard')
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._list.reverse()
+        for f in self._list:
+            if f:
+                f()
+        return False

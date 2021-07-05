@@ -23,6 +23,8 @@ from .security import TpmFile, Keychain, KeychainSqlite3
 from .transport.stream_socket import Face, UnixFace, TcpFace
 if sys.platform == 'darwin':
     from .security.tpm.tpm_osx_keychain import TpmOsxKeychain
+if sys.platform == 'win32':
+    from .security.tpm.tpm_cng import TpmCng
 
 
 def read_client_conf():
@@ -91,6 +93,8 @@ def default_keychain(pib: str, tpm: str) -> Keychain:
         tpm = TpmFile(tpm_loc)
     elif tpm_schema == 'tpm-osxkeychain':
         tpm = TpmOsxKeychain()
+    elif tpm_schema == 'tpm-cng':
+        tpm = TpmCng()
     else:
         raise ValueError(f'Unrecognized tpm schema: {tpm}')
     if pib_schema == 'pib-sqlite3':
