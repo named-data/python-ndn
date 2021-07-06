@@ -20,14 +20,10 @@ import sys
 import argparse
 from ...platform import Platform
 from ...security import KeychainSqlite3
+from ...client_conf import default_keychain
 
 
-def add_parser(subparsers):
-    parser = subparsers.add_parser('init')
-    parser.set_defaults(executor=execute)
-
-
-def execute(args: argparse.Namespace):
+def resolve_keychain(args: argparse.Namespace) -> KeychainSqlite3:
     tpm = args.tpm
     tpm_path = args.tpm_path
     base_dir = args.path
@@ -36,24 +32,28 @@ def execute(args: argparse.Namespace):
         tpm = platform.default_tpm_schema()
     if tpm == 'tpm-osxkeychain' and sys.platform != 'darwin':
         print(f'ERROR: {tpm} only works on MacOS.')
-        return -2
+        exit(-2)
     if tpm == 'tpm-cng' and sys.platform != 'win32':
         print(f'ERROR: {tpm} only works on Windows 10/11 with a TPM chip.')
-        return -2
+        exit(-2)
     if not base_dir:
-        base_dir = platform.default_pib_paths()[0]
+        for d in platform.default_pib_paths():
+            if os.path.exists(d):
+                base_dir = d
+                break
+        if not base_dir:
+            print(f'ERROR: Cannot find a PIB.')
+            exit(-2)
+
     pib_path = os.path.join(base_dir, 'pib.db')
+    if not os.path.exists(pib_path):
+        print(f'ERROR: Specified or default PIB database file {pib_path} does not exist.')
+        exit(-2)
+
     if not tpm_path:
         if tpm == 'tpm-file':
             tpm_path = os.path.join(base_dir, 'ndnsec-key-file')
         else:
             tpm_path = ''
-    print(f'Initializing PIB at {pib_path}, with tpm-locator={tpm}:{tpm_path}')
-    ret = KeychainSqlite3.initialize(pib_path, tpm, tpm_path)
-    if ret:
-        print('Successfully created PIB. Before running any NDN application, '
-              'Please make sure you have the correct client.conf and a default key.')
-        return 0
-    else:
-        print('Failed to create PIB database.')
-        return -1
+
+    return default_keychain(f'pib-sqlite3:{base_dir}', f'{tpm}:{tpm_path}')
