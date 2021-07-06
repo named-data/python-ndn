@@ -16,19 +16,12 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from . import cmd_init, cmd_list
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers()
+def add_parser(subparsers):
+    par_init = subparsers.add_parser('list')
+    par_init.set_defaults(executor=execute)
 
-    cmd_init.add_parser(subparsers)
-    cmd_list.add_parser(subparsers)
 
-    args = parser.parse_args()
-    if 'executor' not in args:
-        parser.print_help()
-        exit(-1)
-
-    return args.executor(args)
+def execute(args: argparse.Namespace):
+    print(f'list::: {args}')

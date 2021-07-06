@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import logging
+import os
 import sqlite3
 from typing import Iterator
 from dataclasses import dataclass
@@ -24,6 +26,147 @@ from ...app_support.security_v2 import self_sign
 from ..signer.sha256_digest_signer import DigestSha256Signer
 from ..tpm.tpm import Tpm
 from .keychain import Keychain
+
+
+INITIALIZE_SQL = """
+CREATE TABLE IF NOT EXISTS
+  tpmInfo(
+    tpm_locator           BLOB
+  );
+CREATE TABLE IF NOT EXISTS
+  identities(
+    id                    INTEGER PRIMARY KEY,
+    identity              BLOB NOT NULL,
+    is_default            INTEGER DEFAULT 0
+  );
+CREATE UNIQUE INDEX IF NOT EXISTS
+  identityIndex ON identities(identity);
+CREATE TRIGGER IF NOT EXISTS
+  identity_default_before_insert_trigger
+  BEFORE INSERT ON identities
+  FOR EACH ROW
+  WHEN NEW.is_default=1
+  BEGIN
+    UPDATE identities SET is_default=0;
+  END;
+CREATE TRIGGER IF NOT EXISTS
+  identity_default_after_insert_trigger
+  AFTER INSERT ON identities
+  FOR EACH ROW
+  WHEN NOT EXISTS
+    (SELECT id
+       FROM identities
+       WHERE is_default=1)
+  BEGIN
+    UPDATE identities
+      SET is_default=1
+      WHERE identity=NEW.identity;
+  END;
+CREATE TRIGGER IF NOT EXISTS
+  identity_default_update_trigger
+  BEFORE UPDATE ON identities
+  FOR EACH ROW
+  WHEN NEW.is_default=1 AND OLD.is_default=0
+  BEGIN
+    UPDATE identities SET is_default=0;
+  END;
+CREATE TABLE IF NOT EXISTS
+  keys(
+    id                    INTEGER PRIMARY KEY,
+    identity_id           INTEGER NOT NULL,
+    key_name              BLOB NOT NULL,
+    key_bits              BLOB NOT NULL,
+    is_default            INTEGER DEFAULT 0,
+    FOREIGN KEY(identity_id)
+      REFERENCES identities(id)
+      ON DELETE CASCADE
+      ON UPDATE CASCADE
+  );
+CREATE UNIQUE INDEX IF NOT EXISTS
+  keyIndex ON keys(key_name);
+CREATE TRIGGER IF NOT EXISTS
+  key_default_before_insert_trigger
+  BEFORE INSERT ON keys
+  FOR EACH ROW
+  WHEN NEW.is_default=1
+  BEGIN
+    UPDATE keys
+      SET is_default=0
+      WHERE identity_id=NEW.identity_id;
+  END;
+CREATE TRIGGER IF NOT EXISTS
+  key_default_after_insert_trigger
+  AFTER INSERT ON keys
+  FOR EACH ROW
+  WHEN NOT EXISTS
+    (SELECT id
+       FROM keys
+       WHERE is_default=1
+         AND identity_id=NEW.identity_id)
+  BEGIN
+    UPDATE keys
+      SET is_default=1
+      WHERE key_name=NEW.key_name;
+  END;
+CREATE TRIGGER IF NOT EXISTS
+  key_default_update_trigger
+  BEFORE UPDATE ON keys
+  FOR EACH ROW
+  WHEN NEW.is_default=1 AND OLD.is_default=0
+  BEGIN
+    UPDATE keys
+      SET is_default=0
+      WHERE identity_id=NEW.identity_id;
+  END;
+CREATE TABLE IF NOT EXISTS
+  certificates(
+    id                    INTEGER PRIMARY KEY,
+    key_id                INTEGER NOT NULL,
+    certificate_name      BLOB NOT NULL,
+    certificate_data      BLOB NOT NULL,
+    is_default            INTEGER DEFAULT 0,
+    FOREIGN KEY(key_id)
+      REFERENCES keys(id)
+      ON DELETE CASCADE
+      ON UPDATE CASCADE
+  );
+CREATE UNIQUE INDEX IF NOT EXISTS
+  certIndex ON certificates(certificate_name);
+CREATE TRIGGER IF NOT EXISTS
+  cert_default_before_insert_trigger
+  BEFORE INSERT ON certificates
+  FOR EACH ROW
+  WHEN NEW.is_default=1
+  BEGIN
+    UPDATE certificates
+      SET is_default=0
+      WHERE key_id=NEW.key_id;
+  END;
+CREATE TRIGGER IF NOT EXISTS
+  cert_default_after_insert_trigger
+  AFTER INSERT ON certificates
+  FOR EACH ROW
+  WHEN NOT EXISTS
+    (SELECT id
+       FROM certificates
+       WHERE is_default=1
+         AND key_id=NEW.key_id)
+  BEGIN
+    UPDATE certificates
+      SET is_default=1
+      WHERE certificate_name=NEW.certificate_name;
+  END;
+CREATE TRIGGER IF NOT EXISTS
+  cert_default_update_trigger
+  BEFORE UPDATE ON certificates
+  FOR EACH ROW
+  WHEN NEW.is_default=1 AND OLD.is_default=0
+  BEGIN
+    UPDATE certificates
+      SET is_default=0
+      WHERE key_id=NEW.key_id;
+  END;
+"""
 
 
 @dataclass
@@ -270,6 +413,27 @@ class KeychainSqlite3(Keychain):
     path: str
     tpm_locator: str
     _signer_cache: dict
+
+    @staticmethod
+    def initialize(path: str, tpm_schema: str, tpm_path: str = '') -> bool:
+        if os.path.exists(path):
+            logging.fatal(f'PIB database {path} already exists.')
+            return False
+        # Make sure the directory exists
+        base_dir = os.path.dirname(path)
+        os.makedirs(base_dir, exist_ok=True)
+        # Create an empty folder if the schema is file
+        if tpm_schema == 'tpm-file':
+            if not tpm_path:
+                tpm_path = os.path.join(base_dir, 'ndnsec-key-file')
+            os.makedirs(tpm_path, exist_ok=True)
+        # Create sqlite3 database
+        conn = sqlite3.connect(path)
+        conn.executescript(INITIALIZE_SQL)
+        conn.execute('INSERT INTO tpmInfo (tpm_locator) VALUES (?)', (f'{tpm_schema}:{tpm_path}'.encode(),))
+        conn.commit()
+        conn.close()
+        return True
 
     def __init__(self, path: str, tpm: Tpm):
         self.path = path
