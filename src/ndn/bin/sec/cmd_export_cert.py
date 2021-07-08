@@ -15,24 +15,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import argparse
+import base64
+from .utils import resolve_keychain, get_default_cert
 
 
-CMD_LIST = '''
-Available commands:
-  Get-Status (status)
-  Get-Face (face,gf)
-  New-Face (nf)
-  Remove-Face (rf)
-  Get-Route (route,gr)
-  New-Route (nr)
-  Remove-Route (rr)
-  Get-Strategy (strategy,gs)
-  Set-Strategy (ss)
-  Remove-Strategy (rs)
-
-Try '%(prog)s COMMAND -h' for more information on each command
-'''
+def add_parser(subparsers):
+    parser = subparsers.add_parser('Export-Cert', aliases=['export', 'ec', 'export-cert'])
+    parser.add_argument('obj', metavar='OBJECT', nargs='?', default='',
+                        help='name of the identity/key/certificate to export.')
+    parser.set_defaults(executor=execute)
 
 
-def main():
-    pass
+def execute(args: argparse.Namespace):
+    kc = resolve_keychain(args)
+    cert = get_default_cert(kc, args)
+    if cert is None:
+        return -2
+
+    text = base64.standard_b64encode(bytes(cert.data)).decode()
+    cnt = (len(text) + 63) // 64
+    for i in range(cnt):
+        print(text[i * 64:(i + 1) * 64])

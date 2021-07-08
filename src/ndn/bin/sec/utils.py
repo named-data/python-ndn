@@ -18,9 +18,15 @@
 import os
 import sys
 import argparse
+from typing import Tuple
 from ...platform import Platform
 from ...security import KeychainSqlite3
 from ...client_conf import default_keychain
+from ...app_support.security_v2 import KEY_COMPONENT
+from ...encoding import Name, FormalName
+
+
+KEY_KEYWORD = KEY_COMPONENT
 
 
 def resolve_keychain(args: argparse.Namespace) -> KeychainSqlite3:
@@ -57,3 +63,65 @@ def resolve_keychain(args: argparse.Namespace) -> KeychainSqlite3:
             tpm_path = ''
 
     return default_keychain(f'pib-sqlite3:{base_dir}', f'{tpm}:{tpm_path}')
+
+
+def infer_obj_name(obj_name: FormalName) -> Tuple[int, FormalName, FormalName, FormalName]:
+    if len(obj_name) > 2 and obj_name[-2] == KEY_KEYWORD:
+        v = 1
+        id_name = obj_name[:-2]
+        key_name = obj_name
+        cert_name = []
+    elif len(obj_name) > 4 and obj_name[-4] == KEY_KEYWORD:
+        v = 2
+        id_name = obj_name[:-4]
+        key_name = obj_name[:-2]
+        cert_name = obj_name
+    else:
+        v = 0
+        id_name = obj_name
+        key_name = []
+        cert_name = []
+    return v, id_name, key_name, cert_name
+
+
+def get_default_cert(kc: KeychainSqlite3, args: argparse.Namespace):
+    obj = args.obj
+    id_name = []
+    key_name = []
+    cert_name = []
+
+    if obj:
+        obj_name = Name.from_str(obj)
+        _, id_name, key_name, cert_name = infer_obj_name(obj_name)
+
+    try:
+        if id_name:
+            iden = kc[id_name]
+        else:
+            iden = kc.default_identity()
+    except KeyError as e:
+        print('Requested identity does not exist.')
+        print(f'KeyError: {e}')
+        return None
+
+    try:
+        if key_name:
+            key = iden[key_name]
+        else:
+            key = iden.default_key()
+    except KeyError as e:
+        print('Requested key does not exist.')
+        print(f'KeyError: {e}')
+        return None
+
+    try:
+        if cert_name:
+            cert = key[cert_name]
+        else:
+            cert = key.default_cert()
+    except KeyError as e:
+        print('Requested certificate does not exist.')
+        print(f'KeyError: {e}')
+        return None
+
+    return cert

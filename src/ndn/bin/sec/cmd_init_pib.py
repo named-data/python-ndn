@@ -23,7 +23,7 @@ from ...security import KeychainSqlite3
 
 
 def add_parser(subparsers):
-    parser = subparsers.add_parser('init')
+    parser = subparsers.add_parser('Init-Pib', aliases=['init', 'init-pib'])
     parser.set_defaults(executor=execute)
 
 

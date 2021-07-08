@@ -16,5 +16,17 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 
+
+CMD_LIST = '''
+Available commands:
+  Serve-Data (poke,sd)
+  Fetch-Data (peek,fd)
+  Serve-RdrContent (putchunks,src)
+  Fetch-RdrContent (catchunks,frc)
+
+Try '%(prog)s COMMAND -h' for more information on each command
+'''
+
+
 def main():
     pass

@@ -653,3 +653,9 @@ class KeychainSqlite3(Keychain):
         if not identity.has_default_key():
             identity.set_default_key(key_name)
         return identity[key_name]
+
+    def import_cert(self, key_name: NonStrictName, cert_name: NonStrictName, cert_data: BinaryStr):
+        self.conn.execute('INSERT INTO certificates (key_id, certificate_name, certificate_data)'
+                          'VALUES ((SELECT id FROM keys WHERE key_name=?), ?, ?)',
+                          (key_name, cert_name, bytes(cert_data)))
+        self.conn.commit()

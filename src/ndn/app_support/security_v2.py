@@ -26,6 +26,7 @@ from ..encoding.ndn_format_0_3 import DataPacketValue
 
 KEY_COMPONENT = Component.from_str('KEY')
 SELF_COMPONENT = Component.from_str('self')
+SIGN_REQ_COMPONENT = Component.from_str('cert-request')
 
 
 class SecurityV2TypeNumber:
@@ -117,7 +118,14 @@ def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
                     datetime.fromisoformat('1970-01-01T00:00:00'), end_time)
 
 
-def derive_cert(key_name, issuer_id, pub_key, signer, start_time, expire_sec):
+def sign_req(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
+    start_time = datetime.utcnow()
+    end_time = start_time + timedelta(days=10)
+    return new_cert(key_name, SIGN_REQ_COMPONENT, pub_key, signer,
+                    datetime.utcnow(), end_time)
+
+
+def derive_cert(key_name, issuer_id, pub_key, signer, start_time, expire_sec) -> Tuple[FormalName, VarBinaryStr]:
     end_time = start_time + timedelta(seconds=expire_sec)
     if isinstance(issuer_id, str):
         issuer_id = Component.from_str(issuer_id)
