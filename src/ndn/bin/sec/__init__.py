@@ -16,21 +16,23 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from . import cmd_init, cmd_list
+from . import cmd_init_pib, cmd_get_childitem, cmd_get_default, cmd_set_default, \
+    cmd_new_item, cmd_sign_cert, cmd_remove_item, cmd_export_cert, cmd_import_cert, \
+    cmd_get_signreq
 
 
 CMD_LIST = '''
 Available commands:
-  init           Initialize a PIB
-  list           List all known identities/keys/certificates
-  get-default    Show the default identity/key/certificate
-  set-default    Change the default identity/key/certificate
-  delete         Delete an identity/key/certificate
-  key-gen        Generate a key for an identity
-  sign-req       Generate a certificate signing request
-  cert-gen       Create a certificate for an identity
-  cert-dump      Export a certificate
-  cert-install   Import a certificate from a file
+  Init-Pib (init)             Initialize a new PIB
+  Get-ChildItem (list,ls,gci) List all known identities/keys/certificates
+  Get-Default (gd)            Show the default identity/key/certificate
+  Set-Default (sd)            Change the default identity/key/certificate
+  New-Item (key-gen,ni)       Create a new identity or a new key
+  Sign-Cert (cert-gen,sc)     Issue a new certificate for an external sign request
+  Remove-Item (del,ri,rm)     Delete an identity/key/certificate
+  Export-Cert (export,ec)     Export the default certificate
+  Import-Cert (import,ic)     Import a certificate from a file
+  Get-SignReq (sign-req,gsr)  Generate a certificate signing request
   
 Try '%(prog)s COMMAND -h' for more information on each command
 '''
@@ -40,8 +42,16 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, epilog=CMD_LIST)
     subparsers = parser.add_subparsers(metavar='COMMAND', help='sub-command to execute')
 
-    cmd_init.add_parser(subparsers)
-    cmd_list.add_parser(subparsers)
+    cmd_init_pib.add_parser(subparsers)
+    cmd_get_childitem.add_parser(subparsers)
+    cmd_get_default.add_parser(subparsers)
+    cmd_set_default.add_parser(subparsers)
+    cmd_new_item.add_parser(subparsers)
+    cmd_sign_cert.add_parser(subparsers)
+    cmd_remove_item.add_parser(subparsers)
+    cmd_export_cert.add_parser(subparsers)
+    cmd_import_cert.add_parser(subparsers)
+    cmd_get_signreq.add_parser(subparsers)
 
     parser.add_argument('--pib', metavar='PIB_SCHEMA', choices=['pib-sqlite3'], default='pib-sqlite3',
                         help='the schema of PIB. Only pib-sqlite3 is available currently.')

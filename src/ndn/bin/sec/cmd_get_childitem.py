@@ -23,7 +23,7 @@ from .utils import resolve_keychain
 
 
 def add_parser(subparsers):
-    parser = subparsers.add_parser('list')
+    parser = subparsers.add_parser('Get-ChildItem', aliases=['list', 'ls', 'gci', 'get-childitem'])
     parser.add_argument('-k', '--key', dest='verbose', action='store_const', const=1, default=0,
                         help='list all keys associated with each identity')
     parser.add_argument('-c', '--cert', dest='verbose', action='store_const', const=2, default=0,
