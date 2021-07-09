@@ -27,7 +27,7 @@ from .utils import resolve_keychain
 def add_parser(subparsers):
     parser = subparsers.add_parser('Import-Cert', aliases=['import', 'ic', 'import-cert'])
     parser.add_argument('file', metavar='FILE', nargs='?', default='-',
-                        help='name of the identity/key/certificate to export.')
+                        help="file name of the certificate to be imported, '-' for stdin")
     parser.set_defaults(executor=execute)
 
 

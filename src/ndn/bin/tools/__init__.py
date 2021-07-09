@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import argparse
+from . import cmd_fetch_data, cmd_serve_data, cmd_fetch_rdrcontent, cmd_serve_rdrcontent
 
 
 CMD_LIST = '''
@@ -29,4 +31,18 @@ Try '%(prog)s COMMAND -h' for more information on each command
 
 
 def main():
-    pass
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, epilog=CMD_LIST)
+    subparsers = parser.add_subparsers(metavar='COMMAND', help='sub-command to execute')
+
+    cmd_fetch_data.add_parser(subparsers)
+    cmd_serve_data.add_parser(subparsers)
+    cmd_fetch_rdrcontent.add_parser(subparsers)
+    cmd_serve_rdrcontent.add_parser(subparsers)
+
+    args = parser.parse_args()
+    if 'executor' not in args:
+        parser.print_help()
+        exit(-1)
+
+    return args.executor(args)
+
