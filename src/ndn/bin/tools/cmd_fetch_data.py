@@ -91,7 +91,7 @@ def execute(args: argparse.Namespace):
         except InterestTimeout:
             print(f'Timeout')
         except InterestCanceled:
-            print(f'Canceled')
+            print(f'Local forwarder disconnected')
         except ValidationFailure:
             print(f'Data failed to validate')
         finally:
