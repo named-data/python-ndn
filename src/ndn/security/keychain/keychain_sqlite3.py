@@ -541,11 +541,16 @@ class KeychainSqlite3(Keychain):
             self.set_default_identity(name)
         return self[name]
 
+    def __del__(self):
+        if self.conn is not None:
+            self.shutdown()
+
     def shutdown(self):
         """
         Close the connection.
         """
         self.conn.close()
+        self.conn = None
 
     def del_identity(self, name: NonStrictName):
         """

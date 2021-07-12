@@ -91,12 +91,12 @@ class TestInterestNack(NDNAppTestSuite):
 
 class TestInterestTimeout(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
-        await face.consume_output(b'\x05\x14\x07\x0f\x08\rnot important\x0c\x01\x01')
-        await aio.sleep(0.002)
+        await face.consume_output(b'\x05\x14\x07\x0f\x08\rnot important\x0c\x01\x0a')
+        await aio.sleep(0.05)
 
     async def app_main(self):
         with pytest.raises(InterestTimeout):
-            await self.app.express_interest('not important', nonce=None, lifetime=1)
+            await self.app.express_interest('not important', nonce=None, lifetime=10)
 
 
 class TestDataValidationFalure(NDNAppTestSuite):
