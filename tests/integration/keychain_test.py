@@ -45,6 +45,7 @@ class TestKeychainSqlite3:
 
             self.keychain.del_identity('test')
             assert len(self.keychain) == 0
+            self.keychain.shutdown()
 
     def prepare_db(self, base_dir):
         self.pib_file = os.path.join(base_dir, 'pib.db')
