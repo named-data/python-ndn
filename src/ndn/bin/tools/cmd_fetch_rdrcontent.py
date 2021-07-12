@@ -15,16 +15,140 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import os
+import sys
 import argparse
+from ...encoding import Name, Component
+from ...app import NDNApp
+from ...security import KeychainDigest
+from ...types import InterestTimeout, InterestNack, InterestCanceled, ValidationFailure
+
+
+METADATA_COMPONENT = Component.from_str('32=metadata')
 
 
 def add_parser(subparsers):
     parser = subparsers.add_parser('Fetch-RdrContent', aliases=['catchunks', 'frc', 'fetch-rdrcontent'])
-    parser.add_argument('obj', metavar='OBJECT', nargs='?', default='',
-                        help='name of the identity/key/certificate to export.')
+    parser.add_argument('-o', '--output', metavar='FILE',
+                        help="write the AppParam into a file. '-' for stdout")
+    parser.add_argument('-l', '--lifetime', metavar='LIFETIME', default='4000',
+                        help='set InterestLifetime, in milliseconds')
+    parser.add_argument('-f', '--fresh', action='store_true',
+                        help='set MustBeFresh')
+    parser.add_argument('-r', '--retries', metavar='RETRIES', default='15',
+                        help="maximum number of retries in case of Nack or timeout (-1 = no limit)")
+    parser.add_argument('-p', '--pipeline-type', metavar='PIPELINE', default='fixed',
+                        help="reserved")
+    parser.add_argument('name', metavar='NAME',
+                        help='name prefix of the desired RDR content. A specific version number can be provided.')
     parser.set_defaults(executor=execute)
 
 
 def execute(args: argparse.Namespace):
-    print(args)
+    try:
+        lifetime = int(args.lifetime)
+    except ValueError:
+        print(f'Invalid lifetime: {args.lifetime}')
+        return -1
+    try:
+        name = Name.from_str(args.name)
+    except (ValueError, IndexError):
+        print(f'Invalid name: {args.name}')
+        return -1
+    try:
+        retries = int(args.retries)
+        if retries <= 0:
+            retries = sys.maxsize
+    except ValueError:
+        print(f'Invalid retries number: {args.retries}')
+        return -1
+
+    if Component.get_type(name[-1]) == Component.TYPE_VERSION and len(name) >= 2:
+        if name[-2] == METADATA_COMPONENT:
+            # Given metadata version
+            meta_name = name
+            data_name = None
+            name = name[:-2]
+        else:
+            # Given data version
+            data_name = name
+            name = name[:-1]
+            meta_name = name
+    else:
+        meta_name = name
+        data_name = None
+    name_len = len(name)
+
+    app = NDNApp(keychain=KeychainDigest())
+
+    async def after_start():
+        nonlocal data_name
+        try:
+            if data_name is None:
+                data_name = await fetch_metadata(app, retries, meta_name, name_len, args.fresh, lifetime)
+            content, cnt = await fetch_content(app, retries, data_name, args.fresh, lifetime)
+            print(f'Segment Count: {cnt}  Content size: {len(content)}')
+            if args.output:
+                if args.output == '-':
+                    print(content.decode())
+                else:
+                    with open(os.path.expandvars(args.output), 'wb') as f:
+                        f.write(content)
+        except InterestNack as e:
+            print(f'Nacked with reason={e.reason}')
+        except InterestTimeout:
+            print(f'Timeout')
+        except InterestCanceled:
+            print(f'Local forwarder disconnected')
+        except ValidationFailure:
+            print(f'Data failed to validate')
+        except (ValueError, IndexError):
+            print(f'Decoding error')
+        except OSError as e:
+            print(f'OSError: {e}')
+        finally:
+            app.shutdown()
+
+    app.run_forever(after_start())
+
+
+async def retry(app, retry_times, name, can_be_prefix, must_be_fresh, timeout):
+    trial_times = 0
+    while True:
+        future = app.express_interest(name, can_be_prefix=can_be_prefix,
+                                      must_be_fresh=must_be_fresh, lifetime=timeout)
+        try:
+            return await future
+        except (InterestTimeout, InterestNack):
+            trial_times += 1
+            if trial_times >= retry_times:
+                raise
+
+
+async def fetch_metadata(app, retry_times, meta_name, name_len, fresh, timeout):
+    _, _, encoded_data_name = await retry(app, retry_times, meta_name, True, fresh, timeout)
+    try:
+        data_name = Name.from_bytes(encoded_data_name)
+    except (ValueError, IndexError):
+        print(f'Unable to decode data name from metadata packet: {bytes(encoded_data_name).hex()}')
+        raise
+    if data_name[:name_len] != meta_name[:name_len]:
+        print(f'The prefix of data name {Name.to_str(data_name)} '
+              f'does not agree with metadata name {Name.to_str(meta_name)}')
+        raise ValueError()
+    return data_name
+
+
+async def fetch_content(app, retry_times, data_name, fresh, timeout):
+    i = 0
+    ret = []
+    while True:
+        seg_component = Component.from_segment(i)
+        _, meta, cur = await retry(app, retry_times, data_name + [seg_component], False, fresh, timeout)
+        ret.append(cur)
+        final = meta.final_block_id
+        if final is None or final == seg_component:
+            break
+        i += 1
+    return b''.join(ret), i + 1
 
