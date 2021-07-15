@@ -34,7 +34,7 @@ app = NDNApp()
 def on_interest(name: FormalName, param: InterestParam, _app_param: Optional[BinaryStr]):
     print(f'>> I: {Name.to_str(name)}, {param}')
     content = "Hello, world!".encode()
-    app.put_data(name, content=content, freshness_period=10000, no_signature=True)
+    app.put_data(name, content=content, freshness_period=10000)
     print(f'<< D: {Name.to_str(name)}')
     print(MetaInfo(freshness_period=10000))
     print(f'Content: (size: {len(content)})')
