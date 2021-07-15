@@ -23,7 +23,7 @@ from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_tl_num, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
     make_data, InterestParam, make_interest, FormalName, SignaturePtrs, parse_lp_packet
-from .security import Keychain, sha256_digest_checker, params_sha256_checker
+from .security import Keychain, sha256_digest_checker, params_sha256_checker, NullSigner
 from .transport.stream_socket import Face
 from .app_support.nfd_mgmt import make_command, parse_response
 from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
@@ -137,7 +137,9 @@ class NDNApp:
         :param kwargs: :ref:`label-keyword-arguments`.
         :return: TLV encoded Data packet.
         """
-        if 'signer' in kwargs:
+        if kwargs.pop('no_signature', False):
+            signer = NullSigner()
+        elif 'signer' in kwargs:
             signer = kwargs['signer']
         else:
             signer = self.keychain.get_signer(kwargs)

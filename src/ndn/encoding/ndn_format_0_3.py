@@ -99,21 +99,23 @@ class SignatureType:
     r"""
     Numbers used in SignatureType.
 
-    =================   ==============================================
+    =================   ==================================================
     Type                Description
-    =================   ==============================================
+    =================   ==================================================
     NOT_SIGNED          Not signed
     DIGEST_SHA256       SHA-256 digest (only for integrity protection)
     SHA256_WITH_RSA     RSA signature over a SHA-256 digest
     SHA256_WITH_ECDSA   An ECDSA signature over a SHA-256 digest
     HMAC_WITH_SHA256    SHA256 hash-based message authentication codes
-    =================   ==============================================
+    NULL                An empty signature for testing and experimentation
+    =================   ==================================================
     """
     NOT_SIGNED = None
     DIGEST_SHA256 = 0
     SHA256_WITH_RSA = 1
     SHA256_WITH_ECDSA = 3
     HMAC_WITH_SHA256 = 4
+    NULL = 200
 
 
 class KeyLocator(TlvModel):

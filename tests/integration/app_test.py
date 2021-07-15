@@ -142,7 +142,8 @@ class TestRoute(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.ignore_output(0)
         await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
-        await face.consume_output(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
+        await face.consume_output(b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
+                                  b'\x16\x03\x1b\x01\xc8\x17\x00')
 
     async def app_main(self):
         @self.app.route('/not')
@@ -194,7 +195,8 @@ class TestRoute2(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.ignore_output(0)
         await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
-        await face.consume_output(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
+        await face.consume_output(b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
+                                  b'\x16\x03\x1b\x01\xc8\x17\x00')
 
     async def app_main(self):
         @self.app.route('/not', need_raw_packet=True, need_sig_ptrs=True)
@@ -226,7 +228,8 @@ class TestCongestionMark(NDNAppTestSuite):
         await face.ignore_output(0)
         await face.input_packet(b'\x64\x1e\xfd\x03\x40\x01\x01\x50\x17'
                                 b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
-        await face.consume_output(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
+        await face.consume_output(b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
+                                  b'\x16\x03\x1b\x01\xc8\x17\x00')
 
     async def app_main(self):
         @self.app.route('/not', need_raw_packet=True, need_sig_ptrs=True)
