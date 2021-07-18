@@ -31,11 +31,11 @@ def add_parser(subparsers):
     parser = subparsers.add_parser('Fetch-RdrContent', aliases=['catchunks', 'frc', 'fetch-rdrcontent'])
     parser.add_argument('-o', '--output', metavar='FILE',
                         help="write the AppParam into a file. '-' for stdout")
-    parser.add_argument('-l', '--lifetime', metavar='LIFETIME', default='4000',
+    parser.add_argument('-l', '--lifetime', metavar='LIFETIME', default=4000, type=int,
                         help='set InterestLifetime, in milliseconds')
     parser.add_argument('-f', '--fresh', action='store_true',
                         help='set MustBeFresh')
-    parser.add_argument('-r', '--retries', metavar='RETRIES', default='15',
+    parser.add_argument('-r', '--retries', metavar='RETRIES', default=15, type=int,
                         help="maximum number of retries in case of Nack or timeout (-1 = no limit)")
     parser.add_argument('-p', '--pipeline-type', metavar='PIPELINE', default='fixed',
                         help="reserved")
@@ -45,23 +45,15 @@ def add_parser(subparsers):
 
 
 def execute(args: argparse.Namespace):
-    try:
-        lifetime = int(args.lifetime)
-    except ValueError:
-        print(f'Invalid lifetime: {args.lifetime}')
-        return -1
+    lifetime = int(args.lifetime)
     try:
         name = Name.from_str(args.name)
     except (ValueError, IndexError):
         print(f'Invalid name: {args.name}')
         return -1
-    try:
-        retries = int(args.retries)
-        if retries <= 0:
-            retries = sys.maxsize
-    except ValueError:
-        print(f'Invalid retries number: {args.retries}')
-        return -1
+    retries = int(args.retries)
+    if retries <= 0:
+        retries = sys.maxsize
 
     if Component.get_type(name[-1]) == Component.TYPE_VERSION and len(name) >= 2:
         if name[-2] == METADATA_COMPONENT:
@@ -125,17 +117,13 @@ async def retry(app, retry_times, name, can_be_prefix, must_be_fresh, timeout):
                 raise
 
 
-async def fetch_metadata(app, retry_times, meta_name, name_len, fresh, timeout):
+async def fetch_metadata(app, retry_times, meta_name, _name_len, fresh, timeout):
     _, _, encoded_data_name = await retry(app, retry_times, meta_name, True, fresh, timeout)
     try:
         data_name = Name.from_bytes(encoded_data_name)
     except (ValueError, IndexError):
         print(f'Unable to decode data name from metadata packet: {bytes(encoded_data_name).hex()}')
         raise
-    if data_name[:name_len] != meta_name[:name_len]:
-        print(f'The prefix of data name {Name.to_str(data_name)} '
-              f'does not agree with metadata name {Name.to_str(meta_name)}')
-        raise ValueError()
     return data_name
 
 

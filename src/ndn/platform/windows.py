@@ -81,14 +81,14 @@ class Win32(Platform):
         # Note: %TEMP% won't be redirected even when the executable is a MSIX/MicrosoftStore app
         return 'unix://' + os.path.expandvars(r'%TEMP%\nfd.sock')
 
-    def default_pib_schema(self):
+    def default_pib_scheme(self):
         return 'pib-sqlite3'
 
     def default_pib_paths(self):
         return [os.path.expandvars(r'%LOCALAPPDATA%\ndn'),
                 os.path.expandvars(r'%USERPROFILE%\ndn')]
 
-    def default_tpm_schema(self):
+    def default_tpm_scheme(self):
         return 'tpm-cng'
 
     def default_tpm_paths(self):

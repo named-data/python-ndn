@@ -50,7 +50,7 @@ class Platform(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def default_pib_schema(self) -> str:
+    def default_pib_scheme(self) -> str:
         pass
 
     @abc.abstractmethod
@@ -58,7 +58,7 @@ class Platform(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def default_tpm_schema(self) -> str:
+    def default_tpm_scheme(self) -> str:
         pass
 
     @abc.abstractmethod

@@ -25,7 +25,7 @@ from ...security import KeychainDigest
 
 def add_parser(subparsers):
     parser = subparsers.add_parser('Serve-Data', aliases=['poke', 'sd', 'serve-data'])
-    parser.add_argument('-f', '--freshness', metavar='FRESHNESS', default='60000',
+    parser.add_argument('-f', '--freshness', metavar='FRESHNESS', default=60000, type=int,
                         help='the name of the Data packet')
     parser.add_argument('-o', '--output', metavar='FILE',
                         help='write the AppParam into a file')
@@ -38,11 +38,7 @@ def add_parser(subparsers):
 
 
 def execute(args: argparse.Namespace):
-    try:
-        fresh = int(args.freshness)
-    except ValueError:
-        print(f'Invalid freshness period: {args.freshness}')
-        return -1
+    fresh = int(args.freshness)
     try:
         name = Name.from_str(args.name)
     except (ValueError, IndexError):

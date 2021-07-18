@@ -40,10 +40,10 @@ def read_client_conf():
         nonlocal path
         sp = value.split(':')
         if len(sp) == 1:
-            schema = value
+            scheme = value
             loc = ''
         else:
-            schema, loc = sp
+            scheme, loc = sp
         if not loc or not os.path.exists(loc):
             if loc and (path is not None):
                 loc = os.path.join(os.path.dirname(path), loc)
@@ -57,13 +57,13 @@ def read_client_conf():
                     if os.path.exists(p):
                         loc = p
                         break
-        return ':'.join((schema, loc))
+        return ':'.join((scheme, loc))
 
     path = get_path()
     ret = {
         'transport': Platform().default_transport(),
-        'pib': Platform().default_pib_schema(),
-        'tpm': Platform().default_tpm_schema()
+        'pib': Platform().default_pib_scheme(),
+        'tpm': Platform().default_tpm_scheme()
     }
     if path:
         parser = ConfigParser()
@@ -87,28 +87,28 @@ def read_client_conf():
 
 
 def default_keychain(pib: str, tpm: str) -> Keychain:
-    pib_schema, pib_loc = pib.split(':', 1)
-    tpm_schema, tpm_loc = tpm.split(':', 1)
-    if tpm_schema == 'tpm-file':
+    pib_scheme, pib_loc = pib.split(':', 1)
+    tpm_scheme, tpm_loc = tpm.split(':', 1)
+    if tpm_scheme == 'tpm-file':
         tpm = TpmFile(tpm_loc)
-    elif tpm_schema == 'tpm-osxkeychain':
+    elif tpm_scheme == 'tpm-osxkeychain':
         tpm = TpmOsxKeychain()
-    elif tpm_schema == 'tpm-cng':
+    elif tpm_scheme == 'tpm-cng':
         tpm = TpmCng()
     else:
-        raise ValueError(f'Unrecognized tpm schema: {tpm}')
-    if pib_schema == 'pib-sqlite3':
+        raise ValueError(f'Unrecognized tpm scheme: {tpm}')
+    if pib_scheme == 'pib-sqlite3':
         pib = KeychainSqlite3(os.path.join(pib_loc, 'pib.db'), tpm)
     else:
-        raise ValueError(f'Unrecognized pib schema: {pib}')
+        raise ValueError(f'Unrecognized pib scheme: {pib}')
     return pib
 
 
 def default_face(face: str) -> Face:
-    schema, uri = face.split('://')
-    if schema == 'unix':
+    scheme, uri = face.split('://')
+    if scheme == 'unix':
         return UnixFace(uri)
-    elif schema == 'tcp' or schema == 'tcp4':
+    elif scheme == 'tcp' or scheme == 'tcp4':
         if uri.find(':') >= 0:
             host, port = uri.split(':')
             port = port

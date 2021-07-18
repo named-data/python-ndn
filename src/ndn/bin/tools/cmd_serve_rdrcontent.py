@@ -29,9 +29,9 @@ METADATA_COMPONENT = Component.from_str('32=metadata')
 
 def add_parser(subparsers):
     parser = subparsers.add_parser('Serve-RdrContent', aliases=['putchunks', 'src', 'serve-rdrcontent'])
-    parser.add_argument('-f', '--freshness', metavar='FRESHNESS', default='60000',
+    parser.add_argument('-f', '--freshness', metavar='FRESHNESS', default=60000, type=int,
                         help='the name of the Data packet')
-    parser.add_argument('-s', '--size', metavar='SIZE', default=8000,
+    parser.add_argument('-s', '--size', metavar='SIZE', default=8000, type=int,
                         help='maximum chunk size, in bytes')
     # More to be added
     parser.add_argument('name', metavar='NAME',
@@ -42,16 +42,8 @@ def add_parser(subparsers):
 
 
 def execute(args: argparse.Namespace):
-    try:
-        fresh = int(args.freshness)
-    except ValueError:
-        print(f'Invalid freshness period: {args.freshness}')
-        return -1
-    try:
-        size = int(args.size)
-    except ValueError:
-        print(f'Invalid chunk size: {args.size}')
-        return -1
+    fresh = int(args.freshness)
+    size = int(args.size)
     try:
         name = Name.from_str(args.name)
     except (ValueError, IndexError):

@@ -30,13 +30,13 @@ class Linux(Platform):
     def default_transport(self):
         return 'unix:///run/nfd.sock'
 
-    def default_pib_schema(self):
+    def default_pib_scheme(self):
         return 'pib-sqlite3'
 
     def default_pib_paths(self):
         return [os.path.expanduser(r'~/.ndn')]
 
-    def default_tpm_schema(self):
+    def default_tpm_scheme(self):
         return 'tpm-file'
 
     def default_tpm_paths(self):

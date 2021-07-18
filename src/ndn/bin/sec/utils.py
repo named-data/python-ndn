@@ -35,7 +35,7 @@ def resolve_keychain(args: argparse.Namespace) -> KeychainSqlite3:
     base_dir = args.path
     platform = Platform()
     if not tpm:
-        tpm = platform.default_tpm_schema()
+        tpm = platform.default_tpm_scheme()
     if tpm == 'tpm-osxkeychain' and sys.platform != 'darwin':
         print(f'ERROR: {tpm} only works on MacOS.')
         exit(-2)

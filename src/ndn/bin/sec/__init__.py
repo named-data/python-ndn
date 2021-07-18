@@ -53,13 +53,13 @@ def main():
     cmd_import_cert.add_parser(subparsers)
     cmd_get_signreq.add_parser(subparsers)
 
-    parser.add_argument('--pib', metavar='PIB_SCHEMA', choices=['pib-sqlite3'], default='pib-sqlite3',
-                        help='the schema of PIB. Only pib-sqlite3 is available currently.')
+    parser.add_argument('--pib', metavar='PIB_SCHEME', choices=['pib-sqlite3'], default='pib-sqlite3',
+                        help='the scheme of PIB. Only pib-sqlite3 is available currently.')
     parser.add_argument('--path', metavar='PIB_PATH', help='the path to the base folder of PIB. '
                                                            'By default it is "~/.ndn" or "%%LOCALAPPDATA%%\\ndn".')
-    parser.add_argument('--tpm', metavar='TPM_SCHEMA', choices=['tpm-file', 'tpm-osxkeychain', 'tpm-cng'],
-                        help='the TPM schema. Must be tpm-file, tpm-osxkeychain or tpm-cng.')
-    parser.add_argument('--tpm-path', help='the path of TPM when the schema is tpm-file')
+    parser.add_argument('--tpm', metavar='TPM_SCHEME', choices=['tpm-file', 'tpm-osxkeychain', 'tpm-cng'],
+                        help='the TPM scheme. Must be tpm-file, tpm-osxkeychain or tpm-cng.')
+    parser.add_argument('--tpm-path', help='the path of TPM when the scheme is tpm-file')
 
     args = parser.parse_args()
     if 'executor' not in args:

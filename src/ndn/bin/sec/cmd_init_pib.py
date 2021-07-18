@@ -33,7 +33,7 @@ def execute(args: argparse.Namespace):
     base_dir = args.path
     platform = Platform()
     if not tpm:
-        tpm = platform.default_tpm_schema()
+        tpm = platform.default_tpm_scheme()
     if tpm == 'tpm-osxkeychain' and sys.platform != 'darwin':
         print(f'ERROR: {tpm} only works on MacOS.')
         return -2

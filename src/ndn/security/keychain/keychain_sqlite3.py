@@ -415,22 +415,22 @@ class KeychainSqlite3(Keychain):
     _signer_cache: dict
 
     @staticmethod
-    def initialize(path: str, tpm_schema: str, tpm_path: str = '') -> bool:
+    def initialize(path: str, tpm_scheme: str, tpm_path: str = '') -> bool:
         if os.path.exists(path):
             logging.fatal(f'PIB database {path} already exists.')
             return False
         # Make sure the directory exists
         base_dir = os.path.dirname(path)
         os.makedirs(base_dir, exist_ok=True)
-        # Create an empty folder if the schema is file
-        if tpm_schema == 'tpm-file':
+        # Create an empty folder if the scheme is file
+        if tpm_scheme == 'tpm-file':
             if not tpm_path:
                 tpm_path = os.path.join(base_dir, 'ndnsec-key-file')
             os.makedirs(tpm_path, exist_ok=True)
         # Create sqlite3 database
         conn = sqlite3.connect(path)
         conn.executescript(INITIALIZE_SQL)
-        conn.execute('INSERT INTO tpmInfo (tpm_locator) VALUES (?)', (f'{tpm_schema}:{tpm_path}'.encode(),))
+        conn.execute('INSERT INTO tpmInfo (tpm_locator) VALUES (?)', (f'{tpm_scheme}:{tpm_path}'.encode(),))
         conn.commit()
         conn.close()
         return True

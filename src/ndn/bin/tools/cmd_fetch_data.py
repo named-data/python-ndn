@@ -28,7 +28,7 @@ def add_parser(subparsers):
     parser = subparsers.add_parser('Fetch-Data', aliases=['peek', 'fd', 'fetch-data'])
     parser.add_argument('-o', '--output', metavar='FILE',
                         help="write the AppParam into a file. '-' for stdout")
-    parser.add_argument('-l', '--lifetime', metavar='LIFETIME', default='4000',
+    parser.add_argument('-l', '--lifetime', metavar='LIFETIME', default=4000, type=int,
                         help='set InterestLifetime, in milliseconds')
     parser.add_argument('-p', '--prefix', action='store_true',
                         help='set CanBePrefix')
@@ -42,11 +42,7 @@ def add_parser(subparsers):
 
 
 def execute(args: argparse.Namespace):
-    try:
-        lifetime = int(args.lifetime)
-    except ValueError:
-        print(f'Invalid lifetime: {args.lifetime}')
-        return -1
+    lifetime = int(args.lifetime)
     try:
         name = Name.from_str(args.name)
     except (ValueError, IndexError):
