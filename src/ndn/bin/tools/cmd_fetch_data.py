@@ -42,7 +42,7 @@ def add_parser(subparsers):
 
 
 def execute(args: argparse.Namespace):
-    lifetime = int(args.lifetime)
+    lifetime = args.lifetime
     try:
         name = Name.from_str(args.name)
     except (ValueError, IndexError):
