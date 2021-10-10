@@ -16,6 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import struct
+from enum import Enum, Flag
 from ..utils import timestamp, gen_nonce_64
 from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
     SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num, IncludeBase, parse_and_check_tl,\
@@ -185,6 +186,30 @@ class CsInfo(TlvModel):
     n_cs_entries = UintField(0x87)
     n_hits = UintField(0x81)
     n_misses = UintField(0x82)
+
+
+class FaceScope(Enum):
+    NON_LOCAL = 0
+    LOCAL = 1
+
+
+class FacePersistency(Enum):
+    PERSISTENT = 0
+    ON_DEMAND = 1
+    PERMANENT = 2
+
+
+class FaceLinkType(Enum):
+    POINT_TO_POINT = 0
+    MULTI_ACCESS = 1
+    AD_HOC = 2
+
+
+class FaceFlags(Flag):
+    NO_FLAG = 0
+    LOCAL_FIELDS_ENABLED = 1
+    LP_RELIABILITY_ENABLED = 2
+    CONGESTION_MARKING_ENABLED = 4
 
 
 def make_command(module, command, **kwargs):
