@@ -35,8 +35,7 @@ async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs) -> bool:
             ret = sha256_algo.digest() == sig_value
         logging.debug('Digest check %s -> %s' % (Name.to_str(name), ret))
         return ret
-    else:
-        return True
+    return True
 
 
 # This is automatically called

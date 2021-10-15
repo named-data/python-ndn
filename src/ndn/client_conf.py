@@ -108,7 +108,7 @@ def default_face(face: str) -> Face:
     scheme, uri = face.split('://')
     if scheme == 'unix':
         return UnixFace(uri)
-    elif scheme == 'tcp' or scheme == 'tcp4':
+    if scheme == 'tcp' or scheme == 'tcp4':
         if uri.find(':') >= 0:
             host, port = uri.split(':')
             port = port
@@ -116,5 +116,4 @@ def default_face(face: str) -> Face:
             host = uri
             port = 6363
         return TcpFace(host, int(port))
-    else:
-        raise ValueError(f'Unrecognized face: {face}')
+    raise ValueError(f'Unrecognized face: {face}')

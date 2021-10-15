@@ -149,8 +149,7 @@ def cftype_to_value(cftype):
     if typeID in known_cftypes:
         convert_function = known_cftypes[typeID]
         return convert_function(cftype)
-    else:
-        return cftype
+    return cftype
 
 cf.CFSetGetCount.restype = CFIndex
 cf.CFSetGetCount.argtypes = [c_void_p]

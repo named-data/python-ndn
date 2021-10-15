@@ -206,9 +206,9 @@ def normalize(name: NonStrictName) -> FormalName:
     """
     if is_binary_str(name):
         return decode(name)[0]
-    elif isinstance(name, str):
+    if isinstance(name, str):
         return from_str(name)
-    elif not isinstance(name, Iterable):
+    if not isinstance(name, Iterable):
         raise TypeError('invalid type for name')
     ret = list(name)
     for i, comp in enumerate(ret):

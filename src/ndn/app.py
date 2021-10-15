@@ -246,8 +246,7 @@ class NDNApp:
         if await validator(name, sig):
             if need_raw_packet:
                 return name, meta_info, content, raw_packet
-            else:
-                return name, meta_info, content
+            return name, meta_info, content
         else:
             raise ValidationFailure(name, meta_info, content)
 
@@ -277,7 +276,7 @@ class NDNApp:
             if after_start:
                 if isinstance(after_start, Coroutine):
                     after_start.close()
-                elif isinstance(after_start, aio.Task) or isinstance(after_start, aio.Future):
+                elif isinstance(after_start, (aio.Task, aio.Future)):
                     after_start.cancel()
             raise
         task = aio.create_task(starting_task())
@@ -409,10 +408,9 @@ class NDNApp:
                     logging.error(f'Registration for {Name.to_str(name)} failed: '
                                   f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
                     return False
-                else:
-                    logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
-                                  f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
-                    return True
+                logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
+                              f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                return True
             except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
                 logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
                 return False

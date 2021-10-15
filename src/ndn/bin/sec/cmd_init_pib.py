@@ -54,6 +54,5 @@ def execute(args: argparse.Namespace):
         print('Successfully created PIB. Before running any NDN application, '
               'Please make sure you have the correct client.conf and a default key.')
         return 0
-    else:
-        print('Failed to create PIB database.')
-        return -1
+    print('Failed to create PIB database.')
+    return -1

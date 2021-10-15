@@ -296,25 +296,24 @@ class UintField(Field):
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
             return 0
+        if not isinstance(val, int) or val < 0:
+            raise TypeError(f'{self.name}=f{val} is not a legal uint')
+        tl_size = get_tl_num_size(self.type_num) + 1
+        if self.fixed_len is not None:
+            ret = self.fixed_len
         else:
-            if not isinstance(val, int) or val < 0:
-                raise TypeError(f'{self.name}=f{val} is not a legal uint')
-            tl_size = get_tl_num_size(self.type_num) + 1
-            if self.fixed_len is not None:
-                ret = self.fixed_len
+            if val <= 0xFF:
+                ret = 1
+            elif val <= 0xFFFF:
+                ret = 2
+            elif val <= 0xFFFFFFFF:
+                ret = 4
             else:
-                if val <= 0xFF:
-                    ret = 1
-                elif val <= 0xFFFF:
-                    ret = 2
-                elif val <= 0xFFFFFFFF:
-                    ret = 4
-                else:
-                    ret = 8
-            if val >= 0x100 ** ret:
-                raise ValueError(f'{val} cannot be encoded into {ret} bytes')
-            markers[f'{self.name}##encoded_length'] = ret
-            return ret + tl_size
+                ret = 8
+        if val >= 0x100 ** ret:
+            raise ValueError(f'{val} cannot be encoded into {ret} bytes')
+        markers[f'{self.name}##encoded_length'] = ret
+        return ret + tl_size
 
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         if val is None:
@@ -335,14 +334,13 @@ class UintField(Field):
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         if length == 1:
             return struct.unpack_from('!B', wire, offset)[0]
-        elif length == 2:
+        if length == 2:
             return struct.unpack_from('!H', wire, offset)[0]
-        elif length == 4:
+        if length == 4:
             return struct.unpack_from('!I', wire, offset)[0]
-        elif length == 8:
+        if length == 8:
             return struct.unpack_from('!Q', wire, offset)[0]
-        else:
-            raise ValueError("Uint's length should be 1, 2, 4 or 8")
+        raise ValueError("Uint's length should be 1, 2, 4 or 8")
 
 
 class BoolField(Field):
@@ -368,8 +366,7 @@ class BoolField(Field):
             offset += write_tl_num(self.type_num, wire, offset)
             wire[offset] = 0
             return tl_size
-        else:
-            return 0
+        return 0
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         return True
@@ -394,30 +391,29 @@ class SignatureValueField(Field):
         signer = self.signer.get_arg(markers)
         if signer is None:
             return 0
-        else:
-            sig_value_len = signer.get_signature_value_size()
-            length = 1 + get_tl_num_size(sig_value_len) + sig_value_len
-            markers[f'{self.name}##encoded_length'] = sig_value_len
-            return length
+        sig_value_len = signer.get_signature_value_size()
+        length = 1 + get_tl_num_size(sig_value_len) + sig_value_len
+        markers[f'{self.name}##encoded_length'] = sig_value_len
+        return length
 
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         signer = self.signer.get_arg(markers)
         if signer is None:
             return 0
-        else:
-            sig_cover_start = self.starting_point.get_arg(markers)
-            if sig_cover_start is not None:
-                sig_cover_part = self.covered_part.get_arg(markers)
-                sig_cover_part.append(wire[sig_cover_start:offset])
 
-            origin_offset = offset
-            sig_value_len = markers[f'{self.name}##encoded_length']
-            offset += write_tl_num(self.type_num, wire, offset)
-            markers[f'{self.name}##wire_length'] = wire[offset:offset+1]
-            offset += write_tl_num(sig_value_len, wire, offset)
-            self.value_buffer.set_arg(markers, wire[offset:offset + sig_value_len])
-            offset += sig_value_len
-            return offset - origin_offset
+        sig_cover_start = self.starting_point.get_arg(markers)
+        if sig_cover_start is not None:
+            sig_cover_part = self.covered_part.get_arg(markers)
+            sig_cover_part.append(wire[sig_cover_start:offset])
+
+        origin_offset = offset
+        sig_value_len = markers[f'{self.name}##encoded_length']
+        offset += write_tl_num(self.type_num, wire, offset)
+        markers[f'{self.name}##wire_length'] = wire[offset:offset+1]
+        offset += write_tl_num(sig_value_len, wire, offset)
+        self.value_buffer.set_arg(markers, wire[offset:offset + sig_value_len])
+        offset += sig_value_len
+        return offset - origin_offset
 
     def calculate_signature(self, markers: dict):
         signer = self.signer.get_arg(markers)
@@ -481,7 +477,7 @@ class InterestNameField(Field):
                 typ = Component.get_type(comp)
                 if typ == Component.TYPE_INVALID:
                     raise TypeError('invalid type for name component')
-                elif typ == Component.TYPE_PARAMETERS_SHA256:
+                if typ == Component.TYPE_PARAMETERS_SHA256:
                     # Params Sha256 can occur at most once
                     if need_digest and digest_pos is None:
                         digest_pos = i
@@ -615,13 +611,12 @@ class BytesField(Field):
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         if val is None:
             return 0
-        else:
-            origin_offset = offset
-            offset += write_tl_num(self.type_num, wire, offset)
-            offset += write_tl_num(len(val), wire, offset)
-            wire[offset:offset+len(val)] = val
-            offset += len(val)
-            return offset - origin_offset
+        origin_offset = offset
+        offset += write_tl_num(self.type_num, wire, offset)
+        offset += write_tl_num(len(val), wire, offset)
+        wire[offset:offset+len(val)] = val
+        offset += len(val)
+        return offset - origin_offset
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         return memoryview(wire)[offset:offset+length]
@@ -812,16 +807,15 @@ class ModelField(Field):
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         if val is None:
             return 0
-        else:
-            inner_markers = markers[f'{self.name}##inner_markers']
-            length = markers[f'{self.name}##encoded_length']
+        inner_markers = markers[f'{self.name}##inner_markers']
+        length = markers[f'{self.name}##encoded_length']
 
-            origin_offset = offset
-            offset += write_tl_num(self.type_num, wire, offset)
-            offset += write_tl_num(length, wire, offset)
-            val.encode(wire, offset, inner_markers)
-            offset += length
-            return offset - origin_offset
+        origin_offset = offset
+        offset += write_tl_num(self.type_num, wire, offset)
+        offset += write_tl_num(length, wire, offset)
+        val.encode(wire, offset, inner_markers)
+        offset += length
+        return offset - origin_offset
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         inner_markers = {}
@@ -878,12 +872,11 @@ class RepeatedField(Field):
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         if val is None:
             return 0
-        else:
-            origin_offset = offset
-            for i, ele in enumerate(val):
-                self.element_type.name = f'{self.name}[{i}]'
-                offset += self.element_type.encode_into(ele, markers, wire, offset)
-            return offset - origin_offset
+        origin_offset = offset
+        for i, ele in enumerate(val):
+            self.element_type.name = f'{self.name}[{i}]'
+            offset += self.element_type.encode_into(ele, markers, wire, offset)
+        return offset - origin_offset
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
         lst = self.get_value(instance)

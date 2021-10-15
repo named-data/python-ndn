@@ -712,19 +712,18 @@ class ObjCMethod:
         """Return ctypes type for an encoded Objective-C type."""
         if encoding in self.typecodes:
             return self.typecodes[encoding]
-        elif encoding[0:1] == b'^' and encoding[1:] in self.typecodes:
+        if encoding[0:1] == b'^' and encoding[1:] in self.typecodes:
             return POINTER(self.typecodes[encoding[1:]])
-        elif encoding[0:1] == b'^' and encoding[1:] in [CGImageEncoding, NSZoneEncoding]:
+        if encoding[0:1] == b'^' and encoding[1:] in [CGImageEncoding, NSZoneEncoding]:
             # special cases
             return c_void_p
-        elif encoding[0:1] == b'r' and encoding[1:] in self.typecodes:
+        if encoding[0:1] == b'r' and encoding[1:] in self.typecodes:
             # const decorator, don't care
             return self.typecodes[encoding[1:]]
-        elif encoding[0:2] == b'r^' and encoding[2:] in self.typecodes:
+        if encoding[0:2] == b'r^' and encoding[2:] in self.typecodes:
             # const pointer, also don't care
             return POINTER(self.typecodes[encoding[2:]])
-        else:
-            raise Exception('unknown encoding for %s: %s' % (self.name, encoding))
+        raise Exception('unknown encoding for %s: %s' % (self.name, encoding))
 
     def get_prototype(self):
         """Returns a ctypes CFUNCTYPE for the method."""
@@ -870,15 +869,14 @@ class ObjCClass:
         for and creating a new method object."""
         if name in self.instance_methods:
             return self.instance_methods[name]
-        else:
-            # If method name isn't in the cached list, it might be a method of
-            # the superclass, so call class_getInstanceMethod to check.
-            selector = get_selector(name.replace(b'_', b':'))
-            method = c_void_p(objc.class_getInstanceMethod(self.ptr, selector))
-            if method.value:
-                objc_method = ObjCMethod(method)
-                self.instance_methods[name] = objc_method
-                return objc_method
+        # If method name isn't in the cached list, it might be a method of
+        # the superclass, so call class_getInstanceMethod to check.
+        selector = get_selector(name.replace(b'_', b':'))
+        method = c_void_p(objc.class_getInstanceMethod(self.ptr, selector))
+        if method.value:
+            objc_method = ObjCMethod(method)
+            self.instance_methods[name] = objc_method
+            return objc_method
         return None
 
     def get_class_method(self, name):
@@ -887,15 +885,14 @@ class ObjCClass:
         for and creating a new method object."""
         if name in self.class_methods:
             return self.class_methods[name]
-        else:
-            # If method name isn't in the cached list, it might be a method of
-            # the superclass, so call class_getInstanceMethod to check.
-            selector = get_selector(name.replace(b'_', b':'))
-            method = c_void_p(objc.class_getClassMethod(self.ptr, selector))
-            if method.value:
-                objc_method = ObjCMethod(method)
-                self.class_methods[name] = objc_method
-                return objc_method
+        # If method name isn't in the cached list, it might be a method of
+        # the superclass, so call class_getInstanceMethod to check.
+        selector = get_selector(name.replace(b'_', b':'))
+        method = c_void_p(objc.class_getClassMethod(self.ptr, selector))
+        if method.value:
+            objc_method = ObjCMethod(method)
+            self.class_methods[name] = objc_method
+            return objc_method
         return None
 
     def __getattr__(self, name):

@@ -88,14 +88,12 @@ class Node:
         """
         if is_binary_str(key):
             return bytes(key) in self.children
-        else:
-            return key[:2] in self.matches
+        return key[:2] in self.matches
 
     def _get(self, key):
         if is_binary_str(key):
             return self.children[bytes(key)]
-        else:
-            return self.matches[key[:2]][1]
+        return self.matches[key[:2]][1]
 
     def _set(self, key, val):
         if is_binary_str(key):
@@ -153,8 +151,7 @@ class Node:
         if match is not None:
             env[match[0]] = Component.get_value(comp)
             return match[1]
-        else:
-            return None
+        return None
 
     def match(self, name: NonStrictName):
         """
@@ -279,8 +276,7 @@ class Node:
             return await sha256_digest_checker(name, sig_ptrs)
         if isinstance(validate_policy, policy.InterestValidator):
             return await validate_policy.validate(match, sig_ptrs)
-        else:
-            raise TypeError(f'The InterestValidator policy is of wrong type. Name={Name.to_str(name)}')
+        raise TypeError(f'The InterestValidator policy is of wrong type. Name={Name.to_str(name)}')
 
     def _on_interest_root(self, name: FormalName, param: InterestParam,
                           app_param: Optional[BinaryStr], raw_packet: BinaryStr):

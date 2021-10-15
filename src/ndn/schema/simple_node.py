@@ -148,14 +148,13 @@ class RDRNode(Node):
         async def need(self, match, **kwargs):
             if self.parent.timestamp is None:
                 return await super().need(match, **kwargs)
-            else:
-                meta_info = {
-                    **match.env,
-                    'content_type': ContentType.BLOB,
-                    'freshness_period': self.FRESHNESS_PERIOD,
-                    'final_block_id': None
-                }
-                return self.make_metadata(match), meta_info
+            meta_info = {
+                **match.env,
+                'content_type': ContentType.BLOB,
+                'freshness_period': self.FRESHNESS_PERIOD,
+                'final_block_id': None
+            }
+            return self.make_metadata(match), meta_info
 
     def __init__(self, parent=None, **kwargs):
         super().__init__(parent)

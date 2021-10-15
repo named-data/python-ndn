@@ -56,8 +56,7 @@ class InterestTreeNode:
         if exact_match_interest:
             self.pending_list = [ele for ele in self.pending_list if not ele[2]]
             return False
-        else:
-            return True
+        return True
 
     def timeout(self, future: aio.Future):
         self.pending_list = [ele for ele in self.pending_list if ele[0] is not future]

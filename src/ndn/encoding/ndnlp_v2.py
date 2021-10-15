@@ -98,8 +98,7 @@ def parse_lp_packet(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Op
 
     if ret.nack is not None:
         return ret.nack.nack_reason, ret.fragment
-    else:
-        return None, ret.fragment
+    return None, ret.fragment
 
 
 def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):
@@ -110,8 +109,7 @@ def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int],
 
     if ret.nack is not None:
         return ret.nack.nack_reason, ret.fragment
-    else:
-        return None, None
+    return None, None
 
 
 def make_network_nack(encoded_interest: BinaryStr, nack_reason: int) -> VarBinaryStr:

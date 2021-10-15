@@ -142,15 +142,14 @@ class TpmCng(Tpm):
     def _convert_key_format(key_bits, key_type: str):
         if key_type == 'rsa':
             raise NotImplementedError('RSA on CNG is not implemented yet')
-        elif key_type == 'ec':
+        if key_type == 'ec':
             cng = Cng()
             pubkey_stru = c.cast(key_bits, c.POINTER(cng.BcryptEcckeyBlob))[0]
             base_idx = c.sizeof(cng.BcryptEcckeyBlob)
             key_x = int.from_bytes(key_bits[base_idx:base_idx + pubkey_stru.cb_key], 'big')
             key_y = int.from_bytes(key_bits[base_idx + pubkey_stru.cb_key:], 'big')
             return ECC.construct(curve='P-256', point_x=key_x, point_y=key_y).export_key(format='DER')
-        else:
-            raise ValueError(f'Unsupported key type {key_type}')
+        raise ValueError(f'Unsupported key type {key_type}')
 
     def _get_key(self, key_label: str):
         cng = Cng()
@@ -159,8 +158,7 @@ class TpmCng(Tpm):
         if not cng.nt_success(status):
             if status == cng.NTE_BAD_KEYSET:
                 raise KeyError(f"Unable to find key with label {key_label}")
-            else:
-                raise OSError(f'Error {status} returned by NCryptOpenKey', status)
+            raise OSError(f'Error {status} returned by NCryptOpenKey', status)
 
         cb_property = c.c_ulong(4)
         sig_len = c.c_ulong()
@@ -200,12 +198,11 @@ class TpmCng(Tpm):
     def _convert_pub_key_format(key_bits: BinaryStr, key_type: str):
         if key_type == 'rsa':
             return RSA.import_key(key_bits).export_key(format='DER')
-        elif key_type == 'ec':
+        if key_type == 'ec':
             xp = int.from_bytes(key_bits[1:33], 'big')
             yp = int.from_bytes(key_bits[33:], 'big')
             return ECC.construct(curve='P-256', point_x=xp, point_y=yp).export_key(format='DER')
-        else:
-            raise ValueError(f'Unsupported key type {key_type}')
+        raise ValueError(f'Unsupported key type {key_type}')
 
     def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
         cng = Cng()

@@ -96,7 +96,7 @@ class TpmOsxKeychain(Tpm):
             ret = sec.security.SecItemCopyMatching(g.query, pointer(g.dic))
             if ret == sec.errSecItemNotFound:
                 raise KeyError(f"Unable to find key {key_name}")
-            elif ret != sec.errSecSuccess:
+            if ret != sec.errSecSuccess:
                 raise RuntimeError(f"Error happened when searching specific key {key_name}")
 
             key_type = cfstring_to_string(cf.CFDictionaryGetValue(g.dic, sec.kSecAttrKeyType))
@@ -129,12 +129,11 @@ class TpmOsxKeychain(Tpm):
     def _convert_key_format(key_bits: BinaryStr, key_type: str):
         if key_type == 'rsa':
             return RSA.import_key(key_bits).export_key(format='DER')
-        elif key_type == 'ec':
+        if key_type == 'ec':
             xp = int.from_bytes(key_bits[1:33], 'big')
             yp = int.from_bytes(key_bits[33:], 'big')
             return ECC.construct(curve='P-256', point_x=xp, point_y=yp).export_key(format='DER')
-        else:
-            raise ValueError(f'Unsupported key type {key_type}')
+        raise ValueError(f'Unsupported key type {key_type}')
 
     def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
         sec = OsxSec()

@@ -34,12 +34,11 @@ def get_tl_num_size(val: int) -> int:
     """
     if val <= 0xFC:
         return 1
-    elif val <= 0xFFFF:
+    if val <= 0xFFFF:
         return 3
-    elif val <= 0xFFFFFFFF:
+    if val <= 0xFFFFFFFF:
         return 5
-    else:
-        return 9
+    return 9
 
 
 def write_tl_num(val: int, buf: VarBinaryStr, offset: int = 0) -> int:
@@ -54,15 +53,14 @@ def write_tl_num(val: int, buf: VarBinaryStr, offset: int = 0) -> int:
     if val <= 0xFC:
         struct.pack_into('!B', buf, offset, val)
         return 1
-    elif val <= 0xFFFF:
+    if val <= 0xFFFF:
         struct.pack_into('!BH', buf, offset, 0xFD, val)
         return 3
-    elif val <= 0xFFFFFFFF:
+    if val <= 0xFFFFFFFF:
         struct.pack_into('!BI', buf, offset, 0xFE, val)
         return 5
-    else:
-        struct.pack_into('!BQ', buf, offset, 0xFF, val)
-        return 9
+    struct.pack_into('!BQ', buf, offset, 0xFF, val)
+    return 9
 
 
 def pack_uint_bytes(val: int) -> bytes:
@@ -74,12 +72,11 @@ def pack_uint_bytes(val: int) -> bytes:
     """
     if val <= 0xFF:
         return struct.pack('!B', val)
-    elif val <= 0xFFFF:
+    if val <= 0xFFFF:
         return struct.pack('!H', val)
-    elif val <= 0xFFFFFFFF:
+    if val <= 0xFFFFFFFF:
         return struct.pack('!I', val)
-    else:
-        return struct.pack('!Q', val)
+    return struct.pack('!Q', val)
 
 
 def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
@@ -93,12 +90,11 @@ def parse_tl_num(buf: BinaryStr, offset: int = 0) -> (int, int):
     ret = buf[offset]
     if ret <= 0xFC:
         return ret, 1
-    elif ret == 0xFD:
+    if ret == 0xFD:
         return struct.unpack('!H', buf[offset+1:offset+3])[0], 3
-    elif ret == 0xFE:
+    if ret == 0xFE:
         return struct.unpack('!I', buf[offset+1:offset+5])[0], 5
-    else:
-        return struct.unpack('!Q', buf[offset+1:offset+9])[0], 9
+    return struct.unpack('!Q', buf[offset+1:offset+9])[0], 9
 
 
 async def read_tl_num_from_stream(reader: aio.StreamReader, bio: io.BytesIO) -> int:
@@ -114,18 +110,17 @@ async def read_tl_num_from_stream(reader: aio.StreamReader, bio: io.BytesIO) -> 
     num = buf[0]
     if num <= 0xFC:
         return num
-    elif num == 0xFD:
+    if num == 0xFD:
         buf = await reader.readexactly(2)
         bio.write(buf)
         return struct.unpack('!H', buf)[0]
-    elif num == 0xFE:
+    if num == 0xFE:
         buf = await reader.readexactly(4)
         bio.write(buf)
         return struct.unpack('!I', buf)[0]
-    else:
-        buf = await reader.readexactly(8)
-        bio.write(buf)
-        return struct.unpack('!Q', buf)[0]
+    buf = await reader.readexactly(8)
+    bio.write(buf)
+    return struct.unpack('!Q', buf)[0]
 
 
 def parse_and_check_tl(wire: BinaryStr, expected_type: int) -> memoryview:
@@ -157,8 +152,7 @@ def shrink_length(wire: VarBinaryStr, val: int) -> VarBinaryStr:
     new_siz_len = write_tl_num(real_size, wire, typ_len)
     if new_siz_len == siz_len:
         return wire[:-val]
-    else:
-        diff = siz_len - new_siz_len
-        write_tl_num(typ, wire, diff)
-        write_tl_num(real_size, wire, typ_len + diff)
-        return wire[diff:-val]
+    diff = siz_len - new_siz_len
+    write_tl_num(typ, wire, diff)
+    write_tl_num(real_size, wire, typ_len + diff)
+    return wire[diff:-val]

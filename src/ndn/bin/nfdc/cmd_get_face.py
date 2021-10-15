@@ -65,7 +65,7 @@ def execute(args: argparse.Namespace):
 
                 if not data:
                     return False
-                elif data[0] == 0x65:
+                if data[0] == 0x65:
                     msg = parse_response(data)
                     print('Query failed with response', msg['status_code'], msg['status_text'])
                 else:

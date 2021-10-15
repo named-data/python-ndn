@@ -139,4 +139,3 @@ async def fetch_content(app, retry_times, data_name, fresh, timeout):
             break
         i += 1
     return b''.join(ret), i + 1
-

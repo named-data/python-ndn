@@ -147,13 +147,12 @@ def from_str(val: str) -> bytearray:
             # Check special case
             if typ_str == 'sha256digest':
                 return from_bytes(bytearray.fromhex(val[type_offset + 1:]), TYPE_IMPLICIT_SHA256)
-            elif typ_str == 'params-sha256':
+            if typ_str == 'params-sha256':
                 return from_bytes(bytearray.fromhex(val[type_offset + 1:]), TYPE_PARAMETERS_SHA256)
-            elif typ_str in ALTERNATE_URI_STR:
+            if typ_str in ALTERNATE_URI_STR:
                 return from_number(int(val[type_offset + 1:]), ALTERNATE_URI_STR[typ_str])
             # General case
-            else:
-                typ = int(typ_str)
+            typ = int(typ_str)
         except ValueError:
             raise_except()
     else:
@@ -178,9 +177,8 @@ def from_str(val: str) -> bytearray:
         if val[i] != '%':
             view[pos] = val[i].encode('utf-8')[0]
             return 1
-        else:
-            view[pos] = int(val[i+1:i+3], 16)
-            return 3
+        view[pos] = int(val[i+1:i+3], 16)
+        return 3
 
     while i < len(val):
         try:
@@ -297,23 +295,22 @@ def to_str(component: BinaryStr) -> str:
 
     if typ == TYPE_IMPLICIT_SHA256:
         return f"sha256digest={component[offset:].hex()}"
-    elif typ == TYPE_PARAMETERS_SHA256:
+    if typ == TYPE_PARAMETERS_SHA256:
         return f"params-sha256={component[offset:].hex()}"
-    elif typ in ALTERNATE_URI_TYPE:
+    if typ in ALTERNATE_URI_TYPE:
         return ALTERNATE_URI_TYPE[typ].format(int.from_bytes(component[offset:], 'big'))
-    else:
-        ret = ""
-        if typ != TYPE_GENERIC:
-            ret = f"{typ}="
 
-        def decode(val: int) -> str:
-            ret = chr(val)
-            if ret in CHARSET and ret not in {'%', '='}:
-                return ret
-            else:
-                return f"%{val:02X}"
+    ret = ""
+    if typ != TYPE_GENERIC:
+        ret = f"{typ}="
 
-        return ret + "".join(decode(val) for val in component[offset:])
+    def decode(val: int) -> str:
+        ret = chr(val)
+        if ret in CHARSET and ret not in {'%', '='}:
+            return ret
+        return f"%{val:02X}"
+
+    return ret + "".join(decode(val) for val in component[offset:])
 
 
 def to_number(component: BinaryStr) -> int:
@@ -348,7 +345,6 @@ def escape_str(val: str) -> str:
     def escape_chr(ch):
         if ch in CHARSET:
             return ch
-        else:
-            return ''.join(f'%{x:02X}' for x in ch.encode())
+        return ''.join(f'%{x:02X}' for x in ch.encode())
 
     return ''.join(escape_chr(ch) for ch in val)

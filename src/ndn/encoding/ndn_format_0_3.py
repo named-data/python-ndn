@@ -419,8 +419,7 @@ def make_interest(name: NonStrictName,
         ret = shrink_length(ret, shrink_size)
     if need_final_name:
         return ret, InterestPacketValue.name.get_final_name(markers['interest##inner_markers'])
-    else:
-        return ret
+    return ret
 
 
 def make_data(name: NonStrictName,
