@@ -87,9 +87,10 @@ class TestComponent:
 
     @staticmethod
     def test_invalid_type():
-        # 0-typed component is not checked in ndn-python
-        assert Component.from_str("0=A") == b'\x00\x01A'
-        with pytest.raises(struct.error):
+        # 0-typed component is now checked in ndn-python
+        with pytest.raises(ValueError):
+            Component.from_str("0=A")
+        with pytest.raises(ValueError):
             Component.from_str("-1=A")
         with pytest.raises(ValueError):
             Component.from_str("+=A")
@@ -107,6 +108,8 @@ class TestComponent:
             Component.to_str(b'\x00\x01ABC')
         with pytest.raises(ValueError):
             Component.from_str('sha256digest=a04z')
+        with pytest.raises(ValueError):
+            Component.from_str('65536=a04z')
 
     @staticmethod
     def test_compare():
@@ -141,13 +144,13 @@ class TestComponent:
 
     @staticmethod
     def test_number():
-        assert Component.from_segment(13) == b'!\x01\r'
-        assert Component.from_byte_offset(13) == b'\x22\x01\r'
-        assert Component.from_sequence_num(13) == b'%\x01\r'
-        assert Component.from_version(13) == b'#\x01\r'
+        assert Component.from_segment(13) == b'\x32\x01\r'
+        assert Component.from_byte_offset(13) == b'\x34\x01\r'
+        assert Component.from_sequence_num(13) == b'\x3a\x01\r'
+        assert Component.from_version(13) == b'\x36\x01\r'
         timeval = 15686790223318112
         comp = Component.from_timestamp(timeval)
-        assert Component.get_type(comp) == 36
+        assert Component.get_type(comp) == 0x38
         assert Component.get_value(comp) == b'\x00\x37\xbb\x0d\x76\xed\x4c\x60'
         assert Component.to_number(comp) == timeval
 
@@ -157,11 +160,11 @@ class TestComponent:
         assert Component.to_str(Component.from_version(13)) == 'v=13'
         assert Component.to_str(Component.from_timestamp(timeval)) == 't=15686790223318112'
 
-        assert Component.from_str('seg=13') == b'!\x01\r'
-        assert Component.from_str('off=13') == b'\x22\x01\r'
-        assert Component.from_str('seq=13') == b'%\x01\r'
-        assert Component.from_str('v=13') == b'#\x01\r'
-        assert Component.from_str('t=15686790223318112') == b'$\x08\x007\xbb\rv\xedL`'
+        assert Component.from_str('seg=13') == b'\x32\x01\r'
+        assert Component.from_str('off=13') == b'\x34\x01\r'
+        assert Component.from_str('seq=13') == b'\x3a\x01\r'
+        assert Component.from_str('v=13') == b'\x36\x01\r'
+        assert Component.from_str('t=15686790223318112') == b'\x38\x08\x007\xbb\rv\xedL`'
 
 
 class TestName:

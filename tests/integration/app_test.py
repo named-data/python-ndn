@@ -51,9 +51,9 @@ class NDNAppTestSuite:
 class TestConsumerBasic(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.consume_output(b'\x050\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
-                                  b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x12\x00\x0c\x02\x17p')
+                                  b'\x38\x08\x00\x00\x01m\xa4\xf3\xffm\x12\x00\x0c\x02\x17p')
         await face.input_packet(b'\x06B\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
-                                b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
+                                b'\x38\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
                                 b'\x15\rHello, world!')
 
     async def app_main(self):
@@ -209,9 +209,9 @@ class TestRoute2(NDNAppTestSuite):
 class TestConsumerRawPacket(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.consume_output(b'\x050\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
-                                  b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x12\x00\x0c\x02\x17p')
+                                  b'\x38\x08\x00\x00\x01m\xa4\xf3\xffm\x12\x00\x0c\x02\x17p')
         await face.input_packet(b'\x06B\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
-                                b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
+                                b'\x38\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
                                 b'\x15\rHello, world!')
 
     async def app_main(self):
@@ -219,7 +219,7 @@ class TestConsumerRawPacket(NDNAppTestSuite):
         _, _, _, raw = await self.app.express_interest(
             name, must_be_fresh=True, can_be_prefix=False, lifetime=6000, nonce=None, need_raw_packet=True)
         assert (raw == b'\x06\x42\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
-                       b'$\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
+                       b'\x38\x08\x00\x00\x01m\xa4\xf3\xffm\x14\x07\x18\x01\x00\x19\x02\x03\xe8'
                        b'\x15\rHello, world!')
 
 

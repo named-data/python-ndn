@@ -54,11 +54,11 @@ TYPE_GENERIC = 0x08
 TYPE_IMPLICIT_SHA256 = 0x01
 TYPE_PARAMETERS_SHA256 = 0x02
 TYPE_KEYWORD = 0x20
-TYPE_SEGMENT = 0x21
-TYPE_BYTE_OFFSET = 0x22
-TYPE_VERSION = 0x23
-TYPE_TIMESTAMP = 0x24
-TYPE_SEQUENCE_NUM = 0x25
+TYPE_SEGMENT = 0x32
+TYPE_BYTE_OFFSET = 0x34
+TYPE_VERSION = 0x36
+TYPE_TIMESTAMP = 0x38
+TYPE_SEQUENCE_NUM = 0x3A
 
 ALTERNATE_URI_TYPE = {
     TYPE_SEGMENT: 'seg={}',
@@ -76,6 +76,8 @@ ALTERNATE_URI_STR = {
     'seq': TYPE_SEQUENCE_NUM,
 }
 
+MAX_COMPONENT_TYPE_VALUE = 65535
+
 
 def from_bytes(val: BinaryStr, typ: int = TYPE_GENERIC) -> bytearray:
     """
@@ -85,6 +87,8 @@ def from_bytes(val: BinaryStr, typ: int = TYPE_GENERIC) -> bytearray:
     :param typ: the type of the component. :const:`TYPE_GENERIC` by default.
     :return: the component.
     """
+    if typ <= 0 or typ > MAX_COMPONENT_TYPE_VALUE:
+        raise ValueError(f'Type number {typ} not in range 0<T<=65535.')
     size_typ = get_tl_num_size(typ)
     size_len = get_tl_num_size(len(val))
     ret = bytearray(size_typ + size_len + len(val))
@@ -119,8 +123,8 @@ def from_str(val: str) -> bytearray:
     :return: the component.
     :raises ValueError: the string is not a legal URI.
     """
-    def raise_except():
-        raise ValueError(f'{val} is not a legal Name.')
+    def raise_except(explain=''):
+        raise ValueError(f'{val} is not a legal NameComponent: {explain}')
 
     # Check empty string
     if not val:
@@ -131,12 +135,12 @@ def from_str(val: str) -> bytearray:
     # Check charset
     for i, ch in enumerate(val):
         if ch not in CHARSET:
-            raise_except()
+            raise_except(f'Unrecognized char {ch} for NameComponent.')
         if ch == '%':
             percent_cnt += 1
         if ch == "=":
             if type_offset is not None:
-                raise_except()
+                raise_except(f'Multiple TLV types are present.')
             else:
                 type_offset = i
     # Get Type
@@ -154,15 +158,17 @@ def from_str(val: str) -> bytearray:
             # General case
             else:
                 typ = int(typ_str)
-        except ValueError:
-            raise_except()
+        except ValueError as e:
+            raise_except(f'Unable to parse Component type: {e}')
+        if typ <= 0 or typ > MAX_COMPONENT_TYPE_VALUE:
+            raise_except(f'Type number {typ} not in range 0<T<=65535.')
     else:
         typ = TYPE_GENERIC
         type_offset = -1
     # Alloc buf
     length = len(val) - type_offset - 1 - 2 * percent_cnt
     if length < 0:
-        raise_except()
+        raise_except(f'Too many %%%%% in the Component.')
     size_typ = get_tl_num_size(typ)
     size_len = get_tl_num_size(length)
     ret = bytearray(size_typ + size_len + length)
@@ -186,8 +192,8 @@ def from_str(val: str) -> bytearray:
         try:
             i += encode()
             pos += 1
-        except IndexError:
-            raise_except()
+        except IndexError as e:
+            raise_except(repr(e))
     return ret
 
 
