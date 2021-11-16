@@ -39,7 +39,7 @@ def execute(_args: argparse.Namespace):
             msg = GeneralStatus.parse(data)
 
             print('General status:')
-            print(f'{"version":>25}\t{bytes(msg.nfd_version).decode()}')
+            print(f'{"version":>25}\t{msg.nfd_version}')
             st_time = datetime.datetime.fromtimestamp(msg.start_timestamp / 1000)
             print(f'{"startTime":>25}\t{st_time.strftime("%Y-%m-%d %H:%M:%S.%f")}')
             cur_time = datetime.datetime.fromtimestamp(msg.current_timestamp / 1000)

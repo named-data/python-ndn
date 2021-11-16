@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import abc
 import struct
+from enum import Enum, Flag
 from typing import Optional, Type, List, Iterable
 from functools import reduce
 from .tlv_type import BinaryStr, VarBinaryStr, is_binary_str
@@ -286,12 +287,50 @@ class UintField(Field):
     :ivar fixed_len: the fixed value for Length if it's not ``None``.
         Only 1, 2, 4 and 8 are acceptable.
     :vartype fixed_len: int
+    :ivar val_base_type: the base type of the value of the field.
+        Can be int (default), an Enum or a Flag type.
     """
-    def __init__(self, type_num: int, default=None, fixed_len: int = None):
+    def __init__(self, type_num: int, default=None, fixed_len: int = None,
+                 val_base_type=int):
         super().__init__(type_num, default)
         if fixed_len not in {None, 1, 2, 4, 8}:
             raise ValueError("Uint's length should be 1, 2, 4, 8 or None")
+        if not issubclass(val_base_type, (Flag, Enum, int)):
+            raise TypeError("Uint's base class should be int, an Enum, or a Flag")
         self.fixed_len = fixed_len
+        self.val_base_type = val_base_type
+
+    def __set__(self, instance, value):
+        """
+        Set the value of this uint field.
+        Will try to convert ``value`` into ``int``.
+
+        :param instance: the instance whose field is being set.
+        :param value: the new value.
+        """
+        if not isinstance(value, int) and value is not None:
+            if isinstance(value, (Flag, Enum)):
+                value = value.value
+            else:
+                raise TypeError(f"Cannot convert {value} into a uint field.")
+        instance.__dict__[self.name] = value
+
+    def __get__(self, instance, owner):
+        """
+        Get the value of this uint field in a specific instance.
+        Convert the value into the given ``val_base_type``.
+
+        :param instance: the instance that this field is being accessed through.
+        :param owner: the owner class of this field.
+        :return: the value of this field.
+        """
+        if instance is None:
+            return self
+        value = self.get_value(instance)
+        if value is not None:
+            return self.val_base_type(value)
+        else:
+            return None
 
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
@@ -603,9 +642,29 @@ class BytesField(Field):
 
     Type: :any:`BinaryStr`
 
+    :ivar is_string: If the value is a UTF-8 string. False by default.
+
     .. note::
-        Do not assign it with a :class:`str`.
+        Do not assign it with a :class:`str` if ``is_string`` is False.
     """
+    def __init__(self, type_num: int, default=None, is_string: bool = False):
+        super().__init__(type_num, default)
+        self.is_string = is_string
+
+    def __set__(self, instance, value):
+        if isinstance(value, str):
+            value = value.encode('utf-8')
+        instance.__dict__[self.name] = value
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        value = self.get_value(instance)
+        if self.is_string and value is not None:
+            return bytes(value).decode('utf-8')
+        else:
+            return value
+
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
             return 0

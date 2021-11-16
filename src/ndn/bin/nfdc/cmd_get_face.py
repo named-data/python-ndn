@@ -44,7 +44,7 @@ def execute(args: argparse.Namespace):
             print(f'{"FaceID":7}{"RemoteURI":<30}\t{"LocalURI":<30}')
             print(f'{"------":7}{"---------":<30}\t{"--------":<30}')
             for f in msg.face_status:
-                print(f'{f.face_id:<7}{bytes(f.uri).decode():<30}\t{bytes(f.local_uri).decode():<30}')
+                print(f'{f.face_id:<7}{f.uri:<30}\t{f.local_uri:<30}')
 
         except InterestNack as e:
             print(f'Nacked with reason={e.reason}')
@@ -73,11 +73,11 @@ def execute(args: argparse.Namespace):
                     for f in msg.face_status:
                         print()
                         print(f'{"Face ID":>12}\t{f.face_id}')
-                        print(f'{"Remote URI":>12}\t{bytes(f.uri).decode()}')
-                        print(f'{"Local URI":>12}\t{bytes(f.local_uri).decode()}')
-                        print(f'{"Scope":>12}\t{FaceScope(f.face_scope).name}')
-                        print(f'{"Persistency":>12}\t{FacePersistency(f.face_persistency).name}')
-                        print(f'{"Link Type":>12}\t{FaceLinkType(f.link_type).name}')
+                        print(f'{"Remote URI":>12}\t{f.uri}')
+                        print(f'{"Local URI":>12}\t{f.local_uri}')
+                        print(f'{"Scope":>12}\t{f.face_scope.name}')
+                        print(f'{"Persistency":>12}\t{f.face_persistency.name}')
+                        print(f'{"Link Type":>12}\t{f.link_type.name}')
                         if f.mtu:
                             print(f'{"MTU":>12}\t{f.mtu}')
                         else:
@@ -107,11 +107,11 @@ def execute(args: argparse.Namespace):
             if not await exec_query():
                 print('No face is found')
         else:
-            filt.face_query_filter.uri = face_uri.encode()
+            filt.face_query_filter.uri = face_uri
             data_name = Name.from_str(name) + [Component.from_bytes(filt.encode())]
             if not await exec_query():
                 filt.face_query_filter.uri = None
-                filt.face_query_filter.local_uri = face_uri.encode()
+                filt.face_query_filter.local_uri = face_uri
                 data_name = Name.from_str(name) + [Component.from_bytes(filt.encode())]
                 if not await exec_query():
                     print('No face is found')
