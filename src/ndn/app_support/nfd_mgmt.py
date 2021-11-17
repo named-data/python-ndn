@@ -48,6 +48,12 @@ class FaceFlags(Flag):
     CONGESTION_MARKING_ENABLED = 4
 
 
+class RouteFlags(Flag):
+    NO_FLAG = 0
+    CHILD_INHERIT = 1
+    CAPTURE = 2
+
+
 class FaceEventKind(Enum):
     CREATED = 1
     DESTROYED = 2
@@ -175,7 +181,7 @@ class Route(TlvModel):
     face_id = UintField(0x69)
     origin = UintField(0x6f)
     cost = UintField(0x6a)
-    flags = UintField(0x6c)
+    flags = UintField(0x6c, val_base_type=RouteFlags)
     expiration_period = UintField(0x6d)
 
 

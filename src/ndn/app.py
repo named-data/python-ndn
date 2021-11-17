@@ -277,7 +277,7 @@ class NDNApp:
             if after_start:
                 if isinstance(after_start, Coroutine):
                     after_start.close()
-                elif isinstance(after_start, aio.Task) or isinstance(after_start, aio.Future):
+                elif isinstance(after_start, (aio.Task, aio.Future)):
                     after_start.cancel()
             raise
         task = aio.create_task(starting_task())

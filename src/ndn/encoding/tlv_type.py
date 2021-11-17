@@ -49,4 +49,4 @@ def is_binary_str(var):
     :param var: The variable to check.
     :return: ``True`` if var is a :any:`BinaryStr`.
     """
-    return isinstance(var, bytes) or isinstance(var, bytearray) or isinstance(var, memoryview)
+    return isinstance(var, (bytes, bytearray, memoryview))

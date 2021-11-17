@@ -335,25 +335,24 @@ class UintField(Field):
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
             return 0
+        if not isinstance(val, int) or val < 0:
+            raise TypeError(f'{self.name}=f{val} is not a legal uint')
+        tl_size = get_tl_num_size(self.type_num) + 1
+        if self.fixed_len is not None:
+            ret = self.fixed_len
         else:
-            if not isinstance(val, int) or val < 0:
-                raise TypeError(f'{self.name}=f{val} is not a legal uint')
-            tl_size = get_tl_num_size(self.type_num) + 1
-            if self.fixed_len is not None:
-                ret = self.fixed_len
+            if val <= 0xFF:
+                ret = 1
+            elif val <= 0xFFFF:
+                ret = 2
+            elif val <= 0xFFFFFFFF:
+                ret = 4
             else:
-                if val <= 0xFF:
-                    ret = 1
-                elif val <= 0xFFFF:
-                    ret = 2
-                elif val <= 0xFFFFFFFF:
-                    ret = 4
-                else:
-                    ret = 8
-            if val >= 0x100 ** ret:
-                raise ValueError(f'{val} cannot be encoded into {ret} bytes')
-            markers[f'{self.name}##encoded_length'] = ret
-            return ret + tl_size
+                ret = 8
+        if val >= 0x100 ** ret:
+            raise ValueError(f'{val} cannot be encoded into {ret} bytes')
+        markers[f'{self.name}##encoded_length'] = ret
+        return ret + tl_size
 
     def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
         if val is None:
