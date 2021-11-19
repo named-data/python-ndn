@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+from enum import Enum, Flag
 from ndn.encoding import TlvModel, NameField, UintField, BytesField, BoolField, Component,\
     RepeatedField, ModelField, Name, IncludeBase
 
@@ -145,24 +146,44 @@ class TestEncodeDecode:
 
 class TestAsDict:
     def test_asdict(self):
+        class EnumVal(Enum):
+            E1 = 1
+            E2 = 2
+
+        class FlagVal(Flag):
+            F1 = 1
+            F2 = 2
+
         class WordArray(TlvModel):
             words = RepeatedField(UintField(0x04, fixed_len=2))
 
         class Model(TlvModel):
             name = NameField()
             int_val = UintField(0x03)
-            str_val = BytesField(0x02)
+            bytes_val = BytesField(0x02)
             bool_val = BoolField(0x01)
             array = ModelField(0x05, WordArray)
+            flag_val = UintField(0x06, val_base_type=FlagVal)
+            enum_arr = RepeatedField(UintField(0x07, val_base_type=EnumVal))
+            str_val = BytesField(0x08, is_string=True)
+            str_arr = RepeatedField(BytesField(0x09, is_string=True))
 
         obj = Model()
         obj.name = '/test/name'
         obj.int_val = 0
-        obj.str_val = b'\x00'
+        obj.bytes_val = b'\x00'
         obj.array = WordArray()
         obj.array.words = [1, 2, 3]
+        obj.flag_val = FlagVal.F1 | FlagVal.F2
+        obj.enum_arr = [EnumVal.E1, EnumVal.E2]
+        obj.str_val = 'वरुण'
+        obj.str_arr = ['あいう', 'utf-8']
         assert obj.asdict() == {'name': '/test/name',
                                 'int_val': 0,
-                                'str_val': b'\x00',
+                                'bytes_val': b'\x00',
                                 'bool_val': None,
-                                'array': {'words': [1, 2, 3]}}
+                                'array': {'words': [1, 2, 3]},
+                                'flag_val': FlagVal.F1 | FlagVal.F2,
+                                'enum_arr': [EnumVal.E1, EnumVal.E2],
+                                'str_val': 'वरुण',
+                                'str_arr': ['あいう', 'utf-8']}

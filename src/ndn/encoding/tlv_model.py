@@ -695,7 +695,7 @@ class TlvModel(metaclass=TlvModelMeta):
     _encoded_fields: List[Field]
 
     def __repr__(self):
-        values = ', '.join(f'{field.name}={field.get_value(self).__repr__()}' for field in self._encoded_fields)
+        values = ', '.join(f'{field.name}={field.__get__(self, None).__repr__()}' for field in self._encoded_fields)
         return f'{self.__class__.__name__}({values})'
 
     def __eq__(self, other):
@@ -720,13 +720,18 @@ class TlvModel(metaclass=TlvModelMeta):
         result = []
         for field in self._encoded_fields:
             if isinstance(field, ModelField):
-                result.append((field.name, field.get_value(self).asdict()))
+                result.append((field.name, field.__get__(self, None).asdict()))
             elif isinstance(field, RepeatedField):
                 result.append((field.name, field.aslist(self)))
             elif isinstance(field, BytesField):
-                result.append((field.name, bytes(field.get_value(self))))
+                val = field.__get__(self, None)
+                if isinstance(val, str):
+                    result.append((field.name, val))
+                else:
+                    # memoryview, bytearray, bytes
+                    result.append((field.name, bytes(val)))
             else:
-                result.append((field.name, field.get_value(self)))
+                result.append((field.name, field.__get__(self, None)))
         return dict_factory(result)
 
     def encoded_length(self, markers: Optional[dict] = None) -> int:
@@ -952,7 +957,7 @@ class RepeatedField(Field):
 
     def aslist(self, instance):
         ret = []
-        for x in self.get_value(instance):
+        for x in self.__get__(instance, None):
             if isinstance(x, TlvModel):
                 ret.append(x.asdict())
             elif isinstance(x, memoryview):
