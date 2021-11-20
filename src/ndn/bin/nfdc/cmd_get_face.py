@@ -19,8 +19,7 @@ import argparse
 from ...app import NDNApp
 from ...encoding import Name, Component
 from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
-from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response, \
-    FaceScope, FacePersistency, FaceLinkType, FaceFlags
+from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response, FaceFlags
 
 
 def add_parser(subparsers):
@@ -49,11 +48,11 @@ def execute(args: argparse.Namespace):
         except InterestNack as e:
             print(f'Nacked with reason={e.reason}')
         except InterestTimeout:
-            print(f'Timeout')
+            print('Timeout')
         except InterestCanceled:
-            print(f'Local forwarder disconnected')
+            print('Local forwarder disconnected')
         except ValidationFailure:
-            print(f'Data failed to validate')
+            print('Data failed to validate')
         finally:
             app.shutdown()
 
@@ -91,11 +90,11 @@ def execute(args: argparse.Namespace):
             except InterestNack as e:
                 print(f'Nacked with reason={e.reason}')
             except InterestTimeout:
-                print(f'Timeout')
+                print('Timeout')
             except InterestCanceled:
-                print(f'Local forwarder disconnected')
+                print('Local forwarder disconnected')
             except ValidationFailure:
-                print(f'Data failed to validate')
+                print('Data failed to validate')
             return True
 
         name = "/localhost/nfd/faces/query"

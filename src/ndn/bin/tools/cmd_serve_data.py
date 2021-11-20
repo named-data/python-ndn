@@ -52,7 +52,7 @@ def execute(args: argparse.Namespace):
             with open(os.path.expandvars(args.file), 'rb') as f:
                 text = f.read()
     except (ValueError, OSError, IndexError):
-        print(f'Unable to read the input file')
+        print('Unable to read the input file')
         return -2
 
     app = NDNApp(keychain=KeychainDigest())

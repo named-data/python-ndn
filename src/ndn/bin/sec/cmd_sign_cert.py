@@ -81,7 +81,7 @@ def execute(args: argparse.Namespace):
             raise IndexError()
         issuer_id = issuer[0]
     except (ValueError, IndexError):
-        print(f'Issue ID is not a single component')
+        print('Issue ID is not a single component')
         return -3
 
     if not args.not_before:
@@ -105,7 +105,7 @@ def execute(args: argparse.Namespace):
     try:
         _, cert = new_cert(signee_key_name, issuer_id, sign_req.content, signer, not_before, not_after)
     except (ValueError, IndexError):
-        print(f'Failed to issue the certificate')
+        print('Failed to issue the certificate')
         return -5
 
     text = base64.standard_b64encode(bytes(cert)).decode()

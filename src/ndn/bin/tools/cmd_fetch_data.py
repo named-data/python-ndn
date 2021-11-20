@@ -59,7 +59,7 @@ def execute(args: argparse.Namespace):
         else:
             app_param = None
     except (ValueError, OSError, IndexError):
-        print(f'Unable to read the input file')
+        print('Unable to read the input file')
         return -2
 
     app = NDNApp(keychain=KeychainDigest())
@@ -85,13 +85,12 @@ def execute(args: argparse.Namespace):
         except InterestNack as e:
             print(f'Nacked with reason={e.reason}')
         except InterestTimeout:
-            print(f'Timeout')
+            print('Timeout')
         except InterestCanceled:
-            print(f'Local forwarder disconnected')
+            print('Local forwarder disconnected')
         except ValidationFailure:
-            print(f'Data failed to validate')
+            print('Data failed to validate')
         finally:
             app.shutdown()
 
     app.run_forever(after_start())
-

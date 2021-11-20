@@ -1,6 +1,17 @@
 Changelog
 =========
 
+Latest (master)
++++++++++++++++
+* Add ``express_raw_interest`` function to ``NDNApp``.
+* Add validator for known keys.
+* Add CodeQL scanning.
+* Add support to Windows CNG as a TPM backend.
+* Add binary tools ``pyndntools``, ``pyndnsec`` and ``pynfdc``.
+* Transition to Name Convention Rev03.
+* Add automatic type conversion for ``Enum``, ``Flag`` and ``str``.
+* Drop Python 3.7 support and add Python 3.10.
+
 0.3a1-3 (2021-05-22)
 ++++++++++++++++++++
 * Support Unix socket on Windows 10.

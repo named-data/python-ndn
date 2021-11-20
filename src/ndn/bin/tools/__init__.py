@@ -45,4 +45,3 @@ def main():
         exit(-1)
 
     return args.executor(args)
-

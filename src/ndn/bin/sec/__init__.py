@@ -33,7 +33,7 @@ Available commands:
   Export-Cert (export,ec)     Export the default certificate
   Import-Cert (import,ic)     Import a certificate from a file
   Get-SignReq (sign-req,gsr)  Generate a certificate signing request
-  
+
 Try '%(prog)s COMMAND -h' for more information on each command
 '''
 

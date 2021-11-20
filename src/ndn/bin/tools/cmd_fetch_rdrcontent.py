@@ -89,13 +89,13 @@ def execute(args: argparse.Namespace):
         except InterestNack as e:
             print(f'Nacked with reason={e.reason}')
         except InterestTimeout:
-            print(f'Timeout')
+            print('Timeout')
         except InterestCanceled:
-            print(f'Local forwarder disconnected')
+            print('Local forwarder disconnected')
         except ValidationFailure:
-            print(f'Data failed to validate')
+            print('Data failed to validate')
         except (ValueError, IndexError):
-            print(f'Decoding error')
+            print('Decoding error')
         except OSError as e:
             print(f'OSError: {e}')
         finally:
@@ -139,4 +139,3 @@ async def fetch_content(app, retry_times, data_name, fresh, timeout):
             break
         i += 1
     return b''.join(ret), i + 1
-

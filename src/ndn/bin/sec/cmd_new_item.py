@@ -40,7 +40,7 @@ def execute(args: argparse.Namespace):
     # New identity
     try:
         iden = kc[id_name]
-    except KeyError as e:
+    except KeyError:
         iden = kc.new_identity(id_name)
         print(f'Created new identity: {Name.to_str(id_name)}')
 
@@ -50,7 +50,7 @@ def execute(args: argparse.Namespace):
             _ = iden[key_name]
             print(f'Specified key already exists: {Name.to_str(key_name)}')
             return -2
-        except KeyError as e:
+        except KeyError:
             key = None
     else:
         key = None

@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import pytest
-import struct
 from ndn.encoding import Name, Component
 
 

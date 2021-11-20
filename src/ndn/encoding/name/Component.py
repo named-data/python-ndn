@@ -140,7 +140,7 @@ def from_str(val: str) -> bytearray:
             percent_cnt += 1
         if ch == "=":
             if type_offset is not None:
-                raise_except(f'Multiple TLV types are present.')
+                raise_except('Multiple TLV types are present.')
             else:
                 type_offset = i
     # Get Type
@@ -168,7 +168,7 @@ def from_str(val: str) -> bytearray:
     # Alloc buf
     length = len(val) - type_offset - 1 - 2 * percent_cnt
     if length < 0:
-        raise_except(f'Too many %%%%% in the Component.')
+        raise_except('Too many %%%%% in the Component.')
     size_typ = get_tl_num_size(typ)
     size_len = get_tl_num_size(length)
     ret = bytearray(size_typ + size_len + length)

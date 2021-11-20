@@ -48,7 +48,7 @@ def resolve_keychain(args: argparse.Namespace) -> KeychainSqlite3:
                 base_dir = d
                 break
         if not base_dir:
-            print(f'ERROR: Cannot find a PIB.')
+            print('ERROR: Cannot find a PIB.')
             exit(-2)
 
     pib_path = os.path.join(base_dir, 'pib.db')

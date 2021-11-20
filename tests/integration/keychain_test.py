@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import os
-import sqlite3
 from tempfile import TemporaryDirectory
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import ECC
