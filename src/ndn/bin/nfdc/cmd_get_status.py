@@ -18,8 +18,8 @@
 import argparse
 import datetime
 from ...app import NDNApp
-from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 from ...app_support.nfd_mgmt import GeneralStatus
+from .utils import express_interest
 
 
 def add_parser(subparsers):
@@ -31,10 +31,8 @@ def execute(_args: argparse.Namespace):
     app = NDNApp()
 
     async def after_start():
-        name = "/localhost/nfd/status/general"
         try:
-            _, _, data = await app.express_interest(
-                name, lifetime=1000, can_be_prefix=True, must_be_fresh=True)
+            data = await express_interest(app, "/localhost/nfd/status/general")
 
             msg = GeneralStatus.parse(data)
 
@@ -59,14 +57,6 @@ def execute(_args: argparse.Namespace):
             print(f'{"nOutNacks":>25}\t{msg.n_out_nacks}')
             print(f'{"nSatisfiedInterests":>25}\t{msg.n_satisfied_interests}')
             print(f'{"nUnsatisfiedInterests":>25}\t{msg.n_unsatisfied_interests}')
-        except InterestNack as e:
-            print(f'Nacked with reason={e.reason}')
-        except InterestTimeout:
-            print('Timeout')
-        except InterestCanceled:
-            print('Local forwarder disconnected')
-        except ValidationFailure:
-            print('Data failed to validate')
         finally:
             app.shutdown()
 

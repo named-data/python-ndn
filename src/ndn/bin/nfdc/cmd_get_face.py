@@ -18,8 +18,8 @@
 import argparse
 from ...app import NDNApp
 from ...encoding import Name, Component
-from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
-from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response, FaceFlags
+from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response
+from .utils import express_interest
 
 
 def add_parser(subparsers):
@@ -33,68 +33,44 @@ def execute(args: argparse.Namespace):
     app = NDNApp()
 
     async def list_face():
-        name = "/localhost/nfd/faces/list"
         try:
-            _, _, data = await app.express_interest(
-                name, lifetime=1000, can_be_prefix=True, must_be_fresh=True)
-
+            data = await express_interest(app, "/localhost/nfd/faces/list")
             msg = FaceStatusMsg.parse(data)
             # TODO: Should calculate the length instead of using a fixed number
             print(f'{"FaceID":7}{"RemoteURI":<30}\t{"LocalURI":<30}')
             print(f'{"------":7}{"---------":<30}\t{"--------":<30}')
             for f in msg.face_status:
                 print(f'{f.face_id:<7}{f.uri:<30}\t{f.local_uri:<30}')
-
-        except InterestNack as e:
-            print(f'Nacked with reason={e.reason}')
-        except InterestTimeout:
-            print('Timeout')
-        except InterestCanceled:
-            print('Local forwarder disconnected')
-        except ValidationFailure:
-            print('Data failed to validate')
         finally:
             app.shutdown()
 
     async def inspect_face(face_id, face_uri):
         async def exec_query():
-            try:
-                _, _, data = await app.express_interest(
-                    data_name, lifetime=1000, can_be_prefix=True, must_be_fresh=True)
-
-                if not data:
-                    return False
-                elif data[0] == 0x65:
-                    msg = parse_response(data)
-                    print('Query failed with response', msg['status_code'], msg['status_text'])
-                else:
-                    msg = FaceStatusMsg.parse(data)
-                    for f in msg.face_status:
-                        print()
-                        print(f'{"Face ID":>12}\t{f.face_id}')
-                        print(f'{"Remote URI":>12}\t{f.uri}')
-                        print(f'{"Local URI":>12}\t{f.local_uri}')
-                        print(f'{"Scope":>12}\t{f.face_scope.name}')
-                        print(f'{"Persistency":>12}\t{f.face_persistency.name}')
-                        print(f'{"Link Type":>12}\t{f.link_type.name}')
-                        if f.mtu:
-                            print(f'{"MTU":>12}\t{f.mtu}')
-                        else:
-                            print(f'{"MTU":>12}\t-')
-                        print(f'{"Counter IN":>12}\t{f.n_in_interests}i {f.n_in_data}d '
-                              f'{f.n_in_nacks}n {f.n_in_bytes}B')
-                        print(f'{"Counter OUT":>12}\t{f.n_out_interests}i {f.n_out_data}d '
-                              f'{f.n_out_nacks}n {f.n_out_bytes}B')
-                        print(f'{"Flags":>12}\t{FaceFlags(f.flags)}')
-
-            except InterestNack as e:
-                print(f'Nacked with reason={e.reason}')
-            except InterestTimeout:
-                print('Timeout')
-            except InterestCanceled:
-                print('Local forwarder disconnected')
-            except ValidationFailure:
-                print('Data failed to validate')
+            data = await express_interest(app, data_name)
+            if not data:
+                return False
+            elif data[0] == 0x65:
+                msg = parse_response(data)
+                print('Query failed with response', msg['status_code'], msg['status_text'])
+            else:
+                msg = FaceStatusMsg.parse(data)
+                for f in msg.face_status:
+                    print()
+                    print(f'{"Face ID":>12}\t{f.face_id}')
+                    print(f'{"Remote URI":>12}\t{f.uri}')
+                    print(f'{"Local URI":>12}\t{f.local_uri}')
+                    print(f'{"Scope":>12}\t{f.face_scope.name}')
+                    print(f'{"Persistency":>12}\t{f.face_persistency.name}')
+                    print(f'{"Link Type":>12}\t{f.link_type.name}')
+                    if f.mtu:
+                        print(f'{"MTU":>12}\t{f.mtu}')
+                    else:
+                        print(f'{"MTU":>12}\t-')
+                    print(f'{"Counter IN":>12}\t{f.n_in_interests}i {f.n_in_data}d '
+                          f'{f.n_in_nacks}n {f.n_in_bytes}B')
+                    print(f'{"Counter OUT":>12}\t{f.n_out_interests}i {f.n_out_data}d '
+                          f'{f.n_out_nacks}n {f.n_out_bytes}B')
+                    print(f'{"Flags":>12}\t{f.flags}')
             return True
 
         name = "/localhost/nfd/faces/query"

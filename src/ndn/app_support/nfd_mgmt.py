@@ -90,7 +90,7 @@ class ControlParameters(TlvModel):
 
 class ControlResponse(ControlParametersValue):
     status_code = UintField(0x66)
-    status_text = BytesField(0x67)
+    status_text = BytesField(0x67, is_string=True)
     body = IncludeBase(ControlParametersValue)
 
 

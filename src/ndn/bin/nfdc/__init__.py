@@ -16,7 +16,8 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from . import cmd_get_status, cmd_get_face
+from . import cmd_get_status, cmd_get_face, cmd_get_route, cmd_get_strategy, \
+    cmd_remove_face, cmd_new_face, cmd_remove_route, cmd_new_route, cmd_remove_strategy, cmd_set_strategy
 
 
 CMD_LIST = '''
@@ -42,6 +43,14 @@ def main():
 
     cmd_get_status.add_parser(subparsers)
     cmd_get_face.add_parser(subparsers)
+    cmd_get_route.add_parser(subparsers)
+    cmd_get_strategy.add_parser(subparsers)
+    cmd_remove_face.add_parser(subparsers)
+    cmd_new_face.add_parser(subparsers)
+    cmd_remove_route.add_parser(subparsers)
+    cmd_new_route.add_parser(subparsers)
+    cmd_remove_strategy.add_parser(subparsers)
+    cmd_set_strategy.add_parser(subparsers)
 
     args = parser.parse_args()
     if 'executor' not in args:

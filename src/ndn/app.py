@@ -407,11 +407,11 @@ class NDNApp:
                 ret = parse_response(reply)
                 if ret['status_code'] != 200:
                     logging.error(f'Registration for {Name.to_str(name)} failed: '
-                                  f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                                  f'{ret["status_code"]} {ret["status_text"]}')
                     return False
                 else:
                     logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
-                                  f'{ret["status_code"]} {bytes(ret["status_text"]).decode()}')
+                                  f'{ret["status_code"]} {ret["status_text"]}')
                     return True
             except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
                 logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
