@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Latest (master)
-+++++++++++++++
+0.3 (2021-11-21)
+++++++++++++++++
 * Add ``express_raw_interest`` function to ``NDNApp``.
 * Add validator for known keys.
 * Add CodeQL scanning.
@@ -50,7 +50,6 @@ Latest (master)
 
 0.2b2 (2020-02-18)
 ++++++++++++++++++
-
 * Switch to Apache License 2.0.
 * Add NDNApp.get_original_packet_value.
 * Improve NDNApp.route and NDNApp.express_interest to give access the
@@ -62,5 +61,4 @@ Latest (master)
 
 0.2b1 (2019-11-20)
 ++++++++++++++++++
-
 The initial release.
