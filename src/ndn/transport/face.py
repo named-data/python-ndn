@@ -18,8 +18,9 @@
 import io
 import abc
 import asyncio as aio
+import logging
 from typing import Optional, Callable, Coroutine, Any
-from ..encoding.tlv_var import read_tl_num_from_stream
+from ..encoding.tlv_var import read_tl_num_from_stream, parse_tl_num
 from ..platform import Platform
 
 
@@ -100,3 +101,65 @@ class TcpFace(StreamFace):
     async def open(self):
         self.reader, self.writer = await aio.open_connection(self.host, self.port)
         self.running = True
+
+
+class UdpFace(Face):
+    host: str = '127.0.0.1'
+    port: int = 6363 
+
+    def __init__(self, host: str ='', port: int =0):
+        super().__init__()
+        if host:
+            self.host = host
+        if port:
+            self.port = port
+
+    async def open(self):
+
+        class PacketHandler:
+        
+            def __init__(self, callback, close) -> None:
+                self.callback = callback
+                self.close = close
+
+            def connection_made(self, transport: aio.DatagramTransport) -> None:
+                self.transport = transport
+        
+            def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+                typ,_ = parse_tl_num(data)
+                aio.create_task(self.callback(typ, data))
+                return 
+        
+            def send(self, data):
+                self.transport.sendto(data)
+
+            def error_received(self, exc: Exception) -> None:
+                self.close.set_result(True)
+                logging.warning(exc)
+        
+            def connection_lost(self, exc):
+                if not self.close.done():
+                    self.close.set_result(True)
+                if exc:
+                    logging.warning(exc)
+
+        loop = aio.get_running_loop()
+        self.running = True
+        close = loop.create_future()
+        handler = PacketHandler(self.callback, close)
+        transport, _ = await loop.create_datagram_endpoint(
+        lambda: handler,
+        remote_addr=(self.host, self.port))
+        self.handler = handler
+        self.transport = transport
+        self.close = close
+
+    async def run(self):
+        await self.close
+
+    def send(self, data: bytes):
+        self.handler.send(data)
+    
+    def shutdown(self):
+        self.running = False
+        self.transport.close()
