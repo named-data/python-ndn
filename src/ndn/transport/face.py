@@ -105,9 +105,9 @@ class TcpFace(StreamFace):
 
 class UdpFace(Face):
     host: str = '127.0.0.1'
-    port: int = 6363 
+    port: int = 6363
 
-    def __init__(self, host: str ='', port: int =0):
+    def __init__(self, host: str = '', port: int = 0):
         super().__init__()
         if host:
             self.host = host
@@ -117,26 +117,28 @@ class UdpFace(Face):
     async def open(self):
 
         class PacketHandler:
-        
+
             def __init__(self, callback, close) -> None:
                 self.callback = callback
                 self.close = close
 
-            def connection_made(self, transport: aio.DatagramTransport) -> None:
+            def connection_made(
+                    self, transport: aio.DatagramTransport) -> None:
                 self.transport = transport
-        
-            def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-                typ,_ = parse_tl_num(data)
+
+            def datagram_received(
+                    self, data: bytes, addr: tuple[str, int]) -> None:
+                typ, _ = parse_tl_num(data)
                 aio.create_task(self.callback(typ, data))
-                return 
-        
+                return
+
             def send(self, data):
                 self.transport.sendto(data)
 
             def error_received(self, exc: Exception) -> None:
                 self.close.set_result(True)
                 logging.warning(exc)
-        
+
             def connection_lost(self, exc):
                 if not self.close.done():
                     self.close.set_result(True)
@@ -148,8 +150,8 @@ class UdpFace(Face):
         close = loop.create_future()
         handler = PacketHandler(self.callback, close)
         transport, _ = await loop.create_datagram_endpoint(
-        lambda: handler,
-        remote_addr=(self.host, self.port))
+            lambda: handler,
+            remote_addr=(self.host, self.port))
         self.handler = handler
         self.transport = transport
         self.close = close
@@ -159,7 +161,7 @@ class UdpFace(Face):
 
     def send(self, data: bytes):
         self.handler.send(data)
-    
+
     def shutdown(self):
         self.running = False
         self.transport.close()
