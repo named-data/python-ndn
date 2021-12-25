@@ -1,18 +1,33 @@
-from socket import AF_INET, AF_INET6
-from _pytest.config import main
+# -----------------------------------------------------------------------------
+# Copyright (C) 2019-2020 The python-ndn authors
+#
+# This file is part of python-ndn.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# -----------------------------------------------------------------------------
 import asyncio
+
 from ndn.client_conf import default_face
-from ndn.transport.stream_face import UnixFace, TcpFace
+from ndn.transport.stream_face import TcpFace, UnixFace
 from ndn.transport.udp_face import UdpFace
-from ndn.app import NDNApp
-from ndn.encoding.tlv_var import parse_tl_num
+
 
 def test():
     url = 'unix:///tmp/nfd.sock'
     face = default_face(url)
     assert isinstance(face, UnixFace)
     assert face.path == '/tmp/nfd.sock'
-    
+
     url = 'tcp://localhost'
     face = default_face(url)
     assert isinstance(face, TcpFace)

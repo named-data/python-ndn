@@ -17,20 +17,17 @@
 # -----------------------------------------------------------------------------
 import asyncio as aio
 import logging
-from .face import Face
+
 from ..encoding.tlv_var import parse_tl_num
+from .face import Face
 
 
 class UdpFace(Face):
-    host: str = '127.0.0.1'
-    port: int = 6363
 
-    def __init__(self, host: str = '', port: int = 0):
+    def __init__(self, host: str = '127.0.0.1', port: int = 6363):
         super().__init__()
-        if host:
-            self.host = host
-        if port:
-            self.port = port
+        self.host = host
+        self.port = port
 
     async def open(self):
 
