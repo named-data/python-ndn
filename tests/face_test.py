@@ -2,7 +2,8 @@ from socket import AF_INET, AF_INET6
 from _pytest.config import main
 import asyncio
 from ndn.client_conf import default_face
-from ndn.transport.face import TcpFace, UdpFace, UnixFace
+from ndn.transport.stream_face import UnixFace, TcpFace
+from ndn.transport.udp_face import UdpFace
 from ndn.app import NDNApp
 from ndn.encoding.tlv_var import parse_tl_num
 

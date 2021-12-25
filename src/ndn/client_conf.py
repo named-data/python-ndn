@@ -21,7 +21,9 @@ from configparser import ConfigParser
 from urllib.parse import urlparse
 from .platform import Platform
 from .security import TpmFile, Keychain, KeychainSqlite3
-from .transport.face import Face, UdpFace, UnixFace, TcpFace
+from .transport.face import Face
+from .transport.stream_face import UnixFace, TcpFace
+from .transport.udp_face import UdpFace
 if sys.platform == 'darwin':
     from .security.tpm.tpm_osx_keychain import TpmOsxKeychain
 if sys.platform == 'win32':
