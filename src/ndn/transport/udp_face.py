@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import asyncio as aio
 import logging
+from typing import Tuple
 
 from ..encoding.tlv_var import parse_tl_num
 from .face import Face
@@ -42,7 +43,7 @@ class UdpFace(Face):
                 self.transport = transport
 
             def datagram_received(
-                    self, data: bytes, addr: tuple[str, int]) -> None:
+                    self, data: bytes, addr: Tuple[str, int]) -> None:
                 typ, _ = parse_tl_num(data)
                 aio.create_task(self.callback(typ, data))
                 return
