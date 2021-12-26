@@ -18,9 +18,12 @@
 import os
 import sys
 from configparser import ConfigParser
+from urllib.parse import urlparse
 from .platform import Platform
 from .security import TpmFile, Keychain, KeychainSqlite3
-from .transport.stream_socket import Face, UnixFace, TcpFace
+from .transport.face import Face
+from .transport.stream_face import UnixFace, TcpFace
+from .transport.udp_face import UdpFace
 if sys.platform == 'darwin':
     from .security.tpm.tpm_osx_keychain import TpmOsxKeychain
 if sys.platform == 'win32':
@@ -105,16 +108,16 @@ def default_keychain(pib: str, tpm: str) -> Keychain:
 
 
 def default_face(face: str) -> Face:
-    scheme, uri = face.split('://')
+    url = urlparse(face)
+    scheme = url.scheme
     if scheme == 'unix':
-        return UnixFace(uri)
-    elif scheme == 'tcp' or scheme == 'tcp4':
-        if uri.find(':') >= 0:
-            host, port = uri.split(':')
-            port = port
-        else:
-            host = uri
-            port = 6363
-        return TcpFace(host, int(port))
+        return UnixFace(url.path)
+    host, port = url.hostname, url.port
+    if not port:
+        port = 6363
+    if scheme == 'tcp' or scheme == 'tcp4' or scheme == 'tcp6':
+        return TcpFace(host, port)
+    elif scheme == 'udp' or scheme == 'udp4' or scheme == 'udp6':
+        return UdpFace(host, int(port))
     else:
         raise ValueError(f'Unrecognized face: {face}')

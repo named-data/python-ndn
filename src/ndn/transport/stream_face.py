@@ -18,33 +18,10 @@
 import io
 import abc
 import asyncio as aio
-from typing import Optional, Callable, Coroutine, Any
+from typing import Optional
 from ..encoding.tlv_var import read_tl_num_from_stream
 from ..platform import Platform
-
-
-class Face(metaclass=abc.ABCMeta):
-    running: bool = False
-    callback: Callable[[int, bytes], Coroutine[Any, None, None]] = None
-
-    def __init__(self):
-        self.running = False
-
-    @abc.abstractmethod
-    async def open(self):
-        pass
-
-    @abc.abstractmethod
-    def shutdown(self):
-        pass
-
-    @abc.abstractmethod
-    def send(self, data: bytes):
-        pass
-
-    @abc.abstractmethod
-    async def run(self):
-        pass
+from .face import Face
 
 
 class StreamFace(Face, metaclass=abc.ABCMeta):

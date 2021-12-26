@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import asyncio as aio
 from ndn.encoding import parse_tl_num
-from ndn.transport.stream_socket import Face
+from ndn.transport.face import Face
 
 
 class DummyFace(Face):

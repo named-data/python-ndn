@@ -24,7 +24,7 @@ from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_tl_num, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
     make_data, InterestParam, make_interest, FormalName, SignaturePtrs, parse_lp_packet
 from .security import Keychain, sha256_digest_checker, params_sha256_checker, NullSigner
-from .transport.stream_socket import Face
+from .transport.face import Face
 from .app_support.nfd_mgmt import make_command, parse_response
 from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
 from .types import NetworkError, InterestTimeout, Validator, Route, InterestCanceled, \
