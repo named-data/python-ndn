@@ -15,10 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-import io
 import abc
 import asyncio as aio
+import io
 from typing import Optional
+
+from ndn.transport.ip_face import IpFace
+
 from ..encoding.tlv_var import read_tl_num_from_stream
 from ..platform import Platform
 from .face import Face
@@ -62,8 +65,11 @@ class UnixFace(StreamFace):
         self.reader, self.writer = await Platform().open_unix_connection(self.path)
         self.running = True
 
+    def isLocalFace(self):
+        return True
 
-class TcpFace(StreamFace):
+
+class TcpFace(StreamFace, IpFace):
     host: str = '127.0.0.1'
     port: int = 6363
 

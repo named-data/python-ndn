@@ -20,10 +20,10 @@ import logging
 from typing import Tuple
 
 from ..encoding.tlv_var import parse_tl_num
-from .face import Face
+from .ip_face import IpFace
 
 
-class UdpFace(Face):
+class UdpFace(IpFace):
 
     def __init__(self, host: str = '127.0.0.1', port: int = 6363):
         super().__init__()

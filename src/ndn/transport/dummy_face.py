@@ -16,6 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import asyncio as aio
+
 from ndn.encoding import parse_tl_num
 from ndn.transport.face import Face
 
@@ -45,6 +46,9 @@ class DummyFace(Face):
         await self.test_func(self)
         if self.app:
             self.app.shutdown()
+
+    def isLocalFace(self):
+        return True
 
     async def consume_output(self, expected_output, timeout=0.01):
         self.expected_len = len(expected_output)

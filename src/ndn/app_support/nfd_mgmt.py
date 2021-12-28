@@ -17,6 +17,8 @@
 # -----------------------------------------------------------------------------
 import struct
 from enum import Enum, Flag
+from typing import Optional
+from ..transport.face import Face
 from ..utils import timestamp, gen_nonce_64
 from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
     SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num, IncludeBase, parse_and_check_tl,\
@@ -225,9 +227,17 @@ class CsInfo(TlvModel):
     n_misses = UintField(0x82)
 
 
-def make_command(module, command, **kwargs):
-    ret = Name.from_str(f"/localhost/nfd/{module}/{command}")
+def make_command(module, command, face = None, **kwargs):
 
+    def isLocalFace(face : Optional[Face]):
+        if not face:
+            return True
+        return face.isLocalFace()
+
+    if isLocalFace(face):
+        ret = Name.from_str(f"/localhost/nfd/{module}/{command}")
+    else:
+        ret = Name.from_str(f"/localhop/nfd/{module}/{command}")
     # Command parameters
     cp = ControlParameters()
     cp.cp = ControlParametersValue()
