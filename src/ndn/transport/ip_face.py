@@ -15,33 +15,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-import abc
-from typing import Any, Callable, Coroutine
+from socket import AF_INET, AF_INET6, gaierror, getaddrinfo
+
+from .face import Face
 
 
-class Face(metaclass=abc.ABCMeta):
-    running: bool = False
-    callback: Callable[[int, bytes], Coroutine[Any, None, None]] = None
+class IpFace(Face):
 
-    def __init__(self):
-        self.running = False
-
-    @abc.abstractmethod
-    async def open(self):
-        pass
-
-    @abc.abstractmethod
-    def shutdown(self):
-        pass
-
-    @abc.abstractmethod
-    def send(self, data: bytes):
-        pass
-
-    @abc.abstractmethod
-    async def run(self):
-        pass
-
-    @abc.abstractmethod
-    async def isLocalFace(self):
-        pass
+    def isLocalFace(self):
+        local_checker = {AF_INET: lambda x: x.startswith('127'),
+                         AF_INET6: lambda x: x == '::1'}
+        try:
+            r = getaddrinfo(self.host, self.port)
+        except gaierror:
+            return False
+        for res_family, _, _, _, addr in r:
+            if not local_checker[res_family](addr[0]):
+                return False
+        return True

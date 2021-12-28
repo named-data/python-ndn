@@ -403,7 +403,7 @@ class NDNApp:
         # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
         async with self._prefix_register_semaphore:
             try:
-                _, _, reply = await self.express_interest(make_command('rib', 'register', name=name), lifetime=1000)
+                _, _, reply = await self.express_interest(make_command('rib', 'register', self.face, name=name), lifetime=1000)
                 ret = parse_response(reply)
                 if ret['status_code'] != 200:
                     logging.error(f'Registration for {Name.to_str(name)} failed: '
@@ -427,7 +427,7 @@ class NDNApp:
         name = Name.normalize(name)
         del self._prefix_tree[name]
         try:
-            await self.express_interest(make_command('rib', 'unregister', name=name), lifetime=1000)
+            await self.express_interest(make_command('rib', 'unregister', self.face, name=name), lifetime=1000)
             return True
         except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure):
             return False
