@@ -33,8 +33,8 @@ class LpTypeNumber:
     LP_PACKET = 0x64
     NACK = 0x0320
     NACK_REASON = 0x0321
-    NEXT_HOP_FACE_ID = 0x0330
     INCOMING_FACE_ID = 0x032C
+    NEXT_HOP_FACE_ID = 0x0330
     CACHE_POLICY = 0x0334
     CACHE_POLICY_TYPE = 0x0335
     CONGESTION_MARK = 0x0340
@@ -64,8 +64,8 @@ class LpPacketValue(TlvModel):
     frag_count = UintField(LpTypeNumber.FRAG_COUNT)
     pit_token = BytesField(LpTypeNumber.PIT_TOKEN)
     nack = ModelField(LpTypeNumber.NACK, NetworkNack)
-    next_hop_face_id = UintField(LpTypeNumber.NEXT_HOP_FACE_ID)
     incoming_face_id = UintField(LpTypeNumber.INCOMING_FACE_ID)
+    next_hop_face_id = UintField(LpTypeNumber.NEXT_HOP_FACE_ID)
     cache_policy = ModelField(LpTypeNumber.CACHE_POLICY, CachePolicy)
     congestion_mark = UintField(LpTypeNumber.CONGESTION_MARK)
     tx_sequence = BytesField(LpTypeNumber.TX_SEQUENCE)
