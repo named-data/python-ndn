@@ -27,7 +27,7 @@ from .tlv_model import TlvModel, InterestNameField, BoolField, UintField, \
     ProcedureArgument, RepeatedField
 
 
-__all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'SignatureInfo',
+__all__ = ['TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator', 'SignatureInfo', 'Delegation',
            'Links', 'MetaInfo', 'InterestParam', 'SignaturePtrs', 'make_interest', 'make_data',
            'parse_interest', 'parse_data', 'Interest', 'Data']
 
@@ -131,8 +131,13 @@ class SignatureInfo(TlvModel):
     signature_seq_num = UintField(TypeNumber.SIGNATURE_SEQ_NUM)
 
 
+class Delegation(TlvModel):
+    preference = UintField(TypeNumber.PREFERENCE)
+    delegation = NameField()
+
+
 class Links(TlvModel):
-    names = RepeatedField(NameField())
+    delegations = RepeatedField(ModelField(TypeNumber.DELEGATION, Delegation))
 
 
 class InterestPacketValue(TlvModel):
@@ -327,7 +332,7 @@ class InterestParam:
     nonce: Optional[int] = None
     lifetime: Optional[int] = 4000
     hop_limit: Optional[int] = None
-    forwarding_hint: List[NonStrictName] = dc.field(default_factory=list)
+    forwarding_hint: List[Tuple[int, NonStrictName]] = dc.field(default_factory=list)
 
     @staticmethod
     def from_dict(kwargs):
@@ -397,8 +402,11 @@ def make_interest(name: NonStrictName,
 
     if interest_param.forwarding_hint:
         interest.interest.forwarding_hint = Links()
-        for cur in interest_param.forwarding_hint:
-            interest.interest.forwarding_hint.names.append(cur)
+        for preference, delegation in interest_param.forwarding_hint:
+            cur = Delegation()
+            cur.preference = preference
+            cur.delegation = delegation
+            interest.interest.forwarding_hint.delegations.append(cur)
 
     interest.interest.application_parameters = app_param
     if signer is not None:

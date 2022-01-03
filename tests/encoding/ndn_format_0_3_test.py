@@ -115,17 +115,17 @@ class TestInterestMake:
         int_param = InterestParam()
         int_param.nonce = 0x01020304
         int_param.forwarding_hint = [
-            (0x87, '/name/A'),
-            (0x02, Name.from_str('/ndn/B')),
-            (0x12, b'\x07\x0d\x08\x0bshekkuenseu')
+            '/name/A',
+            Name.from_str('/ndn/B'),
+            b'\x07\x0d\x08\x0bshekkuenseu'
         ]
         interest = make_interest(name, int_param)
         assert (interest ==
-                b'\x05\x55\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix'
-                b'\x1e\x33'
-                b'\x1f\x0e\x1e\x01\x87\x07\x09\x08\x04name\x08\x01A'
-                b'\x1f\x0d\x1e\x01\x02\x07\x08\x08\x03ndn\x08\x01B'
-                b'\x1f\x12\x1e\x01\x12\x07\r\x08\x0bshekkuenseu'
+                b'\x05\x46\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix'
+                b'\x1e\x24'
+                b'\x07\x09\x08\x04name\x08\x01A'
+                b'\x07\x08\x08\x03ndn\x08\x01B'
+                b'\x07\r\x08\x0bshekkuenseu'
                 b'\x0a\x04\x01\x02\x03\x04\x0c\x02\x0f\xa0')
 
     @staticmethod
