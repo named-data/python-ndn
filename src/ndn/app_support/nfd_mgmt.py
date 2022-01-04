@@ -227,14 +227,10 @@ class CsInfo(TlvModel):
     n_misses = UintField(0x82)
 
 
-def make_command(module, command, face = None, **kwargs):
+def make_command(module, command, face: Optional[Face] = None, **kwargs):
+    local = face.isLocalFace() if face else True
 
-    def isLocalFace(face : Optional[Face]):
-        if not face:
-            return True
-        return face.isLocalFace()
-
-    if isLocalFace(face):
+    if local:
         ret = Name.from_str(f"/localhost/nfd/{module}/{command}")
     else:
         ret = Name.from_str(f"/localhop/nfd/{module}/{command}")
@@ -249,6 +245,8 @@ def make_command(module, command, face = None, **kwargs):
             setattr(cp.cp, k, v)
     ret.append(Component.from_bytes(cp.encode()))
 
+    # Note: when shifting from command Interest to signed Interest, remove all following lines
+    # and add ``app_param=b'', digest_sha256=True`` to app.express_interest
     # Timestamp and nonce
     ret.append(Component.from_bytes(struct.pack('!Q', timestamp())))
     ret.append(Component.from_bytes(struct.pack('!Q', gen_nonce_64())))
