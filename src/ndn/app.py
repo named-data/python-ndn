@@ -513,6 +513,8 @@ class NDNApp:
                 kwargs['raw_packet'] = raw_packet
             if node.extra_param.get('sig_ptrs', False):
                 kwargs['sig_ptrs'] = sig
-            node.callback(name, param, app_param, **kwargs)
+            res = node.callback(name, param, app_param, **kwargs)
         else:
-            node.callback(name, param, app_param)
+            res = node.callback(name, param, app_param)
+        if isinstance(res, Awaitable):
+            await res
