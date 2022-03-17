@@ -362,6 +362,17 @@ class NDNApp:
                 @app.route('/example/rpc')
                 def on_interest(name: FormalName, param: InterestParam, app_param):
                     pass
+
+        .. note::
+            The route function must be a normal function instead of an ``async`` one.
+            This is on purpose, because an Interest is supposed to be replied ASAP,
+            even it cannot finish the request in time.
+            To provide some feedback, a better practice is replying with an Application NACK
+            (or some equivalent Data packet saying the operation cannot be finished in time).
+            If you want to use ``await`` in the handler, please use ``asyncio.create_task`` to create a new coroutine.
+
+        .. note::
+            Currently, python-ndn does not handle PIT Tokens.
         """
         name = Name.normalize(name)
 
@@ -499,20 +510,24 @@ class NDNApp:
             if not await params_sha256_checker(name, sig):
                 logging.warning('Drop malformed Interest: %s' % name)
                 return
-        if sig.signature_info is not None:
-            validator = node.validator if node.validator else self.int_validator
-            valid = await validator(name, sig)
-        else:
-            valid = True
-        if not valid:
-            logging.warning('Drop unvalidated Interest: %s' % name)
-            return
-        if node.extra_param:
-            kwargs = {}
-            if node.extra_param.get('raw_packet', False):
-                kwargs['raw_packet'] = raw_packet
-            if node.extra_param.get('sig_ptrs', False):
-                kwargs['sig_ptrs'] = sig
-            node.callback(name, param, app_param, **kwargs)
-        else:
-            node.callback(name, param, app_param)
+
+        # In case the validator blocks the pipeline, create a task
+        async def submit_interest():
+            if sig.signature_info is not None:
+                validator = node.validator if node.validator else self.int_validator
+                valid = await validator(name, sig)
+            else:
+                valid = True
+            if not valid:
+                logging.warning('Drop unvalidated Interest: %s' % name)
+                return
+            if node.extra_param:
+                kwargs = {}
+                if node.extra_param.get('raw_packet', False):
+                    kwargs['raw_packet'] = raw_packet
+                if node.extra_param.get('sig_ptrs', False):
+                    kwargs['sig_ptrs'] = sig
+                node.callback(name, param, app_param, **kwargs)
+            else:
+                node.callback(name, param, app_param)
+        aio.create_task(submit_interest())
