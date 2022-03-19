@@ -1,4 +1,9 @@
 # -----------------------------------------------------------------------------
+# This piece of is inspired by Pollere' VerSec:
+# https://github.com/pollere/DCT
+# But this code is implemented independently without using any line of the
+# original one, and released under Apache License.
+#
 # Copyright (C) 2019-2022 The python-ndn authors
 #
 # This file is part of python-ndn.

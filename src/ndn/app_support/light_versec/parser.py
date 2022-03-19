@@ -1,4 +1,9 @@
 # -----------------------------------------------------------------------------
+# This piece of is inspired by Pollere' VerSec:
+# https://github.com/pollere/DCT
+# But this code is implemented independently without using any line of the
+# original one, and released under Apache License.
+#
 # Copyright (C) 2019-2022 The python-ndn authors
 #
 # This file is part of python-ndn.
@@ -18,12 +23,12 @@
 import lark
 from typing import Union
 from dataclasses import dataclass
-from ...encoding import Component, BinaryStr
+from ...encoding import Component
 
 
 @dataclass
 class ComponentValue:
-    c: BinaryStr
+    c: bytes
 
 
 @dataclass
@@ -70,9 +75,6 @@ class LvsFile:
 
 
 class Parser(lark.Transformer):
-    # Used to separate temporary identifiers
-    id_number: int = 0
-
     name = NamePat
     cons_expr = list
     cons_set = list
@@ -85,7 +87,7 @@ class Parser(lark.Transformer):
 
     @staticmethod
     def component_from_str(args: list[lark.Token]):
-        return ComponentValue(Component.from_str(args[0].value[1:-1]))
+        return ComponentValue(bytes(Component.from_str(args[0].value[1:-1])))
 
     @staticmethod
     def tag_id(args: list[lark.Token]):
@@ -111,11 +113,9 @@ class Parser(lark.Transformer):
     def cons_term(args):
         return TagConstraint(pat=Pattern(id=args[0].value), options=args[1])
 
-    def definition(self, args):
+    @staticmethod
+    def definition(args):
         rule_id = args[0].value
-        if rule_id[1] == '_':
-            rule_id += '__' + str(self.id_number)
-            self.id_number += 1
         ret = Rule(id=RuleId(id=rule_id), name=args[1][0], comp_cons=[], sign_cons=[])
         for cons in args[1][1:]:
             if isinstance(cons[0], RuleId):
