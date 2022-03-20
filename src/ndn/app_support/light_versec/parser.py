@@ -103,7 +103,13 @@ class Parser(lark.Transformer):
 
     @staticmethod
     def fn_args(args: list[lark.Token]):
-        return [t.value for t in args]
+        ret = []
+        for t in args:
+            if t[0] == '"':
+                ret.append(ComponentValue(bytes(Component.from_str(t.value[1:-1]))))
+            else:
+                ret.append(Pattern(id=t))
+        return ret
 
     @staticmethod
     def fn_call(args):

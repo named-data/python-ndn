@@ -27,6 +27,8 @@ from . import parser as psr
 from . import binary as bny
 from .grammar import lvs_grammar
 
+__all__ = ['SemanticError', 'top_order', 'compile_lvs']
+
 T = TypeVar('T')
 
 
@@ -84,9 +86,14 @@ class Compiler:
 
     def _sort_rule_references(self):
         rule_id_set = set()
+        temp_rule_number = 1
         for rule in self.lvs.rules:
-            if rule.id.id[1] != '_' and rule.id.id in rule_id_set:
-                raise SemanticError(f'Rule {rule.id.id} is redefined')
+            if rule.id.id[1] != '_':
+                if rule.id.id in rule_id_set:
+                    raise SemanticError(f'Rule {rule.id.id} is redefined')
+            else:
+                rule.id.id += f'#{temp_rule_number}'
+                temp_rule_number += 1
             rule_id_set.add(rule.id.id)
         adj_lst = {r: [] for r in rule_id_set}
         for rule in self.lvs.rules:
@@ -152,10 +159,10 @@ class Compiler:
                             elif isinstance(op, psr.FnCall):
                                 for arg in op.args:
                                     if isinstance(arg, psr.Pattern):
-                                        if op.id[0] != '_':
-                                            op.id = self.named_pats[op.id]
+                                        if arg.id[0] != '_':
+                                            arg.id = self.named_pats[arg.id]
                                         else:
-                                            raise SemanticError(f'Temporary pattern {op.id} cannot be used '
+                                            raise SemanticError(f'Temporary pattern {arg.id} cannot be used '
                                                                 f'on the right hand side of any pattern constraint')
                     except (KeyError, IndexError):
                         raise SemanticError(f'Pattern {cons.pat.id} never occurs before.')
@@ -233,32 +240,32 @@ class Compiler:
                 edge.tag = len(self.named_pats) - tag
             edge.dest = self._generate_node(depth + 1, [rc], node.id, previous_tags | {tag})
             edge.cons_sets = []
-            if tag in previous_tags:
-                continue
-            for cons in rc.cons_set:
-                if tag not in set(int(x) for x in cons.pat.id.split(' ')):
-                    continue
-                encoded_cons = bny.PatternConstraint()
-                encoded_cons.options = []
-                for opt in cons.options:
-                    encoded_opt = bny.ConstraintOption()
-                    if isinstance(opt, psr.ComponentValue):
-                        encoded_opt.value = opt.c
-                    elif isinstance(opt, psr.Pattern):
-                        encoded_opt.tag = int(opt.id)
-                    elif isinstance(opt, psr.FnCall):
-                        encoded_opt.fn = bny.UserFnCall()
-                        encoded_opt.fn.fn_id = opt.fn
-                        encoded_opt.fn.args = []
-                        for arg in opt.args:
-                            encoded_arg = bny.UserFnArg()
-                            if isinstance(arg, psr.ComponentValue):
-                                encoded_arg.value = arg.c
-                            else:
-                                encoded_arg.tag = int(arg.id)
-                            encoded_opt.fn.args.append(encoded_arg)
-                    encoded_cons.options.append(encoded_opt)
-                edge.cons_sets.append(encoded_cons)
+            if tag not in previous_tags:
+                for cons in rc.cons_set:
+                    if tag not in set(int(x) for x in cons.pat.id.split(' ')):
+                        continue
+                    encoded_cons = bny.PatternConstraint()
+                    encoded_cons.options = []
+                    for opt in cons.options:
+                        encoded_opt = bny.ConstraintOption()
+                        if isinstance(opt, psr.ComponentValue):
+                            encoded_opt.value = opt.c
+                        elif isinstance(opt, psr.Pattern):
+                            encoded_opt.tag = int(opt.id)
+                        elif isinstance(opt, psr.FnCall):
+                            encoded_opt.fn = bny.UserFnCall()
+                            encoded_opt.fn.fn_id = opt.fn
+                            encoded_opt.fn.args = []
+                            for arg in opt.args:
+                                encoded_arg = bny.UserFnArg()
+                                if isinstance(arg, psr.ComponentValue):
+                                    encoded_arg.value = arg.c
+                                else:
+                                    assert isinstance(arg, psr.Pattern)
+                                    encoded_arg.tag = int(arg.id)
+                                encoded_opt.fn.args.append(encoded_arg)
+                        encoded_cons.options.append(encoded_opt)
+                    edge.cons_sets.append(encoded_cons)
             node.p_edges.append(edge)
         return node.id
 
@@ -269,6 +276,8 @@ class Compiler:
                 continue
             new_sign_cons = []
             for rid in sign_cons:
+                if rid not in self.rule_node_ids:
+                    raise SemanticError(f'Signed by a non-existing key {rid}')
                 new_sign_cons.extend(self.rule_node_ids[rid])
             node.sign_cons = new_sign_cons
 
@@ -302,6 +311,8 @@ def compile_lvs(lvs_text: str) -> bny.LvsModel:
 
     :param lvs_text: Light VerSec text file
     :return: LVS model
+    :raises SemanticError: when the given text file has a semantic error
+    :raises lark.UnexpectedInput: when the given text file has a syntax error
     """
     parser = lark.Lark(lvs_grammar, parser='lalr', transformer=psr.Parser())
     lvs_file: psr.LvsFile = parser.parse(lvs_text)

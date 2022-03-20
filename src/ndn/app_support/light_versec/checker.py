@@ -21,36 +21,117 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from typing import Callable, Iterator
-from ...encoding import Name, BinaryStr, FormalName, NonStrictName
+from ...encoding import Name, BinaryStr, FormalName, NonStrictName, Component
 from . import binary as bny
+from .compiler import top_order
+
+
+__all__ = ['UserFn', 'LvsModelError', 'Checker', 'DEFAULT_USER_FNS']
 
 
 UserFn = Callable[[BinaryStr, list[BinaryStr]], bool]
 
 
+class LvsModelError(Exception):
+    pass
+
+
 class Checker:
     model: bny.LvsModel  # NOTE: working on binary model is less efficient
     fns: dict[str, UserFn]
-    symbols: dict[int, str]
-    symbol_inverse: dict[str, int]
+    _model_fns: set[str]
+    _trust_roots: set[str]
+    _symbols: dict[int, str]
+    _symbol_inverse: dict[str, int]
 
     def __init__(self, model: bny.LvsModel, user_fns: dict[str, UserFn]):
         self.model = model
         self.fns = user_fns
-        self.symbols = {s.tag: s.ident for s in self.model.symbols}
-        self.symbol_inverse = {s.ident: s.tag for s in self.model.symbols}
+        self._symbols = {s.tag: s.ident for s in self.model.symbols}
+        self._symbol_inverse = {s.ident: s.tag for s in self.model.symbols}
+        self._sanity_check()
 
-    def validate_user_fns(self):
-        pass  # TODO
+    def _sanity_check(self):
+        """Basic sanity check. Also collect info for other testing."""
+        if self.model.version > bny.VERSION:
+            raise LvsModelError(f'Unrecognized LVS model version {self.model.version}')
+        self._model_fns = set()
+        self._trust_roots = set()
+        in_deg_nodes = set()
+        adj_lst = {n.id: [] for n in self.model.nodes}
+        nodes_id_lst = set(adj_lst.keys())
 
-    def root_of_trust(self):
-        pass  # TODO
+        def dfs(cur, par):
+            if cur >= len(self.model.nodes):
+                raise LvsModelError(f'Non-existing node id {cur}')
+            node = self.model.nodes[cur]
+            if node.id != cur:
+                raise LvsModelError(f'Malformed node id {cur}')
+            if par and node.parent != par:
+                raise LvsModelError(f'Node {cur} has a wrong parent')
+            for ve in node.v_edges:
+                if ve.dest is None or not ve.value:
+                    raise LvsModelError(f'Node {cur} has a malformed edge')
+                dfs(ve.dest, cur)
+            for pe in node.p_edges:
+                if pe.dest is None or pe.tag is None:
+                    raise LvsModelError(f'Node {cur} has a malformed edge')
+                dfs(pe.dest, cur)
+                for cons in pe.cons_sets:
+                    for op in cons.options:
+                        branch = [not not op.value, op.tag is not None, op.fn is not None].count(True)
+                        if branch != 1:
+                            raise LvsModelError(f'Edge {cur}->{pe.dest} has a malformed condition')
+                        if op.fn is not None:
+                            if not op.fn.fn_id:
+                                raise LvsModelError(f'Edge {cur}->{pe.dest} has a malformed condition')
+                            self._model_fns.add(op.fn.fn_id)
+            for key_node_id in node.sign_cons:
+                if key_node_id >= len(self.model.nodes):
+                    raise LvsModelError(f'Node {cur} is signed by a non-existing key {key_node_id}')
+                in_deg_nodes.add(key_node_id)
+                adj_lst[cur].append(key_node_id)
+
+        dfs(self.model.start_id, None)
+        top_order(nodes_id_lst, adj_lst)
+        self._trust_roots = {n for n in in_deg_nodes
+                             if not self.model.nodes[n].sign_cons}
+
+    def validate_user_fns(self) -> bool:
+        """Check if all user functions required by the model is defined."""
+        return self._model_fns.issubset(self.fns.keys())
+
+    def root_of_trust(self) -> set[str]:
+        """
+        Return the root of signing chains
+
+        :returns: a set containing rule names for all starting nodes of signing DAG.
+        """
+        ret = set()
+        for cur in self._trust_roots:
+            node = self.model.nodes[cur]
+            if node.rule_name:
+                ret = ret | set(node.rule_name)
+            else:
+                ret = ret | {'#_' + str(cur)}
+        return ret
+
+    def save(self) -> bytes:
+        """Save the model to bytes. User functions excluded."""
+        return bytes(self.model.encode())
+
+    @staticmethod
+    def load(binary_model: BinaryStr, user_fns: dict[str, UserFn]):
+        """Load a Light VerSec model from bytes."""
+        model = bny.LvsModel.parse(binary_model)
+        return Checker(model, user_fns)
 
     def _context_to_name(self, context: dict[int, BinaryStr]) -> dict[str, BinaryStr]:
-        return ({self.symbols[tag]: val for tag, val in context.items()
-                 if tag <= self.model.named_pattern_cnt}
-                | {self.symbols[tag]: val for tag, val in context.items()
-                   if tag <= self.model.named_pattern_cnt})
+        named_tag = {self._symbols[tag]: val for tag, val in context.items()
+                     if tag <= self.model.named_pattern_cnt and tag in self._symbols}
+        annon_tag = {str(tag): val for tag, val in context.items()
+                     if tag <= self.model.named_pattern_cnt and tag not in self._symbols}
+        return named_tag | annon_tag
 
     def _check_cons(self, value: BinaryStr, context: dict[int, BinaryStr],
                     cons_set: list[bny.PatternConstraint]) -> bool:
@@ -62,13 +143,13 @@ class Checker:
                         satisfied = True
                         break
                 elif op.tag is not None:
-                    if value == context.get(op.tag, b''):
+                    if value == context.get(op.tag, None):
                         satisfied = True
                         break
                 else:
                     fn_id = op.fn.fn_id
                     if fn_id not in self.fns:
-                        raise KeyError(f'User function {fn_id} is undefined')
+                        raise LvsModelError(f'User function {fn_id} is undefined')
                     args = [context.get(arg.tag, arg.value) for arg in op.fn.args]
                     if self.fns[fn_id](value, args):
                         satisfied = True
@@ -133,6 +214,14 @@ class Checker:
                 cur = node.parent
 
     def match(self, name: NonStrictName) -> Iterator[tuple[list[str], dict[str, BinaryStr]]]:
+        """
+        Iterate all matches of a given name.
+
+        :param name: input NDN name.
+        :return: iterate a pair ``(rule_names, context)``, where ``rule_names`` is a
+                 list containing corresponding rule names of current node,
+                 and ``context`` is a dict containing pattern->value mapping.
+        """
         name = Name.normalize(name)
         for node_id, context in self._match(name, {}):
             node = self.model.nodes[node_id]
@@ -143,6 +232,13 @@ class Checker:
             yield rule_name, self._context_to_name(context)
 
     def check(self, pkt_name: NonStrictName, key_name: NonStrictName) -> bool:
+        """
+        Check whether a packet can be signed by a specified key.
+
+        :param pkt_name: packet name
+        :param key_name: key name
+        :return: whether the key can sign the packet
+        """
         pkt_name = Name.normalize(pkt_name)
         key_name = Name.normalize(key_name)
         for pkt_node_id, context in self._match(pkt_name, {}):
@@ -151,3 +247,9 @@ class Checker:
                 if key_node_id in pkt_node.sign_cons:
                     return True
         return False
+
+
+DEFAULT_USER_FNS = {
+    '$eq': lambda c, args: all(x == c for x in args),
+    '$eq_type': lambda c, args: all(Component.get_type(x) == Component.get_type(c) for x in args),
+}
