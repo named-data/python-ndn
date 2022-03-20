@@ -37,7 +37,7 @@ Run static analysis:
 
     pipenv run make lint
 
-Please use python 3.8+ to generate the documentation.
+Please use python 3.9+ to generate the documentation.
 
 .. code-block:: bash
 
