@@ -15,12 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import logging
 import os
 import sqlite3
-from typing import Iterator
+from typing import Iterator, Any
 from dataclasses import dataclass
-from typing import Dict, Any, Mapping
+from collections.abc import Mapping
 from ...encoding import FormalName, BinaryStr, NonStrictName, Name
 from ...app_support.security_v2 import self_sign
 from ..signer.sha256_digest_signer import DigestSha256Signer
@@ -566,29 +567,42 @@ class KeychainSqlite3(Keychain):
         self.conn.commit()
         self._signer_cache = {}
 
-    def get_signer(self, sign_args: Dict[str, Any]):
-        if sign_args.pop('no_signature', False):
+    def get_signer(self, sign_args: dict[str, Any]):
+        if sign_args.get('no_signature', False):
             return None
-        if sign_args.pop('digest_sha256', False):
+        if sign_args.get('digest_sha256', False):
             return DigestSha256Signer()
-        key_name = sign_args.pop('key', None)
-        if not key_name:
-            id_name = sign_args.pop('identity', None)
-            if id_name:
-                if isinstance(id_name, Identity):
-                    identity = id_name
+        cert_name = sign_args.get('cert', None)
+        if not cert_name:
+            key_name = sign_args.get('key', None)
+            if not key_name:
+                id_name = sign_args.get('identity', None)
+                if id_name:
+                    if isinstance(id_name, Identity):
+                        identity = id_name
+                    else:
+                        identity = self[id_name]
                 else:
-                    identity = self[id_name]
+                    identity = self.default_identity()
+                key = identity.default_key()
+                cert_name = key.default_cert().name
+                key_name = key.name
+            elif isinstance(key_name, Key):
+                cert_name = key_name.default_cert().name
+                key_name = key_name.name
             else:
-                identity = self.default_identity()
-            key_name = identity.default_key().name
-        elif isinstance(key_name, Key):
-            key_name = key_name.name
-        key_name_bytes = Name.to_bytes(key_name)
-        signer = self._signer_cache.get(key_name_bytes, None)
+                id_name = key_name[:-2]
+                cert_name = self[id_name][key_name].default_cert().name
+        else:
+            key_name = cert_name[:-2]
+        key_locator_name = sign_args.get('key_locator', None)
+        if not key_locator_name:
+            key_locator_name = cert_name
+        key_locator_bytes = Name.to_bytes(key_locator_name)
+        signer = self._signer_cache.get(key_locator_bytes, None)
         if not signer:
-            signer = self.tpm.get_signer(key_name)
-            self._signer_cache[key_name_bytes] = signer
+            signer = self.tpm.get_signer(key_name, key_locator_name)
+            self._signer_cache[key_locator_bytes] = signer
         return signer
 
     def del_key(self, name: NonStrictName):

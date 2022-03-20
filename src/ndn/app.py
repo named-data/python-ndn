@@ -137,7 +137,7 @@ class NDNApp:
         :param kwargs: :ref:`label-keyword-arguments`.
         :return: TLV encoded Data packet.
         """
-        if kwargs.pop('no_signature', False):
+        if kwargs.get('no_signature', False):
             signer = NullSigner()
         elif 'signer' in kwargs:
             signer = kwargs['signer']

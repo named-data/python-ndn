@@ -23,18 +23,18 @@ from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBin
 
 
 class Sha256WithRsaSigner(Signer):
-    key_name: NonStrictName
+    key_locator_name: NonStrictName
     key_der: bytes
 
-    def __init__(self, key_name: NonStrictName, key_der: Union[str, bytes]):
-        self.key_name = key_name
+    def __init__(self, key_locator_name: NonStrictName, key_der: Union[str, bytes]):
+        self.key_locator_name = key_locator_name
         self.key_der = key_der
         self.key = RSA.import_key(self.key_der)
 
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.SHA256_WITH_RSA
         signature_info.key_locator = KeyLocator()
-        signature_info.key_locator.name = self.key_name
+        signature_info.key_locator.name = self.key_locator_name
 
     def get_signature_value_size(self):
         return self.key.size_in_bytes()

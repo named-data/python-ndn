@@ -25,7 +25,7 @@ class KeychainDigest(Keychain):
     A signer which has no Identity and always returns a SHA-256 digest signer.
     """
     def get_signer(self, sign_args: Dict[str, Any]):
-        if sign_args.pop('no_signature', False):
+        if sign_args.get('no_signature', False):
             return None
         else:
             return DigestSha256Signer()

@@ -24,13 +24,13 @@ from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBin
 
 class Sha256WithEcdsaSigner(Signer):
     # SHA256 doesn't work for P-384 and P-521
-    key_name: NonStrictName
+    key_locator_name: NonStrictName
     key_der: bytes
     curve_bit: int
     key_size: int
 
-    def __init__(self, key_name: NonStrictName, key_der: Union[bytes, str]):
-        self.key_name = key_name
+    def __init__(self, key_locator_name: NonStrictName, key_der: Union[bytes, str]):
+        self.key_locator_name = key_locator_name
         self.key_der = key_der
         self.key = ECC.import_key(self.key_der)
         curve = self.key.curve
@@ -44,7 +44,7 @@ class Sha256WithEcdsaSigner(Signer):
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.SHA256_WITH_ECDSA
         signature_info.key_locator = KeyLocator()
-        signature_info.key_locator.name = self.key_name
+        signature_info.key_locator.name = self.key_locator_name
 
     def get_signature_value_size(self):
         return self.key_size + 8

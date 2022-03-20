@@ -21,17 +21,17 @@ from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBin
 
 
 class HmacSha256Signer(Signer):
-    key_name: NonStrictName
+    key_locator_name: NonStrictName
     key_bytes: bytes
 
-    def __init__(self, key_name: NonStrictName, key_bytes: bytes):
-        self.key_name = key_name
+    def __init__(self, key_locator_name: NonStrictName, key_bytes: bytes):
+        self.key_locator_name = key_locator_name
         self.key_bytes = key_bytes
 
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.HMAC_WITH_SHA256
         signature_info.key_locator = KeyLocator()
-        signature_info.key_locator.name = self.key_name
+        signature_info.key_locator.name = self.key_locator_name
 
     def get_signature_value_size(self):
         return 32

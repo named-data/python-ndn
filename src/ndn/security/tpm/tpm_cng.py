@@ -18,7 +18,7 @@
 import sys
 import ctypes as c
 import logging
-from typing import Tuple
+from typing import Tuple, Optional
 from Cryptodome.PublicKey import ECC, RSA
 from Cryptodome.Util.asn1 import DerSequence
 from ndn.encoding import FormalName, BinaryStr
@@ -30,9 +30,9 @@ if sys.platform == 'win32':
 
 
 class CngSigner(Signer):
-    def __init__(self, key_name: NonStrictName, sig_len, key_type, h_key):
+    def __init__(self, key_locator_name: NonStrictName, sig_len, key_type, h_key):
         self.h_key = h_key
-        self.key_name = key_name
+        self.key_locator_name = key_locator_name
         if key_type == "RSA":
             self.key_type = SignatureType.SHA256_WITH_RSA
             self.sig_len = sig_len
@@ -45,7 +45,7 @@ class CngSigner(Signer):
     def write_signature_info(self, signature_info):
         signature_info.signature_type = self.key_type
         signature_info.key_locator = KeyLocator()
-        signature_info.key_locator.name = self.key_name
+        signature_info.key_locator.name = self.key_locator_name
 
     def get_signature_value_size(self):
         return self.sig_len
@@ -178,10 +178,12 @@ class TpmCng(Tpm):
 
         return key_type.value, sig_len.value, h_key
 
-    def get_signer(self, key_name: NonStrictName) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: Optional[NonStrictName] = None) -> Signer:
         name_hash = Name.to_bytes(key_name).hex()
         key_type, sig_len, h_key = self._get_key(name_hash)
-        return CngSigner(key_name, sig_len, key_type, h_key)
+        if key_locator_name is None:
+            key_locator_name = key_name
+        return CngSigner(key_locator_name, sig_len, key_type, h_key)
 
     def key_exist(self, key_name: FormalName) -> bool:
         try:

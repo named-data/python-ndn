@@ -71,7 +71,6 @@ class TestFace:
         assert face.host == '::1'
         assert face.port == 6465
 
-
     def test_connection(self):
         url = 'udp://localhost'
         face = default_face(url)

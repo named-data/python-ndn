@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import sys
 import logging
-from typing import Tuple
+from typing import Tuple, Optional
 from ctypes import c_void_p, pointer, c_int
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA, ECC
@@ -29,9 +29,9 @@ if sys.platform == 'darwin':
 
 
 class OsxSigner(Signer):
-    def __init__(self, key_name: NonStrictName, key_bits, key_type, key_ref):
+    def __init__(self, key_locator_name: NonStrictName, key_bits, key_type, key_ref):
         self.key_ref = key_ref
-        self.key_name = key_name
+        self.key_locator_name = key_locator_name
         if key_type == cfstring_to_string(OsxSec().kSecAttrKeyTypeRSA):
             self.key_type = SignatureType.SHA256_WITH_RSA
             self.key_size = key_bits // 8
@@ -46,7 +46,7 @@ class OsxSigner(Signer):
     def write_signature_info(self, signature_info):
         signature_info.signature_type = self.key_type
         signature_info.key_locator = KeyLocator()
-        signature_info.key_locator.name = self.key_name
+        signature_info.key_locator.name = self.key_locator_name
 
     def get_signature_value_size(self):
         return self.key_size
@@ -104,9 +104,11 @@ class TpmOsxKeychain(Tpm):
             key_ref = cf.CFRetain(cf.CFDictionaryGetValue(g.dic, sec.kSecValueRef))
         return key_type, key_bits, key_ref
 
-    def get_signer(self, key_name: NonStrictName) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: Optional[NonStrictName] = None) -> Signer:
         key_type, key_bits, key_ref = self._get_key(key_name)
-        return OsxSigner(key_name, key_bits, key_type, key_ref)
+        if key_locator_name is None:
+            key_locator_name = key_name
+        return OsxSigner(key_locator_name, key_bits, key_type, key_ref)
 
     def key_exist(self, key_name: FormalName) -> bool:
         try:

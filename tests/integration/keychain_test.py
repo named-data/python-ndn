@@ -66,11 +66,15 @@ class TestKeychainSqlite3:
         for content in sig_ptrs.signature_covered_part:
             h.update(content)
         verifier.verify(h, bytes(sig_ptrs.signature_value_buf))
+        return sig_ptrs.signature_info.key_locator.name
 
     def verify_data(self):
         signer = self.keychain.get_signer({})
         data = make_data('/test/data', MetaInfo(), b'content', signer=signer)
-        self.verify(data)
+        key_locator_name = self.verify(data)
+        assert (Name.normalize(key_locator_name) ==
+                Name.normalize(self.keychain.default_identity().default_key().default_cert().name))
 
     def verify_cert(self):
-        self.verify(self.cert)
+        key_locator_name = self.verify(self.cert)
+        assert key_locator_name == self.keychain.default_identity().default_key().name
