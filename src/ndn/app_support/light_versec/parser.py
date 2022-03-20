@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# This piece of is inspired by Pollere' VerSec:
+# This piece of work is inspired by Pollere' VerSec:
 # https://github.com/pollere/DCT
 # But this code is implemented independently without using any line of the
 # original one, and released under Apache License.

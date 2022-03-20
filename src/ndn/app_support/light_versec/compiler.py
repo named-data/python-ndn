@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# This piece of is inspired by Pollere' VerSec:
+# This piece of work is inspired by Pollere' VerSec:
 # https://github.com/pollere/DCT
 # But this code is implemented independently without using any line of the
 # original one, and released under Apache License.
@@ -85,6 +85,8 @@ class Compiler:
     def _sort_rule_references(self):
         rule_id_set = set()
         for rule in self.lvs.rules:
+            if rule.id.id[1] != '_' and rule.id.id in rule_id_set:
+                raise SemanticError(f'Rule {rule.id.id} is redefined')
             rule_id_set.add(rule.id.id)
         adj_lst = {r: [] for r in rule_id_set}
         for rule in self.lvs.rules:
@@ -257,6 +259,7 @@ class Compiler:
                             encoded_opt.fn.args.append(encoded_arg)
                     encoded_cons.options.append(encoded_opt)
                 edge.cons_sets.append(encoded_cons)
+            node.p_edges.append(edge)
         return node.id
 
     def _fix_signing_references(self):
