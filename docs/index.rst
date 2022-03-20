@@ -18,6 +18,7 @@ Table Of Contents
    src/encoding/encoding
    src/security/security
    src/schema/schema
+   src/lvs/lvs
    src/misc
    src/examples/examples
    src/contribute_support

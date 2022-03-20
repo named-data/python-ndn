@@ -128,10 +128,8 @@ class Checker:
         return Checker(model, user_fns)
 
     def _context_to_name(self, context: dict[int, BinaryStr]) -> dict[str, BinaryStr]:
-        named_tag = {self._symbols[tag]: val for tag, val in context.items()
-                     if tag <= self.model.named_pattern_cnt and tag in self._symbols}
-        annon_tag = {str(tag): val for tag, val in context.items()
-                     if tag <= self.model.named_pattern_cnt and tag not in self._symbols}
+        named_tag = {self._symbols[tag]: val for tag, val in context.items() if tag in self._symbols}
+        annon_tag = {str(tag): val for tag, val in context.items() if tag not in self._symbols}
         return named_tag | annon_tag
 
     def _check_cons(self, value: BinaryStr, context: dict[int, BinaryStr],
@@ -197,8 +195,11 @@ class Checker:
                     else:
                         if not self._check_cons(value, context, pe.cons_sets):
                             continue
-                        context[pe.tag] = value
-                        matches.append(pe.tag)
+                        if pe.tag <= self.model.named_pattern_cnt:
+                            context[pe.tag] = value
+                            matches.append(pe.tag)
+                        else:
+                            matches.append(-1)
                     edge_indices.append(edge_index)
                     cur = pe.dest
                     edge_index = -1
@@ -219,6 +220,7 @@ class Checker:
         Iterate all matches of a given name.
 
         :param name: input NDN name.
+        :type name: :any:`NonStrictName`
         :return: iterate a pair ``(rule_names, context)``, where ``rule_names`` is a
                  list containing corresponding rule names of current node,
                  and ``context`` is a dict containing pattern->value mapping.
@@ -237,7 +239,9 @@ class Checker:
         Check whether a packet can be signed by a specified key.
 
         :param pkt_name: packet name
+        :type pkt_name: :any:`NonStrictName`
         :param key_name: key name
+        :type key_name: :any:`NonStrictName`
         :return: whether the key can sign the packet
         """
         pkt_name = Name.normalize(pkt_name)
