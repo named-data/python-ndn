@@ -33,7 +33,7 @@ The following example descrive a trust schema of a blog website:
     #author: #site/role/author/#KEY & { role: "author" } <= #admin
     // An admin's key is signed by the root key
     #admin: #site/"admin"/admin/#KEY <= #root
-    
+
     #KEY: "KEY"/_/_/_
     '''
     lvs_model = compile_lvs(lvs_text)
@@ -199,7 +199,7 @@ A user function can take arguments of type component values and patterns.
 For example, ``$fn("component", pattern)`` is a valid function call.
 When used as a component constraint,
 the LVS library will always call the user function with two arguments:
-the first one is the value of the pattern constrainted,
+the first one is the value of the pattern constrained,
 and the second one is a list containing all arguments.
 For example,
 
@@ -227,7 +227,7 @@ But it is not allowed to be used in a name pattern like ``/$_RULE/"component"``.
 A temporary pattern ``_pattern`` occuring in a name pattern does **not** need to match with a unique value.
 In the previous example, ``#KEY: "KEY"/_/_/_`` can match with names like
 ``KEY/1/self/1``, and there is no need for the last three components to be the same.
-A temporary pattern can be constrainted, but it cannot occur on the right hand side of a component constraint
+A temporary pattern can be constrained, but it cannot occur on the right hand side of a component constraint
 of another pattern.
 
 Formal Grammar
@@ -237,35 +237,46 @@ The formal grammar of LVS is defined as follows:
 
 .. code-block:: ebnf
 
-    TAG_IDENT: CNAME;
-    RULE_IDENT: "#", CNAME;
-    FN_IDENT: "$", CNAME;
+    TAG_IDENT = CNAME;
+    RULE_IDENT = "#", CNAME;
+    FN_IDENT = "$", CNAME;
 
-    name: ["/"], component, {"/", component};
-    component: STR
-             | TAG_IDENT
-             | RULE_IDENT;
+    name = ["/"], component, {"/", component};
+    component = STR
+              | TAG_IDENT
+              | RULE_IDENT;
 
-    definition: RULE_IDENT, ":", def_expr;
-    def_expr: name, ["&", comp_constraints], ["<=", sign_constraints];
-    sign_constraints: RULE_IDENT, {"|", RULE_IDENT};
-    comp_constraints: cons_set, {"|", cons_set};
-    cons_set: "{", cons_term, {",", cons_term}, "}";
-    cons_term: TAG_IDENT, ":", cons_expr;
-    cons_expr: cons_option, {"|", cons_option};
-    cons_option: STR
-               | TAG_IDENT
-               | FN_IDENT, "(", fn_args, ")";
-    fn_args: (STR | TAG_IDENT), {",", (STR | TAG_IDENT)};
+    definition = RULE_IDENT, ":", def_expr;
+    def_expr = name, ["&", comp_constraints], ["<=", sign_constraints];
+    sign_constraints = RULE_IDENT, {"|", RULE_IDENT};
+    comp_constraints = cons_set, {"|", cons_set};
+    cons_set = "{", cons_term, {",", cons_term}, "}";
+    cons_term = TAG_IDENT, ":", cons_expr;
+    cons_expr = cons_option, {"|", cons_option};
+    cons_option = STR
+                | TAG_IDENT
+                | FN_IDENT, "(", fn_args, ")";
+    fn_args = (STR | TAG_IDENT), {",", (STR | TAG_IDENT)};
 
-    file_input: {definition};
+    file_input = {definition};
 
 See the source code for the grammar used by Lark parser.
 
 References
 ----------
 
-.. autofunction:: ndn.app_support.light_versec.compile_lvs
+.. automodule:: ndn.app_support.light_versec
 
-.. autoclass:: ndn.app_support.light_versec.Checker
-  :members:
+    .. autofunction:: compile_lvs
+
+    .. autoclass:: Checker
+        :members:
+
+    .. autoclass:: SemanticError
+        :members:
+
+    .. autoclass:: LvsModelError
+        :members:
+
+.. autonewtypedata:: ndn.app_support.light_versec.checker.UserFn
+

@@ -31,15 +31,30 @@ __all__ = ['UserFn', 'LvsModelError', 'Checker', 'DEFAULT_USER_FNS']
 
 
 UserFn = Callable[[BinaryStr, list[BinaryStr]], bool]
+r"""
+A UserFn represents a LVS user function. It takes two arguments:
+the first one is the value of the constrained pattern;
+the second one is a list consists of all input parameters in the LVS trust schema.
+"""
 
 
 class LvsModelError(Exception):
+    """
+    Raised when the input LVS model is malformed.
+    """
     pass
 
 
 class Checker:
+    """
+    A checker uses a LVS model to match names and checks if a key name is allowed to sign a packet.
+
+    :ivar model: the LVS model used.
+    :ivar user_fns: user functions
+    """
+
     model: bny.LvsModel  # NOTE: working on binary model is less efficient
-    fns: dict[str, UserFn]
+    user_fns: dict[str, UserFn]
     _model_fns: set[str]
     _trust_roots: set[str]
     _symbols: dict[int, str]
@@ -47,7 +62,7 @@ class Checker:
 
     def __init__(self, model: bny.LvsModel, user_fns: dict[str, UserFn]):
         self.model = model
-        self.fns = user_fns
+        self.user_fns = user_fns
         self._symbols = {s.tag: s.ident for s in self.model.symbols}
         self._symbol_inverse = {s.ident: s.tag for s in self.model.symbols}
         self._sanity_check()
@@ -100,7 +115,7 @@ class Checker:
 
     def validate_user_fns(self) -> bool:
         """Check if all user functions required by the model is defined."""
-        return self._model_fns.issubset(self.fns.keys())
+        return self._model_fns.issubset(self.user_fns.keys())
 
     def root_of_trust(self) -> set[str]:
         """
@@ -123,7 +138,14 @@ class Checker:
 
     @staticmethod
     def load(binary_model: BinaryStr, user_fns: dict[str, UserFn]):
-        """Load a Light VerSec model from bytes."""
+        """
+        Load a Light VerSec model from bytes.
+
+        :param binary_model: the compiled LVS model in bytes
+        :type binary_model: :any:`BinaryStr`
+        :param user_fns: user functions
+        :type user_fns: dict[str, :any:`UserFn`]
+        """
         model = bny.LvsModel.parse(binary_model)
         return Checker(model, user_fns)
 
@@ -147,10 +169,10 @@ class Checker:
                         break
                 else:
                     fn_id = op.fn.fn_id
-                    if fn_id not in self.fns:
+                    if fn_id not in self.user_fns:
                         raise LvsModelError(f'User function {fn_id} is undefined')
                     args = [context.get(arg.tag, arg.value) for arg in op.fn.args]
-                    if self.fns[fn_id](value, args):
+                    if self.user_fns[fn_id](value, args):
                         satisfied = True
                         break
             if not satisfied:

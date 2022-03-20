@@ -34,6 +34,9 @@ T = TypeVar('T')
 
 
 class SemanticError(Exception):
+    """
+    Raised when the LVS trust schema to compile has semantic errors.
+    """
     pass
 
 
