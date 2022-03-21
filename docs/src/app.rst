@@ -67,11 +67,16 @@ If there is a conflict, the earlier an argument is listed the higher priority it
   All other related parameters will be ignored. The Keychain will not be used.
 + **no_signature** (*bool*) - not signed. Not recommended.
 + **digest_sha256** (*bool*) - using SHA-256 digest to protect integrity only. ``False`` by default.
++ **cert** (:any:`NonStrictName`) - using the speficied Certificate to sign this packet.
+  The Key name will be derived from the certificate name.
 + **key** - using the specified Key to sign this packet.
   Either a Key object or the :any:`NonStrictName` of a Key is acceptable.
+  KeyLocator will be set to the default Certificate name of this Key unless specified.
 + **identity** - using the default Key of the specified Identity to sign this packet.
   Either an Identity object or the :any:`NonStrictName` of an Identity is acceptable.
   The default Identity will be used if all of the above arguments are omitted.
++ **key_locator** (:any:`NonStrictName`) - using the specified KeyLocator Name regardless of which
+  Key is used.
 
 Reference
 ---------

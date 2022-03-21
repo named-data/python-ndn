@@ -674,6 +674,8 @@ class KeychainSqlite3(Keychain):
         return identity[key_name]
 
     def import_cert(self, key_name: NonStrictName, cert_name: NonStrictName, cert_data: BinaryStr):
+        key_name = Name.to_bytes(key_name)
+        cert_name = Name.to_bytes(cert_name)
         self.conn.execute('INSERT INTO certificates (key_id, certificate_name, certificate_data)'
                           'VALUES ((SELECT id FROM keys WHERE key_name=?), ?, ?)',
                           (key_name, cert_name, bytes(cert_data)))

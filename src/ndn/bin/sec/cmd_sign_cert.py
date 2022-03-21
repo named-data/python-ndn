@@ -60,18 +60,22 @@ def execute(args: argparse.Namespace):
         return -1
     # Note: Do we need to check the validity of sign_req?
 
-    key_loc = args.key_locator
-    v, id_name, key_name, _ = infer_obj_name(key_loc)
+    key_loc = Name.normalize(args.key_locator)
+    v, id_name, key_name, cert_name = infer_obj_name(key_loc)
     try:
         if v == 0:
             signer = kc.get_signer({'identity': id_name})
-        else:
+        elif v == 1:
             signer = kc.get_signer({'key': key_name})
+        else:
+            signer = kc.get_signer({'cert': cert_name})
     except KeyError:
         if v == 0:
             print(f'Specified identity does not exist: {Name.to_str(id_name)}')
-        else:
+        elif v == 1:
             print(f'Specified key does not exist: {Name.to_str(key_name)}')
+        else:
+            print(f'Specified certificate does not exist: {Name.to_str(cert_name)}')
         return -2
     # Currently python-ndn does not support putting a certificate name into KeyLocator
 
