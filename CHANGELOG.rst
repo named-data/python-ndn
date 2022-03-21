@@ -1,6 +1,18 @@
 Changelog
 =========
 
+0.3-1 (2022-03-20)
+++++++++++++++++++
+* Add Light VerSec and cascade validator.
+* Add UDP support.
+* Support remote prefix registration.
+* NDNLPv2 protocol update.
+* NDN 0.3 protocol update (ForwardingHint).
+* Add Boost INFO parser.
+* Drop Python 3.8 support due to typing hint incompatability.
+  CPython 3.8 should still work, but PyPy 3.8 is known to be incompatible.
+* Bug fixes.
+
 0.3 (2021-11-21)
 ++++++++++++++++
 * Add ``express_raw_interest`` function to ``NDNApp``.

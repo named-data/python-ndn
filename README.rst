@@ -8,7 +8,7 @@ python-ndn
 
 A Named Data Networking client library with AsyncIO support in Python 3.
 
-It supports Python >=3.9 and PyPy3 >=7.3.7.
+It supports Python >=3.9 and PyPy3.9 >=7.3.8.
 
 Please see our documentation_ if you have any issues.
 

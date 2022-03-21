@@ -1,6 +1,6 @@
 # [Choice] Python version: 3, 3.8, 3.7, 3.6
 ARG VARIANT=3
-FROM ghcr.io/zjkmxy/nfd-codespace:0.7.1
+FROM ghcr.io/zjkmxy/nfd-codespace:22.02
 
 # [Optional] If your pip requirements rarely change, uncomment this section to add them to the image.
 # COPY requirements.txt /tmp/pip-tmp/
