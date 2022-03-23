@@ -240,6 +240,8 @@ The formal grammar of LVS is defined as follows:
     TAG_IDENT = CNAME;
     RULE_IDENT = "#", CNAME;
     FN_IDENT = "$", CNAME;
+    CNAME = ? C/C++ identifiers ?;
+    STR = ? C/C++ quoted string ?;
 
     name = ["/"], component, {"/", component};
     component = STR
@@ -265,18 +267,7 @@ See the source code for the grammar used by Lark parser.
 References
 ----------
 
-.. automodule:: ndn.app_support.light_versec
+.. toctree::
 
-    .. autofunction:: compile_lvs
-
-    .. autoclass:: Checker
-        :members:
-
-    .. autoclass:: SemanticError
-        :members:
-
-    .. autoclass:: LvsModelError
-        :members:
-
-.. autonewtypedata:: ndn.app_support.light_versec.checker.UserFn
-
+    package
+    details

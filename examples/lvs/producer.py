@@ -50,6 +50,23 @@ def main():
 
     app = NDNApp(keychain=keychain)
 
+    # Note: This producer example does not use LVS validator at all
+    # Also, the content of keychain is as follows:
+    #   /lvs-test
+    #   +->* /lvs-test/KEY/%5Cs%F8%B5%D9k%D2%D2
+    #        +->* /lvs-test/KEY/%5Cs%F8%B5%D9k%D2%D2/self/v=1647829075409
+    # --
+    #   /lvs-test/admin/ndn
+    #   +->* /lvs-test/admin/ndn/KEY/z%C7%D2%B0%22%FB%D0%F3
+    #        +->  /lvs-test/admin/ndn/KEY/z%C7%D2%B0%22%FB%D0%F3/self/v=1647828984149
+    #        +->* /lvs-test/admin/ndn/KEY/z%C7%D2%B0%22%FB%D0%F3/lvs-test/v=1647829580626
+    # --
+    # * /lvs-test/author/xinyu
+    #   +->* /lvs-test/author/xinyu/KEY/%18%F9%A7CP%F6%BD%1B
+    #        +->  /lvs-test/author/xinyu/KEY/%18%F9%A7CP%F6%BD%1B/self/v=1647828975217
+    #        +->* /lvs-test/author/xinyu/KEY/%18%F9%A7CP%F6%BD%1B/ndn/v=1647829957196
+
+
     @app.route('/lvs-test/article/xinyu/hello')
     def on_interest(name, param, _app_param):
         print(f'>> I: {Name.to_str(name)}, {param}')
