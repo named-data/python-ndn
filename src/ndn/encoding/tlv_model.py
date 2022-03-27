@@ -651,18 +651,13 @@ class BytesField(Field):
         self.is_string = is_string
 
     def __set__(self, instance, value):
-        if isinstance(value, str):
-            value = value.encode('utf-8')
         instance.__dict__[self.name] = value
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
         value = self.get_value(instance)
-        if self.is_string and value is not None:
-            return bytes(value).decode('utf-8')
-        else:
-            return value
+        return value
 
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
@@ -674,6 +669,8 @@ class BytesField(Field):
         if val is None:
             return 0
         else:
+            if isinstance(val, str):
+                val = val.encode('utf-8')
             origin_offset = offset
             offset += write_tl_num(self.type_num, wire, offset)
             offset += write_tl_num(len(val), wire, offset)
@@ -682,7 +679,11 @@ class BytesField(Field):
             return offset - origin_offset
 
     def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
-        return memoryview(wire)[offset:offset+length]
+        ret = memoryview(wire)[offset:offset+length]
+        if self.is_string:
+            return bytes(ret).decode('utf-8')
+        else:
+            return ret
 
 
 class TlvModel(metaclass=TlvModelMeta):
