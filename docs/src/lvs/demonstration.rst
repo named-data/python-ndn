@@ -1,6 +1,11 @@
 Compiler and Checker Demonstration
 ==================================
 
+This page gives a demonstration about how the compiler and the checker works,
+using the example trust schema.
+Please refer to :doc:`Implementation Details <./details>`
+for implementation details.
+
 LVS schema input and parsing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We assume the following LVS schema::

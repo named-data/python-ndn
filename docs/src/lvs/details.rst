@@ -124,7 +124,8 @@ Fixing signing constraints
 Finally, we traverse the tree and replace all name-based signing constraints
 with node references.
 
-A workflow demonstration with example trust schema is available 
+A workflow demonstration with example trust schema is available
+at :doc:`Compiler and Checker Demonstration <./demonstration>`.
 
 Checker
 --------
