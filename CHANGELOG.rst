@@ -1,6 +1,11 @@
 Changelog
 =========
 
+master
+++++++
+* Bug fix.
+* Add key suggestion to LVS checker.
+
 0.3-1 (2022-03-20)
 ++++++++++++++++++
 * Add Light VerSec and cascade validator.

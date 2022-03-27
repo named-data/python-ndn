@@ -291,15 +291,6 @@ However, the implementation complexity is also very high.
 Future Work
 -----------
 
-Signing key suggestion
-~~~~~~~~~~~~~~~~~~~~~~
-
-Given a packet name, the checker should suggests
-a certificate which can be used to sign the packet.
-We plan to do it in 13th NDN Hackathon.
-The idea is to enumerate all certificates in the keychain and
-check them one by one.
-
 Access control (ABE)
 ~~~~~~~~~~~~~~~~~~~~
 
