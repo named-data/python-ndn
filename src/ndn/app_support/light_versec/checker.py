@@ -21,7 +21,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from symtable import Symbol
 from typing import Callable, Iterator
 from ...encoding import Name, BinaryStr, FormalName, NonStrictName, Component
 from ...security import Keychain
