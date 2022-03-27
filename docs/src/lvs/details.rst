@@ -4,22 +4,8 @@ Implementation Details
 This page introduces some implementation details
 and some discussion on design for maintainers to understand this work.
 
-Parsing
--------
-
-In python-ndn, LVS is parsed by `Lark <https://lark-parser.readthedocs.io/en/latest/>`_.
-The grammar is defined in ``grammar.py``.
-Lark's parser allows the user to define a function for every grammar rule,
-and calls it at the corresponding reduce step.
-These functions are defined in ``parser.py``.
-Currently these functions only transform the input AST to some Python classes,
-so the LVS compiler can identify the types of terms easily,
-e.g., test whether a component in a name pattern is a component value or another rule.
-Parser does not do actual compiling work.
-
-
-TLV Binary Format
------------------
+Compiler
+--------
 
 The goal of compiling is to transform the input rules into a more "clean" graph structure,
 so the checker can do matching/verification by traveling along the graph,
@@ -27,9 +13,17 @@ with backtracking if necessary.
 By doing so, with little sacrifice of flexibility,
 we make the checker simpler and more efficient.
 
-To accomplish that goal, a compiled LVS schema is currently designed as follows:
+To accomplish that goal, the LVS compiler is currently designed as follows:
 
-* A compiled LVS schema is a name pattern tree with a single root.
+Input/Output
+~~~~~~~~~~~~
+`LVS complier <https://python-ndn.readthedocs.io/en/latest/src/lvs/package.html#ndn.app_support.light_versec.compile_lvs>`_
+takes string format trust schema written in LVS.
+
+Afterwards, LVS complier outs a name pattern tree using :doc:`TLV Model <../examples/tlv_model>`.
+A name pattern tree has the following properties:
+
+* A name pattern tree has a single root.
   Every rule is a path originating from the root.
 * Every edge represents a component in name pattern.
 * There are two types of edges: edges with a component value; edges representing a pattern.
@@ -46,19 +40,31 @@ To accomplish that goal, a compiled LVS schema is currently designed as follows:
 * Patterns are stored using numerical IDs (natural numbers).
   An optional symbol table can be provided to store their names before compile.
 
-The detailed format is defined in ``binary.py``, using :doc:`TLV Model <../examples/tlv_model>`.
+The detailed format is defined in ``binary.py``.
 
-Compilation
------------
+The LVS compiler does the following steps to generate the name pattern tree:
 
-Currently the compiler works in 6 steps:
+1. Parse the LVS schema into ASTs
+2. Sort rule references.
+3. Generate numerical ID for patterns.
+4. Replicate rules with multiple constraint sets ``{...}|{...}``,
+5. Generate the name pattern tree.
+6. Replace rule names in signing constraints with node IDs.
+7. Fill in the symbol table for name pattern.
 
-1. Sort rule references.
-2. Generate numerical ID for patterns.
-3. Replicate rules with multiple constraint sets ``{...}|{...}``,
-4. Generate the name pattern tree.
-5. Replace rule names in signing constraints with node IDs.
-6. Fill in the symbol table.
+Parsing
+~~~~~~~
+
+In python-ndn, LVS is parsed by `Lark <https://lark-parser.readthedocs.io/en/latest/>`_.
+The grammar is defined in ``grammar.py``.
+Lark's parser allows the user to define a function for every grammar rule,
+and calls it at the corresponding reduce step.
+These functions are defined in ``parser.py``.
+Currently these functions only transform the input AST to some Python classes,
+so the LVS compiler can identify the types of terms easily,
+e.g., test whether a component in a name pattern is a component value or another rule.
+Parser does not do actual compiling work.
+
 
 Sorting rules
 ~~~~~~~~~~~~~
@@ -82,7 +88,7 @@ so it is given a new ID every time.
 However, LVS allows the schema to give constraints to temporary patterns.
 In that case, the constraint will be replicated.
 For example, ``/_a/_a & {_a: $eq_type("v=0")}`` will become
-``/_a_1/_a_2 & {_a_1: $eq_type("v=0"), _a_2: $eq_type("v=0")}``.
+``/1/2 & {1: $eq_type("v=0"), 2: $eq_type("v=0")}``.
 
 Since we don't know the number of named pattern at the beginning,
 temporary patterns are numbered with minus number at this time.
@@ -118,6 +124,56 @@ Fixing signing constraints
 Finally, we traverse the tree and replace all name-based signing constraints
 with node references.
 
+A workflow demonstration with example trust schema is available 
+
+Checker
+--------
+A checker uses a LVS model to match names and checks if a key name is allowed to sign a packet.
+Additionally, the caller can supply with some user-defined functions to support customized trust schema checkings (e.g., ``$eq_type("v=0")``).
+
+To match a given name, the checker goes from the tree root,
+and recursively goes along edges that are allowed to pass.
+When the depth equals to the input name length,
+the matching succeeds and returns the end node as well as all matched patterns.
+The checker always tries value edges first,
+since there is at most one edge that can succeeds.
+After all value edges are tried, it tries pattern edges one by one.
+When all edges failed, e.g. at a leaf node,
+the matching backtracks to the parent node.
+
+Signing key checking
+~~~~~~~~~~~~~~~~~~~~
+To check whether name A can sign name B (i.e., ``check(pkt_name, key_name)``),
+the checker matches the data name B first,
+and then tries to the key name A with the context of previous matching.
+If B can reach some node in the signing constraint list
+of A's matching node, the checker returns true.
+False is returned when all possible matches are tried.
+
+Signing key suggesting
+~~~~~~~~~~~~~~~~~~~~~~
+To suggest a signing key name for packet name A (i.e., ``suggest(pkt_name, keychain)``),
+the checker lists all certificats in the local keychain, 
+and returns the first certificate name that can satisfy the signing restrictions.
+It assumes the corresponding certificate in the keychain is valid.
+
+For example::
+
+  #KEY: "KEY"/_/_/_
+  #article: /"article"/_topic/_ & { _topic: "eco" | "spo" } <= #author
+  #author: /site/"author"/_/#KEY <= #admin
+  #admin: /site/"admin"/_/#KEY <= #anchor
+  #anchor: /site/#KEY & {site: "la" | "ny" }
+
+This LVS schema allows both ``/la/author/1`` and ``/ny/author/2`` to sign packet under 
+name ``/article/eco/day1``. If both ``/la/author/1`` and ``/ny/author/2`` appears on the 
+local keychain, signing suggestion would be the first certificate from the two identities 
+that appear in the keychain storage (e.g., ``/la/author/1``).
+
+The ``suggest(pkt_name, keychain)`` itself does not further verify if ``/la/author/1``'s  
+certificate signer is legitimate and repeat the same process till the trust anchor.
+Instead, it trusts the keychain certificates in any case.
+
 Schema Validation
 -----------------
 
@@ -130,25 +186,6 @@ validated by the compiler or the checker:
   matches with the name of trust anchor.
 * All user functions are provided.
 
-Execution
----------
-
-To match a given name, the checker goes from the tree root,
-and recursively goes along edges that are allowed to pass.
-When the depth equals to the input name length,
-the matching succeeds and returns the end node as well as all matched patterns.
-The checker always tries value edges first,
-since there is at most one edge that can succeeds.
-After all value edges are tried, it tries pattern edges one by one.
-When all edges failed, e.g. at a leaf node,
-the matching backtracks to the parent node.
-
-To check whether name A can sign name B,
-the checker matches the data name B first,
-and then tries to the key name A with the context of previous matching.
-If B can reach some node in the signing constraint list
-of A's matching node, the checker returns true.
-False is returned when all possible matches are tried.
 
 Optimization
 ------------

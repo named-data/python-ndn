@@ -15,8 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import os
 import pytest
+from tempfile import TemporaryDirectory
+from ndn.encoding import Name
 from ndn.app_support.light_versec import compile_lvs, Checker, SemanticError, DEFAULT_USER_FNS
+from ndn.app_support.security_v2 import parse_certificate, derive_cert
+from ndn.security import KeychainSqlite3, TpmFile
 
 
 class TestLvsBasic:
@@ -295,3 +300,52 @@ class TestLvsSemantics:
         assert checker.check('/x/y/z', '/xxx/xxx/xxx')
         assert checker.check('/x/x/x', '/xxx/yyy/zzz')
         assert checker.check('/a/a/a', '/xxx/xxx/xxx')
+    
+    @staticmethod
+    def test_signing_suggest():
+        author1_signer_self = Name.from_str("/la/author/1/KEY/%A9%91rp%08%91%1F%91/self/v=1648318117250")
+        author1_signer_la = Name.from_str("/la/author/1/KEY/%A9%91rp%08%91%1F%91/la-signer/v=1648318250653")
+        author2_signer_self = Name.from_str("/ny/author/2/KEY/%5C%B6%0B%A2%40l%112/self/v=1648318154693")
+        author2_signer_ny = Name.from_str("/ny/author/2/KEY/%5C%B6%0B%A2%40l%112/ny-signer/v=1648318290307")
+        
+        lvs = r'''
+        #KEY: "KEY"/_/_/_
+        #article: /"article"/_topic/_ & { _topic: "eco" | "spo" } <= #author
+        #author: /site/"author"/_/#KEY <= #anchor
+        #anchor: /site/#KEY & {site: "la" | "ny" }
+        '''
+        checker = Checker(compile_lvs(lvs), {})
+        keychain = KeychainSqlite3(os.getcwd() + '/tests/misc/pib.db', TpmFile(os.getcwd() + '/tests/misc/privKeys'))
+        
+        assert checker.suggest("/article/eco/day1", keychain) == author1_signer_self
+        assert checker.suggest("/article/life/day1", keychain) is None
+        
+        lvs = r'''
+        #KEY: "KEY"/_/_/_
+        #LAKEY: "KEY"/_/_signer/_ & { _signer: "la-signer" }
+        #article: /"article"/_topic/_ & { _topic: "eco" | "spo" } <= #author
+        #author: /site/"author"/_/#LAKEY <= #anchor
+        #anchor: /site/#KEY & {site: "la"}
+        '''
+        checker = Checker(compile_lvs(lvs), {})
+        assert checker.suggest("/article/eco/day1", keychain) == author1_signer_la
+        
+        lvs = r'''
+        #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
+        #article: /"article"/_topic/_ & { _topic: "life" | "fin" } <= #author
+        #author: /site/"author"/_/#KEY & { site: "ny" } <= #anchor
+        #anchor: /site/#KEY & { site: "ny" }
+        '''
+        checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
+        assert checker.suggest("/article/fin/day1", keychain) == author2_signer_self
+        
+        lvs = r'''
+        #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
+        #NYKEY: "KEY"/_/_signer/_version& { _signer: "ny-signer", _version: $eq_type("v=0")}
+        #article: /"article"/_topic/_ <= #author
+        #author: /site/"author"/_/#NYKEY <= #anchor
+        #anchor: /site/#KEY & {site: "ny"}
+        #site: "ny"
+        '''
+        checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
+        assert checker.suggest("/article/eco/day1", keychain) == author2_signer_ny        

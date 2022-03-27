@@ -21,8 +21,10 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+from symtable import Symbol
 from typing import Callable, Iterator
 from ...encoding import Name, BinaryStr, FormalName, NonStrictName, Component
+from ...security import Keychain
 from . import binary as bny
 from .compiler import top_order
 
@@ -275,6 +277,24 @@ class Checker:
                     return True
         return False
 
+    def suggest(self, pkt_name: NonStrictName, keychain: Keychain) -> FormalName:
+        """
+        Suggest a key from the keychain that is used to sign the specific data packet.
+
+        :param pkt_name: packet name
+        :type pkt_name: :any:`NonStrictName`
+        :param keychain: keychain
+        :type keychain: Keychain
+        :return: the first key (in the order of storage) in the keychain that can sign the packet
+        """
+        pkt_name = Name.normalize(pkt_name)
+        for id_name in keychain:
+            identity = keychain[id_name]
+            for key_name in identity:
+                key = identity[key_name]
+                for cert_name in key:
+                    if self.check(pkt_name, cert_name):
+                        return cert_name
 
 DEFAULT_USER_FNS = {
     '$eq': lambda c, args: all(x == c for x in args),
