@@ -194,14 +194,28 @@ User Functions
 ~~~~~~~~~~~~~~
 
 User functions are named in the format of ``$function``.
-They should be provided by the application code using the trust schema.
+They should be provided as a dictionary via Checker's construction function by the application code using the trust schema.
+The name ``function`` of one user function should be the dictionary key and the corresponding function definition should be the dictionary value. 
 A user function can take arguments of type component values and patterns.
 For example, ``$fn("component", pattern)`` is a valid function call.
 When used as a component constraint,
 the LVS library will always call the user function with two arguments:
 the first one is the value of the pattern constrained,
 and the second one is a list containing all arguments.
-For example,
+The return value of one user function should be either ``True`` or ``False``.
+For example, there is a user function called ``fn``. It should be defined and provided as follows.
+
+.. code-block:: python3
+
+    def fn(component, pattern):
+        if condition:
+            return True
+        else:
+            return False
+    user_fn={"fn": fn}
+    checker=Checker(lvs_model,user_fn)
+
+In the trust schema, the user function can be called as 
 
 .. code-block:: text
 
@@ -263,6 +277,105 @@ The formal grammar of LVS is defined as follows:
     file_input = {definition};
 
 See the source code for the grammar used by Lark parser.
+
+Tutorial
+--------------
+
+Suppose that there is a blog platform that contains three roles: admin, author and reader. It follows these specifications:
+1. The prefix of this platform is ``/ndn/blog``. The trust anchor is ``/ndn/blog/KEY/<key-id>/<issuer>/<cert-id>``.
+2. There is a root certificate in this platform. 
+3. Admin has its certificate signed by root certificate. 
+4. The certificates of both author and reader are signed by admin's certificate. 
+5. The IDs of both author and reader should be a 6-digit number.
+6. Both author and admin can post the articles.
+7. The name of a posted article should be ``/ndn/blog/ID/post/<year>/<id>``. The "year" must be a 4-digit number.
+
+Based on the above specifications, the trust schema can be written as:
+
+.. code-block:: text
+
+    // The platform prefix definition. The pair of quotes means that it can only be matched by the identical component.
+    #platform: "ndn"/"blog"
+    // The certificate name suffix definition. Each underscore can be matched by an arbitrary pattern except that contains slash.
+    #KEY="KEY"/_/_/_
+    // The root certificate definition, i.e., /ndn/blog/KEY/<key-id>/<issuer>/<cert-id>.
+    #root: #platform/#KEY
+    // Admin's certificate definition. The non-sharp patterns, role and adminID, are sent from the application. Each pattern can match an arbitrary components, but the matched components for the same pattern should be the same. The constraint shows that the component "_role" must be "admin". The underscore means that the matched components for the pattern "_role" may not be identical in the chain. The admin's certificate must be signed by the root certificate.
+    #admin: #platform/_role/adminID/#KEY & {_role: "admin"} <= #root
+    // author's certificate definition. The ID is verified by a user function. Both constraints must be met. It can only be signed by the admin's certificate. 
+    #author: #platform/_role/ID/#KEY & {_role: "author", ID: $isValidID()} <= #admin
+    // author's and reader's certificate definition. The role can be either "reader" or "author". The ID is verified by a user function. Both constraints must be met. It can only be signed by the admin's certificate. 
+    #user: #platform/_role/ID/#KEY & {_role: "reader"|"author", ID: $isValidID()} <= #admin
+    // article's trust schema. The component "year" is verified by a user function. The article can be signed by the admin's certificate or one author's certificate.
+    #article: #platform/ID/"post"/year/articleID & {year: $isValidYear()} <= #admin | #author
+
+To build the checker of the above trust schema, we must define the user functions by using lambda expressions first. 
+
+.. code-block:: python3
+
+    # Build the dictionary
+    user_fn = {
+        "$isValidID": lambda component, _pattern: len(Component.get_value(component)) == 6,
+        "$isValidYear": lambda component, _pattern: len(Component.get_value(component)) == 4,
+    }
+
+With the string of trust schema and the user function dictionary, we can compile the LVS model and initialize the checker.
+
+.. code-block:: python3
+
+    from ndn.app_support.light_versec import compile_lvs, Checker
+
+    lvs_text = r'''
+    #platform: "ndn"/"blog"
+    #KEY="KEY"/_/_/_
+    #root: #platform/#KEY
+    #admin: #platform/_role/adminID/#KEY & {_role: "admin"} <= #root
+    #author: #platform/_role/ID/#KEY & {_role: "author", ID: $isValidID()} <= #admin
+    #user: #platform/_role/ID/#KEY & {_role: "reader"|"author", ID: $isValidID()} <= #admin
+    #article: #platform/ID/"post"/year/articleID & {year: $isValidYear()} <= #admin | #author
+    '''
+
+    # compile the LVS model
+    lvs_model = compile_lvs(lvs_text)
+    # initialize the checker
+    checker = Checker(lvs_model, user_fn)
+
+With the function ``check``, we can check whether one name is valid under one certificate name. Here are some testing examples.
+
+.. code-block:: python3
+    
+    # Admin's certificate can be signed by the root certificate
+    print(checker.check('/ndn/blog/admin/000001/KEY/1/root/1',
+                        '/ndn/blog/KEY/1/self/1'))  # => True
+    # The component "key" does not match (should be upper-case)
+    print(checker.check('/ndn/blog/admin/000001/key/1/root/1',
+                        '/ndn/blog/KEY/1/self/1'))  # => False
+    # One admin's certificate cannot be signed by another admin.
+    print(checker.check('/ndn/blog/admin/000002/KEY/1/root/1',
+                        '/ndn/blog/admin/000001/KEY/1/root/1'))  # => False
+    # One author's certificate can be signed by an admin (with valid ID).
+    print(checker.check('/ndn/blog/author/100001/KEY/1/000001/1',
+                        '/ndn/blog/admin/000001/KEY/1/root/1'))  # => True
+    # The author's ID is invalid.
+    print(checker.check('/ndn/blog/author/1000/KEY/1/000001/1',
+                        '/ndn/blog/admin/000001/KEY/1/root/1'))  # => False
+    # One reader's certificate can be signed by an admin (with valid ID).
+    print(checker.check('/ndn/blog/reader/200001/KEY/1/000001/1',
+                        '/ndn/blog/admin/000001/KEY/1/root/1'))  # => True
+    # One article can be signed by an author.
+    print(checker.check('/ndn/blog/100001/post/2022/1',
+                        '/ndn/blog/author/100001/KEY/1/000001/1'))  # => True
+    # The author is wrong. The IDs in both article name and certificate name should be the same,
+    # as they use the same pattern "ID".
+    print(checker.check('/ndn/blog/100001/post/2022/1',
+                        '/ndn/blog/author/100002/KEY/1/000001/1'))  # => False
+    # The year is invalid.
+    print(checker.check('/ndn/blog/100001/post/202/1',
+                        '/ndn/blog/author/100001/KEY/1/000001/1'))  # => False
+    # The article cannot be signed by a reader.
+    print(checker.check('/ndn/blog/200001/post/2022/1',
+                        '/ndn/blog/reader/200001/KEY/1/000001/1'))  # => False
+
 
 References
 ----------
