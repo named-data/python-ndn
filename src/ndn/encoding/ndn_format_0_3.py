@@ -84,7 +84,7 @@ class ContentType:
     Type   Description
     ====   ===================================
     BLOB   Payload identified by the data name
-    LINK   A list of delegations
+    LINK   A list of delegation names
     KEY    Public Key
     NACK   Application-level NACK
     ====   ===================================
@@ -469,9 +469,9 @@ def parse_interest(wire: BinaryStr, with_tl: bool = True) -> Interest:
     params.lifetime = ret.lifetime
     params.hop_limit = ret.hop_limit
 
-    if ret.forwarding_hint and ret.forwarding_hint.delegations:
-        for cur in ret.forwarding_hint.delegations:
-            params.forwarding_hint.append((cur.preference, cur.delegation))
+    if ret.forwarding_hint and ret.forwarding_hint.names:
+        for cur in ret.forwarding_hint.names:
+            params.forwarding_hint.append(cur)
 
     sig_ptrs = SignaturePtrs(
         signature_info=ret.signature_info,
