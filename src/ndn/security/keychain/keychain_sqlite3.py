@@ -562,7 +562,7 @@ class KeychainSqlite3(Keychain):
         """
         name = Name.to_bytes(name)
         for key_name in self[name]:
-            self.tpm.delete_key(key_name)
+            self.del_key(key_name)
         self.conn.execute('DELETE FROM identities WHERE identity=?', (name,))
         self.conn.commit()
         self._signer_cache = {}
@@ -614,6 +614,9 @@ class KeychainSqlite3(Keychain):
         """
         formal_name = Name.normalize(name)
         name = Name.to_bytes(name)
+        id_name = formal_name[:-2]
+        key = self[id_name][formal_name]
+        self.conn.execute('DELETE FROM certificates WHERE key_id=?', (key.row_id,))
         self.conn.execute('DELETE FROM keys WHERE key_name=?', (name,))
         self.conn.commit()
         self.tpm.delete_key(formal_name)

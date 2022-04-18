@@ -113,7 +113,7 @@ def new_cert(key_name, issuer_id_component, pub_key, signer, start_time, end_tim
 
 def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
     end_time = datetime.utcnow()
-    end_time.replace(year=end_time.year + 20)
+    end_time = end_time.replace(year=end_time.year + 20)
     return new_cert(key_name, SELF_COMPONENT, pub_key, signer,
                     datetime.fromisoformat('1970-01-01T00:00:00'), end_time)
 
