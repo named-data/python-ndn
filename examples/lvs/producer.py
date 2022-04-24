@@ -72,7 +72,9 @@ def main():
         print(f'>> I: {Name.to_str(name)}, {param}')
         content = "Hello,".encode()
         data_name = name + [Component.from_version(timestamp())]
-        app.put_data(data_name, content=content, freshness_period=10000)
+        sign_cert_name = checker.suggest(data_name, app.keychain)
+        print(f'        Suggested signing cert: {Name.to_str(sign_cert_name)}')
+        app.put_data(data_name, content=content, freshness_period=10000, cert=sign_cert_name)
         print(f'<< D: {Name.to_str(data_name)}')
         print(f'Content: {content.decode()}')
         print('')
@@ -82,7 +84,9 @@ def main():
         print(f'>> I: {Name.to_str(name)}, {param}')
         content = "world!".encode()
         data_name = name + [Component.from_version(timestamp())]
-        app.put_data(data_name, content=content, freshness_period=10000)
+        sign_cert_name = checker.suggest(data_name, app.keychain)
+        print(f'        Suggested signing cert: {Name.to_str(sign_cert_name)}')
+        app.put_data(data_name, content=content, freshness_period=10000, cert=sign_cert_name)
         print(f'<< D: {Name.to_str(data_name)}')
         print(f'Content: {content.decode()}')
         print('')

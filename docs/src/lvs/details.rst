@@ -192,10 +192,10 @@ Optimization
 ------------
 
 This section discusses possible optimizations that may be used.
-Note that the content in this section has not been implemented yet.
+Note that not all the content in this section has been implemented.
 
-Merging from the root
-~~~~~~~~~~~~~~~~~~~~~
+Merging from the root (Done)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For simplicity of implementation,
 the current compiler treats all patterns as different edges.
@@ -214,8 +214,8 @@ The current result tree and optimized one are shown in the figure.
     :align: center
     :width: 50%
 
-Merging from the leaves
-~~~~~~~~~~~~~~~~~~~~~~~
+Merging from the leaves (Not Implmented)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If we waive the requirement of tree structure and accepts a DAG,
 then another way to simplify the result is to merge

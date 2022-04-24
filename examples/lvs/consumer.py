@@ -36,14 +36,14 @@ def main():
     checker = Checker(lvs_model, DEFAULT_USER_FNS)
     app = NDNApp(keychain=keychain)
     validator = lvs_validator(checker, app, trust_anchor.data)
-    app.data_validator = validator
 
     async def fetch_interest(article: str):
         try:
             name = Name.from_str(f'/lvs-test/article/xinyu/{article}')
             print(f'Sending Interest {Name.to_str(name)}')
             data_name, meta_info, content = await app.express_interest(
-                name, must_be_fresh=True, can_be_prefix=True, lifetime=6000)
+                name, must_be_fresh=True, can_be_prefix=True, lifetime=6000,
+                validator=validator)
             print(f'Received Data Name: {Name.to_str(data_name)}')
             print(meta_info)
             print(bytes(content).decode() if content else None)

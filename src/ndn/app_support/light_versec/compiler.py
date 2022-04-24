@@ -21,6 +21,9 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
+import typing
+
 import lark
 from typing import TypeVar, Union, Optional
 from dataclasses import dataclass
@@ -82,6 +85,50 @@ class Compiler:
         name: list[Union[psr.ComponentValue, psr.Pattern]]
         cons_set: list[psr.TagConstraint]
         sign_cons: list[str]
+
+        def pattern_movement(self, depth: int, prev_tags: set[int]) -> tuple[int, list[bny.PatternConstraint], str]:
+            if not isinstance(self.name[depth], psr.Pattern):
+                return 0, [], ''
+            tag = int(self.name[depth].id)
+            if tag in prev_tags:
+                return tag, [], str(tag) + ':'
+            cons_set = []
+            cons_set_str = str(tag) + ':'
+            for cons in self.cons_set:
+                if tag not in set(int(x) for x in cons.pat.id.split(' ')):
+                    continue
+                encoded_cons = bny.PatternConstraint()
+                encoded_cons.options = []
+                cons_set_str += '{'
+                for opt in cons.options:
+                    encoded_opt = bny.ConstraintOption()
+                    if isinstance(opt, psr.ComponentValue):
+                        encoded_opt.value = opt.c
+                        cons_set_str += 'v=' + opt.c.hex()
+                    elif isinstance(opt, psr.Pattern):
+                        encoded_opt.tag = int(opt.id)
+                        cons_set_str += 't=' + opt.id
+                    elif isinstance(opt, psr.FnCall):
+                        encoded_opt.fn = bny.UserFnCall()
+                        encoded_opt.fn.fn_id = opt.fn
+                        cons_set_str += opt.fn + '('
+                        encoded_opt.fn.args = []
+                        for arg in opt.args:
+                            encoded_arg = bny.UserFnArg()
+                            if isinstance(arg, psr.ComponentValue):
+                                encoded_arg.value = arg.c
+                                cons_set_str += 'v=' + arg.c.hex()
+                            else:
+                                assert isinstance(arg, psr.Pattern)
+                                encoded_arg.tag = int(arg.id)
+                                cons_set_str += 't=' + arg.id
+                            encoded_opt.fn.args.append(encoded_arg)
+                        cons_set_str += ')'
+                    encoded_cons.options.append(encoded_opt)
+                    cons_set_str += ','
+                cons_set_str += '}'
+                cons_set.append(encoded_cons)
+            return tag, cons_set, cons_set_str
 
     rep_rules: dict[str, list[RuleChain]]
 
@@ -230,46 +277,21 @@ class Compiler:
             edge.dest = self._generate_node(depth + 1, new_context, node.id, previous_tags)
             node.v_edges.append(edge)
         # Pattern movements
-        # NOTE: As a quick hack, we assume pattern edges are pairwise different, which is less efficient
-        node.p_edges = []
-        for rc in context:
-            if isinstance(rc.name[depth], psr.ComponentValue):
-                continue
+        p_moves = [rc.pattern_movement(depth, previous_tags) + (rc,) for rc in context
+                   if isinstance(rc.name[depth], psr.Pattern)]
+        p_move_strs = set(pm[2] for pm in p_moves)
+        for pm_str in p_move_strs:
+            new_context = [pm[3] for pm in p_moves if pm[2] == pm_str]
+            assert len(new_context) > 0
+            tag = next(pm[0] for pm in p_moves if pm[2] == pm_str)
             edge = bny.PatternEdge()
-            tag = int(rc.name[depth].id)
             if tag >= 0:
                 edge.tag = tag
             else:
                 # TLV integer is required to be unsigned, so we use maximum named pattern + x for temporary pattern -x
                 edge.tag = len(self.named_pats) - tag
-            edge.dest = self._generate_node(depth + 1, [rc], node.id, previous_tags | {tag})
-            edge.cons_sets = []
-            if tag not in previous_tags:
-                for cons in rc.cons_set:
-                    if tag not in set(int(x) for x in cons.pat.id.split(' ')):
-                        continue
-                    encoded_cons = bny.PatternConstraint()
-                    encoded_cons.options = []
-                    for opt in cons.options:
-                        encoded_opt = bny.ConstraintOption()
-                        if isinstance(opt, psr.ComponentValue):
-                            encoded_opt.value = opt.c
-                        elif isinstance(opt, psr.Pattern):
-                            encoded_opt.tag = int(opt.id)
-                        elif isinstance(opt, psr.FnCall):
-                            encoded_opt.fn = bny.UserFnCall()
-                            encoded_opt.fn.fn_id = opt.fn
-                            encoded_opt.fn.args = []
-                            for arg in opt.args:
-                                encoded_arg = bny.UserFnArg()
-                                if isinstance(arg, psr.ComponentValue):
-                                    encoded_arg.value = arg.c
-                                else:
-                                    assert isinstance(arg, psr.Pattern)
-                                    encoded_arg.tag = int(arg.id)
-                                encoded_opt.fn.args.append(encoded_arg)
-                        encoded_cons.options.append(encoded_opt)
-                    edge.cons_sets.append(encoded_cons)
+            edge.cons_sets = next(pm[1] for pm in p_moves if pm[2] == pm_str)
+            edge.dest = self._generate_node(depth + 1, new_context, node.id, previous_tags | {tag})
             node.p_edges.append(edge)
         return node.id
 

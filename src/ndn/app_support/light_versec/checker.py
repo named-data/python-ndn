@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing import Callable, Iterator
 from ...encoding import Name, BinaryStr, FormalName, NonStrictName, Component
 from ...security import Keychain
+from ..security_v2 import parse_certificate
 from . import binary as bny
 from .compiler import top_order
 
@@ -249,6 +250,8 @@ class Checker:
                  and ``context`` is a dict containing pattern->value mapping.
         """
         name = Name.normalize(name)
+        if Component.get_type(name[-1]) == Component.TYPE_IMPLICIT_SHA256:
+            name = name[:-1]
         for node_id, context in self._match(name, {}):
             node = self.model.nodes[node_id]
             if node.rule_name:
@@ -268,7 +271,11 @@ class Checker:
         :return: whether the key can sign the packet
         """
         pkt_name = Name.normalize(pkt_name)
+        if Component.get_type(pkt_name[-1]) == Component.TYPE_IMPLICIT_SHA256:
+            pkt_name = pkt_name[:-1]
         key_name = Name.normalize(key_name)
+        if Component.get_type(key_name[-1]) == Component.TYPE_IMPLICIT_SHA256:
+            key_name = key_name[:-1]
         for pkt_node_id, context in self._match(pkt_name, {}):
             pkt_node = self.model.nodes[pkt_node_id]
             for key_node_id, _ in self._match(key_name, context):
@@ -293,7 +300,13 @@ class Checker:
                 key = identity[key_name]
                 for cert_name in key:
                     if self.check(pkt_name, cert_name):
-                        return cert_name
+                        cert = parse_certificate(key[cert_name].data)
+                        # This is to avoid self-signed certificate
+                        if (not cert.signature_info or not cert.signature_info.key_locator
+                                or not cert.signature_info.key_locator.name):
+                            continue
+                        if self.check(cert_name, cert.signature_info.key_locator.name):
+                            return cert_name
 
 DEFAULT_USER_FNS = {
     '$eq': lambda c, args: all(x == c for x in args),
