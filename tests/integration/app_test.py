@@ -237,3 +237,30 @@ class TestCongestionMark(NDNAppTestSuite):
             assert raw_packet == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05'
             assert not sig_ptrs.signature_info
             self.app.put_data(name, b'test', no_signature=True)
+
+
+class TestImplicitSha256(NDNAppTestSuite):
+    async def face_proc(self, face: DummyFace):
+        await face.consume_output(b'\x05\x2d\x07\x28\x08\x04test\x01\x20'
+                                  b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
+                                  b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
+                                  b'\x0c\x01\x05'
+                                  b'\x05\x2d\x07\x28\x08\x04test\x01\x20'
+                                  b'\x54\x88\xf2\xc1\x1b\x56\x6d\x49\xe9\x90\x4f\xb5\x2a\xa6\xf6\xf9'
+                                  b'\xe6\x6a\x95\x41\x68\x10\x9c\xe1\x56\xee\xa2\xc9\x2c\x57\xe4\xc2'
+                                  b'\x0c\x01\x05')
+        await face.input_packet(b'\x06\x13\x07\x06\x08\x04test\x14\x03\x18\x01\x00\x15\x04test')
+        await aio.sleep(0.1)
+
+    async def app_main(self):
+        fut1 = self.app.express_interest(
+            '/test/sha256digest=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
+            nonce=None, lifetime=5)
+        fut2 = self.app.express_interest(
+            '/test/sha256digest=5488f2c11b566d49e9904fb52aa6f6f9e66a954168109ce156eea2c92c57e4c2',
+            nonce=None, lifetime=5)
+        name2, _, content2 = await fut2
+        with pytest.raises(InterestTimeout):
+            await fut1
+        assert name2 == Name.from_str('/test')
+        assert content2 == b'test'

@@ -22,7 +22,7 @@ from typing import Optional, Any, Awaitable, Coroutine, Tuple, List
 from .utils import gen_nonce
 from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
     parse_tl_num, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
-    make_data, InterestParam, make_interest, FormalName, SignaturePtrs, parse_lp_packet
+    make_data, InterestParam, make_interest, FormalName, SignaturePtrs, parse_lp_packet, Component
 from .security import Keychain, sha256_digest_checker, params_sha256_checker, NullSigner
 from .transport.face import Face
 from .app_support.nfd_mgmt import make_command, parse_response
@@ -74,7 +74,8 @@ class NDNApp:
         :param typ: the Type.
         :param data: the Value of the packet with TL.
         """
-        logging.debug('Packet received %s, %s' % (typ, bytes(data)))
+        # if logging.getLogger().isEnabledFor(logging.DEBUG):
+        #     logging.debug('Packet received %s, %s' % (typ, bytes(data)))
         if typ == LpTypeNumber.LP_PACKET:
             try:
                 nack_reason, fragment = parse_lp_packet(data, with_tl=True)
@@ -92,7 +93,8 @@ class NDNApp:
             except (DecodeError, TypeError, ValueError, struct.error):
                 logging.warning('Unable to decode the fragment of LpPacket')
                 return
-            logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
             self._on_nack(name, nack_reason)
         else:
             if typ == TypeNumber.INTEREST:
@@ -101,7 +103,8 @@ class NDNApp:
                 except (DecodeError, TypeError, ValueError, struct.error):
                     logging.warning('Unable to decode received packet')
                     return
-                logging.debug('Interest received %s' % Name.to_str(name))
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    logging.debug('Interest received %s' % Name.to_str(name))
                 await self._on_interest(name, param, app_param, sig, raw_packet=data)
             elif typ == TypeNumber.DATA:
                 try:
@@ -109,7 +112,8 @@ class NDNApp:
                 except (DecodeError, TypeError, ValueError, struct.error):
                     logging.warning('Unable to decode received packet')
                     return
-                logging.debug('Data received %s' % Name.to_str(name))
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    logging.debug('Data received %s' % Name.to_str(name))
                 await self._on_data(name, meta_info, content, sig, raw_packet=data)
             else:
                 logging.warning('Unable to decode received packet')
@@ -225,31 +229,37 @@ class NDNApp:
                              ) -> Coroutine[Any, None, Tuple[FormalName, MetaInfo, Optional[BinaryStr]]]:
         final_name = Name.normalize(final_name)
         future = aio.get_running_loop().create_future()
-        node = self._int_tree.setdefault(final_name, InterestTreeNode())
-        node.append_interest(future, interest_param)
+        if Component.get_type(final_name[-1]) == Component.TYPE_IMPLICIT_SHA256:
+            node_name = final_name[:-1]
+            implicit_sha256 = Component.get_value(final_name[-1])
+        else:
+            node_name = final_name
+            implicit_sha256 = b''
+        node = self._int_tree.setdefault(node_name, InterestTreeNode())
+        node.append_interest(future, interest_param, implicit_sha256)
         self.face.send(raw_interest)
-        return self._wait_for_data(future, interest_param.lifetime, final_name, node, validator, need_raw_packet)
+        return self._wait_for_data(future, interest_param.lifetime, node_name, node, validator, need_raw_packet)
 
-    async def _wait_for_data(self, future: aio.Future, lifetime: int, name: FormalName,
+    async def _wait_for_data(self, future: aio.Future, lifetime: int, node_name: FormalName,
                              node: InterestTreeNode, validator: Validator, need_raw_packet: bool):
         lifetime = 100 if lifetime is None else lifetime
         try:
-            name, meta_info, content, sig, raw_packet = await aio.wait_for(future, timeout=lifetime/1000.0)
+            data_name, meta_info, content, sig, raw_packet = await aio.wait_for(future, timeout=lifetime/1000.0)
         except aio.TimeoutError:
             if node.timeout(future):
-                del self._int_tree[name]
+                del self._int_tree[node_name]
             raise InterestTimeout()
         except aio.CancelledError:
             raise InterestCanceled()
         if validator is None:
             validator = self.data_validator
-        if await validator(name, sig):
+        if await validator(data_name, sig):
             if need_raw_packet:
-                return name, meta_info, content, raw_packet
+                return data_name, meta_info, content, raw_packet
             else:
-                return name, meta_info, content
+                return data_name, meta_info, content
         else:
-            raise ValidationFailure(name, meta_info, content)
+            raise ValidationFailure(data_name, meta_info, content)
 
     async def main_loop(self, after_start: Awaitable = None) -> bool:
         """
