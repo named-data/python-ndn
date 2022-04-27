@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
+# Copyright (C) 2019-2022 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -16,11 +16,89 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import abc
-import collections
-from typing import Dict, Any
+from collections.abc import Mapping
+from typing import Any
+from ...encoding import FormalName, BinaryStr
 
 
-class Keychain(collections.abc.Mapping):
+class AbstractCertificate(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def data(self) -> BinaryStr:
+        """
+        Get the binary data of the certificate,
+        which is the wire form of the V2 certificate Data packet.
+
+        :return: Certificate binary data.
+        """
+        pass
+
+    @property
+    @abc.abstractmethod
+    def name(self) -> FormalName:
+        """
+        Get the Name of the certificate
+
+        :return: Certificate Name.
+        """
+        pass
+
+    @property
+    @abc.abstractmethod
+    def key(self) -> FormalName:
+        """
+        Get the Name of the Key
+
+        :return: Key Name.
+        """
+        pass
+
+
+class AbstractKey(Mapping[FormalName, AbstractCertificate]):
+    @property
+    @abc.abstractmethod
+    def key_bits(self) -> BinaryStr:
+        """
+        Get the public key bits of the key.
+
+        :return: Public key bits.
+        """
+        pass
+
+    @property
+    @abc.abstractmethod
+    def name(self) -> FormalName:
+        """
+        Get the Name of the key
+
+        :return: Key Name.
+        """
+        pass
+
+    @property
+    @abc.abstractmethod
+    def identity(self) -> FormalName:
+        """
+        Get the Name of the Identity
+
+        :return: Identity Name.
+        """
+        pass
+
+
+class AbstractIdentity(Mapping[FormalName, AbstractKey]):
+    @property
+    @abc.abstractmethod
+    def name(self) -> FormalName:
+        """
+        Get the Name of the identity
+
+        :return: Identity Name.
+        """
+        pass
+
+
+class Keychain(Mapping[FormalName, AbstractIdentity]):
     """
     The abstract Keychain class, derived from :class:`collections.abc.Mapping`.
     It behaves like an immutable dict from :any:`FormalName` to Identity.
@@ -30,7 +108,7 @@ class Keychain(collections.abc.Mapping):
     """
     # __getitem__ will be called extra times, but there is no need to optimize for performance
     @abc.abstractmethod
-    def get_signer(self, sign_args: Dict[str, Any]):
+    def get_signer(self, sign_args: dict[str, Any]):
         """
         Get a signer from sign_args.
 

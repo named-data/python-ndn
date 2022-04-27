@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
+# Copyright (C) 2019-2022 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -20,13 +20,11 @@ import logging
 import os
 import sqlite3
 from typing import Iterator, Any
-from dataclasses import dataclass
-from collections.abc import Mapping
 from ...encoding import FormalName, BinaryStr, NonStrictName, Name
 from ...app_support.security_v2 import self_sign
 from ..signer.sha256_digest_signer import DigestSha256Signer
 from ..tpm.tpm import Tpm
-from .keychain import Keychain
+from .keychain import Keychain, AbstractCertificate, AbstractKey, AbstractIdentity
 
 
 INITIALIZE_SQL = """
@@ -170,8 +168,7 @@ CREATE TRIGGER IF NOT EXISTS
 """
 
 
-@dataclass
-class Certificate:
+class Certificate(AbstractCertificate):
     """
     A dataclass for a Certificate.
 
@@ -187,13 +184,32 @@ class Certificate:
     :vartype is_default: bool
     """
     id: int
-    key: FormalName
-    name: FormalName
-    data: BinaryStr
+    _key: FormalName
+    _name: FormalName
+    _data: BinaryStr
     is_default: bool
 
+    @property
+    def name(self) -> FormalName:
+        return self._name
 
-class Key(Mapping[FormalName, Certificate]):
+    @property
+    def key(self) -> FormalName:
+        return self._key
+
+    @property
+    def data(self) -> BinaryStr:
+        return self._data
+
+    def __init__(self, row_id: int, key: FormalName, name: FormalName, data: BinaryStr, is_default: bool):
+        self.id = row_id
+        self._key = key
+        self._name = name
+        self._data = data
+        self.is_default = is_default
+
+
+class Key(AbstractKey):
     """
     A Key. It behaves like an immutable ``dict`` from :any:`FormalName` to :any:`Certificate`.
 
@@ -209,17 +225,29 @@ class Key(Mapping[FormalName, Certificate]):
     :vartype is_default: bool
     """
     row_id: int
-    identity: FormalName
-    name: FormalName
-    key_bits: BinaryStr
+    _identity: FormalName
+    _name: FormalName
+    _key_bits: BinaryStr
     is_default: bool
+
+    @property
+    def key_bits(self) -> BinaryStr:
+        return self._key_bits
+
+    @property
+    def name(self) -> FormalName:
+        return self._name
+
+    @property
+    def identity(self) -> FormalName:
+        return self._identity
 
     def __init__(self, pib, identity, row_id, name, key_bits, is_default):
         self.pib = pib
-        self.identity = identity
+        self._identity = identity
         self.row_id = row_id
-        self.name = name
-        self.key_bits = key_bits
+        self._name = name
+        self._key_bits = key_bits
         self.is_default = is_default
 
     def __len__(self) -> int:
@@ -237,7 +265,7 @@ class Key(Mapping[FormalName, Certificate]):
             raise KeyError(name)
         row_id, cert_name, cert_data, is_default = data
         cursor.close()
-        return Certificate(id=row_id, key=self.name, name=cert_name, data=cert_data, is_default=is_default != 0)
+        return Certificate(row_id=row_id, key=self._name, name=cert_name, data=cert_data, is_default=is_default != 0)
 
     def __iter__(self) -> Iterator[FormalName]:
         cursor = self.pib.conn.execute('SELECT certificate_name FROM certificates WHERE key_id=?', (self.row_id,))
@@ -293,10 +321,10 @@ class Key(Mapping[FormalName, Certificate]):
             raise KeyError('No default certificate')
         row_id, cert_name, cert_data, is_default = data
         cursor.close()
-        return Certificate(id=row_id, key=self.name, name=cert_name, data=cert_data, is_default=is_default != 0)
+        return Certificate(row_id=row_id, key=self._name, name=cert_name, data=cert_data, is_default=is_default != 0)
 
 
-class Identity(Mapping[FormalName, Key]):
+class Identity(AbstractIdentity):
     """
     An Identity. It behaves like an immutable ``dict`` from :any:`FormalName` to :any:`Key`.
 
@@ -308,13 +336,17 @@ class Identity(Mapping[FormalName, Key]):
     :vartype is_default: bool
     """
     row_id: int
-    name: FormalName
+    _name: FormalName
     is_default: bool
+
+    @property
+    def name(self) -> FormalName:
+        return self._name
 
     def __init__(self, pib, row_id, name, is_default):
         self.pib = pib
         self.row_id = row_id
-        self.name = name
+        self._name = name
         self.is_default = is_default
 
     def __len__(self) -> int:
@@ -332,7 +364,7 @@ class Identity(Mapping[FormalName, Key]):
             raise KeyError(name)
         row_id, key_name, key_bits, is_default = data
         cursor.close()
-        return Key(self.pib, self.name, row_id, Name.from_bytes(key_name), key_bits, is_default != 0)
+        return Key(self.pib, self._name, row_id, Name.from_bytes(key_name), key_bits, is_default != 0)
 
     def __iter__(self) -> Iterator[FormalName]:
         cursor = self.pib.conn.execute('SELECT key_name FROM keys WHERE identity_id=?', (self.row_id,))
@@ -359,7 +391,7 @@ class Identity(Mapping[FormalName, Key]):
         :param key_type: the type of the Key. Can be ``ec`` or ``rsa``.
         :return: the new Key.
         """
-        return self.pib.new_key(self.name, key_type=key_type)
+        return self.pib.new_key(self._name, key_type=key_type)
 
     def has_default_key(self) -> bool:
         """
@@ -396,7 +428,7 @@ class Identity(Mapping[FormalName, Key]):
             raise KeyError('No default key')
         row_id, key_name, key_bits, is_default = data
         cursor.close()
-        return Key(self.pib, self.name, row_id, Name.from_bytes(key_name), key_bits, is_default != 0)
+        return Key(self.pib, self._name, row_id, Name.from_bytes(key_name), key_bits, is_default != 0)
 
 
 class KeychainSqlite3(Keychain):
@@ -593,6 +625,9 @@ class KeychainSqlite3(Keychain):
             else:
                 id_name = key_name[:-2]
                 cert_name = self[id_name][key_name].default_cert().name
+        elif isinstance(cert_name, Certificate):
+            cert_name = cert_name.name
+            key_name = cert_name[:-2]
         else:
             key_name = cert_name[:-2]
         key_locator_name = sign_args.get('key_locator', None)
