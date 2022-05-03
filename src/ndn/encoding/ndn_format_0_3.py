@@ -318,8 +318,8 @@ class InterestParam:
     :ivar hop_limit: HopLimit. ``None`` by default.
     :vartype hop_limit: int
 
-    :ivar forwarding_hint: ForwardingHint. The type should be list of pairs of Preference and Name.
-        e.g.: ``[(1, "/ndn/name1"), (2, ["ndn", "name2"])]``
+    :ivar forwarding_hint: ForwardingHint. The type should be list of Names.
+        e.g.: ``["/ndn/name1", ["ndn", "name2"]]``
     :vartype forwarding_hint: :class:`List` [ :class:`Tuple` [ :class:`int` , :any:`NonStrictName` ]]
     """
     can_be_prefix: bool = False

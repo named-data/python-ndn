@@ -49,7 +49,7 @@ These arguments are used to fill in fields of an Interest packet.
   .. warning::
      On Windows, a too small number may cause a memory failure of the NameTrie. Currently, ``>=10`` is safe.
 + **hop_limit** (*int*) - HopLimit. ``None`` by default.
-+ **forwarding_hint** (*int*) - see :any:`InterestParam`.
++ **forwarding_hint** (*list[NonStrictName]*) - see :any:`InterestParam`.
 
 Signature
 ~~~~~~~~~
