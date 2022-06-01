@@ -115,6 +115,7 @@ class SignatureType:
     SHA256_WITH_RSA = 1
     SHA256_WITH_ECDSA = 3
     HMAC_WITH_SHA256 = 4
+    ED25519 = 5
     NULL = 200
 
 

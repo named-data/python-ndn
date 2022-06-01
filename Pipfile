@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 
 [dev-packages]
-python-ndn = {editable = true, extras = ["dev"], path = "."}
+python-ndn = {editable = true, extras = ["dev,pyca"], path = "."}
 atomicwrites = "*"
 
 [requires]
