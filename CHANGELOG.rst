@@ -1,10 +1,14 @@
 Changelog
 =========
 
-master
-++++++
+0.3-2 (2022-06-11)
+++++++++++++++++++
 * Bug fix.
 * Add key suggestion to LVS checker.
+* Support implicit digest in Interest name for express_interest.
+* Add more interfaces for security.
+* Update ci.
+* Add Ed25519 algorithm.
 
 0.3-1 (2022-03-20)
 ++++++++++++++++++
