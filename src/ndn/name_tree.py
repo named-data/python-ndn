@@ -21,7 +21,7 @@ from hashlib import sha256
 from typing import Optional
 from pygtrie import Trie
 from .encoding import InterestParam, FormalName, BinaryStr
-from .types import InterestNack, Validator, Route
+from .types import InterestNack, Validator, Route, DataTuple
 
 
 class NameTrie(Trie):
@@ -59,7 +59,7 @@ class InterestTreeNode:
             entry.future.set_exception(InterestNack(nack_reason))
         return True
 
-    def satisfy(self, data, is_prefix: bool) -> bool:
+    def satisfy(self, data: DataTuple, is_prefix: bool) -> bool:
         unsatisfied_entries = []
         raw_packet = data[4]
         for entry in self.pending_list:

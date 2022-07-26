@@ -20,7 +20,8 @@ from .tlv_type import BinaryStr, VarBinaryStr
 from .tlv_var import parse_and_check_tl
 from .tlv_model import TlvModel, UintField, BytesField, ModelField, BoolField, DecodeError
 
-__all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack', 'make_network_nack', 'parse_lp_packet']
+__all__ = ['LpTypeNumber', 'NackReason', 'parse_network_nack', 'make_network_nack', 'parse_lp_packet',
+           'parse_lp_packet_v2']
 
 
 class LpTypeNumber:
@@ -88,6 +89,21 @@ def parse_lp_packet(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Op
     :param with_tl: if `wire` has the TL fields.
     :return: a tuple of NackReason and Fragment.
     """
+    ret = parse_lp_packet_v2(wire, with_tl)
+    if ret.nack is not None:
+        return ret.nack.nack_reason, ret.fragment
+    else:
+        return None, ret.fragment
+
+
+def parse_lp_packet_v2(wire: BinaryStr, with_tl: bool = True) -> LpPacketValue:
+    """
+    Parse an LpPacket, return NackReason (if exists) and the fragment.
+
+    :param wire: an LpPacket.
+    :param with_tl: if `wire` has the TL fields.
+    :return: LpPacketValue.
+    """
     if with_tl:
         wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
     markers = {}
@@ -96,10 +112,7 @@ def parse_lp_packet(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Op
     if ret.frag_index is not None or ret.frag_count is not None:
         raise DecodeError('NDNLP fragmentation is not implemented yet.')
 
-    if ret.nack is not None:
-        return ret.nack.nack_reason, ret.fragment
-    else:
-        return None, ret.fragment
+    return ret
 
 
 def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):

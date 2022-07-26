@@ -259,7 +259,7 @@ class NDNApp:
             else:
                 return data_name, meta_info, content
         else:
-            raise ValidationFailure(data_name, meta_info, content)
+            raise ValidationFailure(data_name, meta_info, content, sig)
 
     async def main_loop(self, after_start: Awaitable = None) -> bool:
         """

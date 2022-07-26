@@ -18,12 +18,21 @@
 from typing import List
 from Cryptodome.Hash import SHA256
 from ...encoding import Signer, SignatureType, VarBinaryStr
+from ...utils import timestamp, gen_nonce_64
 
 
 class DigestSha256Signer(Signer):
+    for_interest: bool
+
+    def __init__(self, for_interest: bool = False):
+        self.for_interest = for_interest
+
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.DIGEST_SHA256
         signature_info.key_locator = None
+        if self.for_interest:
+            signature_info.signature_time = timestamp()
+            signature_info.signature_nonce = gen_nonce_64()
 
     def get_signature_value_size(self):
         return 32

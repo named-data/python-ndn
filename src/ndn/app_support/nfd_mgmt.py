@@ -128,6 +128,10 @@ class GeneralStatus(TlvModel):
     n_out_nacks = UintField(0x98)
     n_satisfied_interests = UintField(0x99)
     n_unsatisfied_interests = UintField(0x9a)
+    # The following comes from DNMP's extension to NFD mgmt protocol:
+    # https://github.com/pollere/DNMP-v2/blob/c4359ae1af03824ec1ee8cd27a7d52c9151fa813/formats/forwarder-status.proto
+    # It does not show up in the standard protocol:
+    # https://redmine.named-data.net/projects/nfd/wiki/ForwarderStatus
     n_fragmentation_errors = UintField(0xc8)
     n_out_over_mtu = UintField(0xc9)
     n_in_lp_invalid = UintField(0xca)
@@ -228,25 +232,8 @@ class CsInfo(TlvModel):
 
 
 def make_command(module, command, face: Optional[Face] = None, **kwargs):
-    local = face.isLocalFace() if face else True
+    ret = make_command_v2(module, command, face, **kwargs)
 
-    if local:
-        ret = Name.from_str(f"/localhost/nfd/{module}/{command}")
-    else:
-        ret = Name.from_str(f"/localhop/nfd/{module}/{command}")
-    # Command parameters
-    cp = ControlParameters()
-    cp.cp = ControlParametersValue()
-    for k, v in kwargs.items():
-        if k == 'strategy':
-            cp.cp.strategy = Strategy()
-            cp.cp.strategy.name = v
-        else:
-            setattr(cp.cp, k, v)
-    ret.append(Component.from_bytes(cp.encode()))
-
-    # Note: when shifting from command Interest to signed Interest, remove all following lines
-    # and add ``app_param=b'', digest_sha256=True`` to app.express_interest
     # Timestamp and nonce
     ret.append(Component.from_bytes(struct.pack('!Q', timestamp())))
     ret.append(Component.from_bytes(struct.pack('!Q', gen_nonce_64())))
@@ -267,6 +254,30 @@ def make_command(module, command, face: Optional[Face] = None, **kwargs):
     signer.write_signature_value(memoryview(buf)[offset:], ret)
     ret.append(Component.from_bytes(buf))
 
+    return ret
+
+
+def make_command_v2(module, command, face: Optional[Face] = None, **kwargs):
+    # V2 returns the Command Interest name for the NDNv3 signed Interest
+    # Note: this behavior is supported by NFD and YaNFD but has not been documented yet (on 06/26/2022):
+    # https://redmine.named-data.net/projects/nfd/wiki/ControlCommand
+    # Add ``app_param=b'', signer=sec.DigestSha256Signer(for_interest=True)`` to app.express when using this.
+    local = face.isLocalFace() if face else True
+
+    if local:
+        ret = Name.from_str(f"/localhost/nfd/{module}/{command}")
+    else:
+        ret = Name.from_str(f"/localhop/nfd/{module}/{command}")
+    # Command parameters
+    cp = ControlParameters()
+    cp.cp = ControlParametersValue()
+    for k, v in kwargs.items():
+        if k == 'strategy':
+            cp.cp.strategy = Strategy()
+            cp.cp.strategy.name = v
+        else:
+            setattr(cp.cp, k, v)
+    ret.append(Component.from_bytes(cp.encode()))
     return ret
 
 

@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+from enum import Enum
 from typing import Optional, Callable, Any, Coroutine
 from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, SignaturePtrs
 
@@ -24,6 +25,9 @@ r"""An OnInterest callback function for a route."""
 
 Validator = Callable[[FormalName, SignaturePtrs], Coroutine[Any, None, bool]]
 r"""A validator used to validate an Interest or Data packet."""
+
+# For internal use. = (FormalName, MetaInfo, Content, SigPtrs, RawPacket)
+DataTuple = tuple[FormalName, MetaInfo, Optional[BinaryStr], SignaturePtrs, BinaryStr]
 
 
 class NetworkError(Exception):
@@ -68,6 +72,29 @@ class InterestNack(Exception):
         self.reason = reason
 
 
+class ValidResult(Enum):
+    """
+    Validation result returned by a validator.
+    Most of them are designed for the union checker, which chains multiple checkers in order.
+    For NDNApp (v2), only PASS and ALLOW_BYPASS are considered as True.
+    """
+
+    FAIL = -2
+    r"""Negative. The validation fails and the packet should be discarded. Abort."""
+
+    TIMEOUT = -1
+    r"""The validation process exceeds the Interest deadline. Abort."""
+
+    SILENCE = 0
+    r"""The validator does not handle this type of packet and thus cannot decide. Continue."""
+
+    PASS = 1
+    r"""Affirmative. Passes the current check. Continue."""
+
+    ALLOW_BYPASS = 2
+    r"""The validator allows bypassing all following checkers. Succeed immediately."""
+
+
 class ValidationFailure(Exception):
     """
     Raised when failing to validate a Data packet.
@@ -78,12 +105,21 @@ class ValidationFailure(Exception):
     :vartype meta_info: :any:`MetaInfo`
     :ivar content: the Content of Data.
     :vartype content: Optional[:any:`BinaryStr`]
+    :ivar sig_ptrs: the signature pointers of Data
+    :vartype sig_ptrs: :any:`SignaturePtrs`
+    :ivar result: the reason of failure.
+    :vartype result: :any:`ValidResult`
     """
     name: FormalName
     meta_info: MetaInfo
     content: Optional[BinaryStr]
+    sig_ptrs: SignaturePtrs
+    result: ValidResult
 
-    def __init__(self, name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr]):
+    def __init__(self, name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr],
+                 sig_ptrs: SignaturePtrs, result: ValidResult = ValidResult.FAIL):
         self.name = name
         self.meta_info = meta_info
         self.content = content
+        self.sig_ptrs = sig_ptrs
+        self.result = result
