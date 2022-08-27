@@ -78,8 +78,8 @@ class TestInterestNack(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.consume_output(b'\x05)\x07\x1f\x08\tlocalhost\x08\x03nfd\x08\x05faces\x08\x06events'
                                   b'\x21\x00\x12\x00\x0c\x02\x03\xe8')
-        await face.input_packet(b'\x64\x36\xfd\x03 \x05\xfd\x03!\x01\x96'
-                                b'P\x43\x05)\x07\x1f\x08\tlocalhost\x08\x03nfd\x08\x05faces\x08\x06events'
+        await face.input_packet(b'\x64\x36\xfd\x03\x20\x05\xfd\x03\x21\x01\x96'
+                                b'\x50\x2b\x05)\x07\x1f\x08\tlocalhost\x08\x03nfd\x08\x05faces\x08\x06events'
                                 b'\x21\x00\x12\x00\x0c\x02\x03\xe8')
 
     async def app_main(self):
