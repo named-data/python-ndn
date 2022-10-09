@@ -13,6 +13,9 @@ which connects an NDN application and an NFD node.
 + Express Interests and handle the Data coming back.
 + Register and unregister a route with an Interest handling function.
 
+This package does not support PIT token.
+To use PIT token, consider using :mod:`ndn.appv2` package.
+
 .. _label-keyword-arguments:
 
 Keyword Arguments
