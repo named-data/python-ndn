@@ -41,21 +41,55 @@ r"""The context for NDN Interest or Data handling."""
 
 ReplyFunc = typing.Callable[[enc.BinaryStr], bool]
 r"""
-The callback function called to respond to an Interest.
-The argument is encoded Data packet. Returns False if any error exists.
+Continuation function for :any:`IntHandler` to respond to an Interest.
+
+..  function:: (data: BinaryStr) -> bool
+
+    :param data: an encoded Data packet.
+    :type data: :any:`BinaryStr`
+    :return: True for success, False upon error.
 """
 
 IntHandler = typing.Callable[[enc.FormalName, typing.Optional[enc.BinaryStr], ReplyFunc, PktContext], None]
 r"""
-An OnInterest callback function for a route.
-The arguments are: Interest name, AppParam, reply callback, context.
+Interest handler function associated with a name prefix.
+
+The function should use the provided ``reply`` callback to reply with Data, which can handle PIT
+token properly.
+
+..  function:: (name: FormalName, app_param: Optional[BinaryStr], reply: ReplyFunc, context: PktContext) -> None
+
+    :param name: Interest name.
+    :type name: :any:`FormalName`
+    :param app_param: Interest ApplicationParameters value, or None if absent.
+    :type app_param: Optional[:any:`BinaryStr`]
+    :param reply: continuation function to respond with Data.
+    :type reply: :any:`ReplyFunc`
+    :param context: packet handler context.
+    :type context: :any:`PktContext`
+
+.. note::
+    Interest handler function must be a normal function instead of an ``async`` one.
+    This is on purpose, because an Interest is supposed to be replied ASAP,
+    even it cannot finish the request in time.
+    To provide some feedback, a better practice is replying with an Application NACK
+    (or some equivalent Data packet saying the operation cannot be finished in time).
+    If you want to use ``await`` in the handler, please use ``asyncio.create_task`` to create a new coroutine.
 """
 
 Validator = typing.Callable[[enc.FormalName, enc.SignaturePtrs, PktContext],
                             typing.Coroutine[any, None, ValidResult]]
 r"""
-A validator used to validate an Interest or Data packet.
-The arguments are: Packet name, SignaturePtrs, context.
+Validator function that validates Interest or Data signature against trust policy.
+
+..  function:: (name: FormalName, sig: SignaturePtrs, context: PktContext) -> Coroutine[ValidResult]
+
+    :param name: Interest or Data name.
+    :type name: :any:`FormalName`
+    :param sig: packet signature pointers.
+    :type sig: :any:`SignaturePtrs`
+    :param context: packet handler context.
+    :type context: :any:`PktContext`
 """
 
 
@@ -267,7 +301,7 @@ class NDNApp:
         :type content: Optional[:any:`BinaryStr`]
         :param signer: the Signer used to sign the packet.
         :type signer: Optional[:any:`Signer`]
-        :param kwargs: :ref:`label-keyword-arguments`.
+        :param kwargs: arguments for :any:`MetaInfo`.
         :return: TLV encoded Data packet.
         """
         if 'meta_info' in kwargs:
@@ -404,15 +438,26 @@ class NDNApp:
     def attach_handler(self, name: enc.NonStrictName, handler: IntHandler,
                        validator: typing.Optional[Validator] = None):
         """
-        Attach an incoming Interest handler to a name prefix without sending a register command to the forwarder.
-        In NDNApp v2 handlers will not be cleared after disconnection to NFD.
+        Attach an Interest handler at a name prefix.
+        Incoming Interests under the specified name prefix will be dispatched to the handler.
 
-        :param name: the Name prefix to register.
+        This only sets the handler within NDNApp, but does not send prefix registration commands
+        to the forwarder.
+        To register the prefix in the forwarder, use :any:`register`.
+        The handler association is retained even if the forwarder is disconnected.
+
+        :param name: name prefix.
         :type name: :any:`NonStrictName`
-        :param handler: the callback function for on_interest.
+        :param handler: Interest handler function.
         :type handler: :any:`IntHandler`
-        :param validator: the validator used for signed Interest. Note that set this to ``None`` will
-            discard all signed Interests.
+        :param validator: validator for signed Interests.
+            Non signed Interests, i.e. those without ApplicationParameters and SignatureInfo, are
+            passed to the handler directly without calling the validator.
+            Interests with malformed ParametersSha256DigestComponent are dropped silently.
+            If a validator is not provided (set to ``None``), signed Interests will be dropped.
+            Otherwise, signed Interests are passed to the validator.
+            Those failing the validation are dropped silently.
+            Those passing the validation are passed to the handler function.
         :type validator: Optional[:any:`Validator`]
         """
         name = enc.Name.normalize(name)
@@ -424,25 +469,28 @@ class NDNApp:
 
     def detach_handler(self, name: enc.NonStrictName):
         """
-        Remove the Interest handler for a prefix without sending an unregister command.
+        Detach an Interest handler at a name prefix.
 
-        .. note::
-            ``unregister`` will only remove the callback if the callback's name matches exactly
-            the route's name.
-            This is because there may be one route whose name is the prefix of another.
-            To avoid cancelling unexpected routes, neither ``unregister`` nor ``detach_handler``
-            behaves in a cascading manner.
-            Please remove callbacks manually.
+        This only deletes the handler within NDNApp, but does not unregister the prefix in the
+        forwarder.
+        To unregister the prefix in the forwarder, use :any:`unregister`.
+
+        :param name: name prefix. This must exactly match the name passed to :any:`attach_handler`.
+                     If there are Interest handlers attached to longer prefixes, each handler must
+                     be removed explicitly.
+        :type name: :any:`NonStrictName`
         """
         del self._fib[enc.Name.normalize(name)]
 
     async def register(self, name: enc.NonStrictName) -> bool:
         """
-        Register a prefix dynamically to the forwarder.
-        Note that the registration is separated from Interest handlers.
-        Please use :any:`attach_handler` to register the callback handler.
+        Register a prefix in the forwarder.
 
-        :param name: the Name prefix to register.
+        This only sends the prefix registration command to the forwarder.
+        In order to receive incoming Interests, you also need to use :any:`attach_handler` to
+        attach an Interest handler function.
+
+        :param name: name prefix.
         :type name: :any:`NonStrictName`
 
         :raises ValueError: the prefix is already registered.
@@ -479,9 +527,9 @@ class NDNApp:
 
     async def unregister(self, name: enc.NonStrictName) -> bool:
         """
-        Unregister a route for a specific prefix.
+        Unregister a prefix in the forwarder.
 
-        :param name: the Name prefix.
+        :param name: name prefix.
         :type name: :any:`NonStrictName`
         """
         name = enc.Name.normalize(name)
@@ -569,30 +617,33 @@ class NDNApp:
                 **kwargs) -> typing.Coroutine[any, None,
                                               tuple[enc.FormalName, typing.Optional[enc.BinaryStr], PktContext]]:
         r"""
-        Express an Interest packet.
+        Express an Interest.
 
         The Interest packet is sent immediately and a coroutine used to get the result is returned.
-        Awaiting on what is returned will block until the Data is received and return that Data.
-        An exception is raised if unable to receive the Data.
+        Awaiting on the returned coroutine will block until the Data is received.
+        It then returns the Data name, Data Content value, and :any:`PktContext`.
+        An exception is raised if NDNApp is unable to retrieve the Data.
 
-        :param name: the Name.
+        :param name: Interest name.
         :type name: :any:`NonStrictName`
-        :param validator: the Validator used to verify the Data received.
+        :param validator: validator for the retrieved Data packet.
         :type validator: :any:`Validator`
-        :param app_param: the ApplicationParameters.
+        :param app_param: Interest ApplicationParameters value. If this is not None, a signed
+                          Interest is sent. NDNApp does not support sending parameterized
+                          Interests that are not signed.
         :type app_param: Optional[:any:`BinaryStr`]
-        :param signer: the Signer used to sign the Interest.
+        :param signer: Signer for Interest signing. This is required if `app_param` is specified.
         :type signer: Optional[:any:`Signer`]
-        :param kwargs: :ref:`label-keyword-arguments`.
+        :param kwargs: arguments for :any:`InterestParam`.
         :return: A tuple of (Name, Content, PacketContext) after ``await``.
         :rtype: Coroutine[Any, None, Tuple[:any:`FormalName`, Optional[:any:`BinaryStr`], :any:`PktContext`]]
 
-        The following exception is raised by ``express_interest``:
+        The following exceptions may be raised by ``express``:
 
         :raises NetworkError: the face to NFD is down before sending this Interest.
         :raises ValueError: when the signer is missing but app_param presents.
 
-        The following exceptions are raised by the coroutine returned:
+        The following exceptions may be raised by the returned coroutine:
 
         :raises InterestNack: an NetworkNack is received.
         :raises InterestTimeout: time out.
@@ -613,26 +664,19 @@ class NDNApp:
         return self.express_raw_interest(final_name, interest_param, interest, validator)
 
     def route(self, name: enc.NonStrictName, validator: typing.Optional[Validator] = None):
-        """
+        r"""
         A decorator used to register a permanent route for a specific prefix.
+        The decorated function should be an :any:`IntHandler`.
 
         This function is non-blocking and can be called at any time.
-        If it is called before connecting to NFD, NDNApp will remember this route and
-        automatically register it every time when a connection is established.
-        Failure in registering this route to NFD will be ignored.
+        It can be called before connecting to the forwarder.
+        Every time a forwarder connection is established, NDNApp will automatically send
+        prefix registration commands.
+        Errors in prefix registration are ignored.
 
-        The decorated function should be an Interest Handler and
-        accept 4 arguments: Name, ApplicationParameters, Reply callback, and context dict.
-        The function should use the provided reply callback to reply with Data, which can handle PIT token properly.
-
-        :param name: the Name prefix for this route.
+        :param name: name prefix.
         :type name: :any:`NonStrictName`
-        :param validator: the Validator used to validate coming Interests.
-            An Interest without ApplicationParameters and SignatureInfo will be considered valid without
-            calling validator.
-            Interests with malformed ParametersSha256DigestComponent will be dropped before going into the validator.
-            Otherwise NDNApp will try to validate the Interest with the validator.
-            Interests which fail to be validated will be dropped without raising any exception.
+        :param validator: validator for signed Interests. See :any:`attach_handler` for details.
         :type validator: Optional[:any:`Validator`]
 
         :examples:
@@ -644,13 +688,6 @@ class NDNApp:
                 def on_interest(name, app_param, reply, context):
                     pass
 
-        .. note::
-            The route function must be a normal function instead of an ``async`` one.
-            This is on purpose, because an Interest is supposed to be replied ASAP,
-            even it cannot finish the request in time.
-            To provide some feedback, a better practice is replying with an Application NACK
-            (or some equivalent Data packet saying the operation cannot be finished in time).
-            If you want to use ``await`` in the handler, please use ``asyncio.create_task`` to create a new coroutine.
         """
         name = enc.Name.normalize(name)
 
