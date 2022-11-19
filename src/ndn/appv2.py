@@ -268,7 +268,10 @@ class NDNApp:
                     logging.warning('Unable to decode received packet')
                     return
                 if logging.getLogger().isEnabledFor(logging.DEBUG):
-                    logging.debug(f'Interest received {enc.Name.to_str(name)} w/ token={bytes(pit_token).hex()}')
+                    if pit_token:
+                        logging.debug(f'Interest received {enc.Name.to_str(name)} w/ token={bytes(pit_token).hex()}')
+                    else:
+                        logging.debug(f'Interest received {enc.Name.to_str(name)}')
                 await self._on_interest(name, pit_token, param, app_param, sig, raw_packet=data)
             elif typ == enc.TypeNumber.DATA:
                 try:
