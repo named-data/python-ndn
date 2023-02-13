@@ -6,6 +6,7 @@ Authors
 * Eric Newberry  <https://ericnewberry.com>
 * Junxiao Shi    <https://yoursunny.com>
 * Tianyuan Yu    <https://www.tianyuan-yu.com/>
+* Alwin Kahlert  <https://github.com/akamos>
 
 Anonymous Contributors
 ======================
