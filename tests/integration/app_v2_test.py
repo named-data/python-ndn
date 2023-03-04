@@ -57,7 +57,7 @@ class TestConsumerBasic(NDNAppTestSuite):
                                 b'\x15\rHello, world!')
 
     async def app_main(self):
-        name = f'/example/testApp/randomData/t=1570430517101'
+        name = '/example/testApp/randomData/t=1570430517101'
         data_name, content, pkt_context = await self.app.express(
             name, app.pass_all, must_be_fresh=True, can_be_prefix=False, lifetime=6000, nonce=None)
         assert data_name == enc.Name.from_str(name)
@@ -199,7 +199,7 @@ class TestConsumerRawPacket(NDNAppTestSuite):
                                 b'\x15\rHello, world!')
 
     async def app_main(self):
-        name = f'/example/testApp/randomData/t=1570430517101'
+        name = '/example/testApp/randomData/t=1570430517101'
         _, _, pkt_context = await self.app.express(
             name, validator=app.pass_all,
             must_be_fresh=True, can_be_prefix=False, lifetime=6000, nonce=None, need_raw_packet=True)

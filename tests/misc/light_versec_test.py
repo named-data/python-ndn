@@ -16,10 +16,10 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytest
 from tempfile import TemporaryDirectory
-from ndn.encoding import Name, Component
+from ndn.encoding import Component
 from ndn.app_support.light_versec import compile_lvs, Checker, SemanticError, DEFAULT_USER_FNS
 from ndn.app_support.security_v2 import parse_certificate, derive_cert
 from ndn.security import KeychainSqlite3, TpmFile
@@ -301,9 +301,9 @@ class TestLvsSemantics:
         assert checker.check('/x/y/z', '/xxx/xxx/xxx')
         assert checker.check('/x/x/x', '/xxx/yyy/zzz')
         assert checker.check('/a/a/a', '/xxx/xxx/xxx')
-    
+
     @staticmethod
-    def test_signing_suggest():        
+    def test_signing_suggest():
         with TemporaryDirectory() as tmpdirname:
             pib_file = os.path.join(tmpdirname, 'pib.db')
             tpm_dir = os.path.join(tmpdirname, 'privKeys')
@@ -318,9 +318,9 @@ class TestLvsSemantics:
             la_signer = keychain.get_signer({'cert': la_cert_name})
 
             la_author_id = keychain.touch_identity('/la/author/1')
-            la_author_cert_name, la_author_cert = derive_cert(la_author_id.default_key().name, 
-                                                              Component.from_str('la-signer'), 
-                                                              la_cert_data.content, la_signer, 
+            la_author_cert_name, la_author_cert = derive_cert(la_author_id.default_key().name,
+                                                              Component.from_str('la-signer'),
+                                                              la_cert_data.content, la_signer,
                                                               datetime.utcnow(), 100)
             keychain.import_cert(la_id.default_key().name, la_author_cert_name, la_author_cert)
 
@@ -331,12 +331,11 @@ class TestLvsSemantics:
             ny_signer = keychain.get_signer({'cert': ny_cert_name})
 
             ny_author_id = keychain.touch_identity('/ny/author/2')
-            ny_author_cert_name, ny_author_cert = derive_cert(ny_author_id.default_key().name, 
+            ny_author_cert_name, ny_author_cert = derive_cert(ny_author_id.default_key().name,
                                                               Component.from_str('ny-signer'),
-                                                              ny_cert_data.content, ny_signer, 
+                                                              ny_cert_data.content, ny_signer,
                                                               datetime.utcnow(), 100)
             keychain.import_cert(ny_id.default_key().name, ny_author_cert_name, ny_author_cert)
-
 
             lvs = r'''
             #KEY: "KEY"/_/_/_
@@ -348,7 +347,7 @@ class TestLvsSemantics:
 
             assert checker.suggest("/article/eco/day1", keychain) == la_author_cert_name
             assert checker.suggest("/article/life/day1", keychain) is None
-            
+
             lvs = r'''
             #KEY: "KEY"/_/_/_
             #LAKEY: "KEY"/_/_signer/_ & { _signer: "la-signer" }
@@ -358,7 +357,7 @@ class TestLvsSemantics:
             '''
             checker = Checker(compile_lvs(lvs), {})
             assert checker.suggest("/article/eco/day1", keychain) == la_author_cert_name
-            
+
             lvs = r'''
             #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
             #article: /"article"/_topic/_ & { _topic: "life" | "fin" } <= #author
@@ -367,7 +366,7 @@ class TestLvsSemantics:
             '''
             checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
             assert checker.suggest("/article/fin/day1", keychain) == ny_author_cert_name
-            
+
             lvs = r'''
             #KEY: "KEY"/_/_/_version & { _version: $eq_type("v=0") }
             #NYKEY: "KEY"/_/_signer/_version& { _signer: "ny-signer", _version: $eq_type("v=0")}
@@ -377,4 +376,4 @@ class TestLvsSemantics:
             #site: "ny"
             '''
             checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
-            assert checker.suggest("/article/eco/day1", keychain) == ny_author_cert_name        
+            assert checker.suggest("/article/eco/day1", keychain) == ny_author_cert_name

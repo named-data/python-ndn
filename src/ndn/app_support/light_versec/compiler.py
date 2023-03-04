@@ -22,8 +22,6 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-import typing
-
 import lark
 from typing import TypeVar, Union, Optional
 from dataclasses import dataclass

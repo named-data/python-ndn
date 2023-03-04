@@ -308,6 +308,7 @@ class Checker:
                         if self.check(cert_name, cert.signature_info.key_locator.name):
                             return cert_name
 
+
 DEFAULT_USER_FNS = {
     '$eq': lambda c, args: all(x == c for x in args),
     '$eq_type': lambda c, args: all(Component.get_type(x) == Component.get_type(c) for x in args),
