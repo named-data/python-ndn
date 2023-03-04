@@ -30,6 +30,7 @@ class Face(metaclass=abc.ABCMeta):
     async def open(self):
         pass
 
+    # TODO: Should switch to async function, since some requires gracefully shutdown
     @abc.abstractmethod
     def shutdown(self):
         pass
