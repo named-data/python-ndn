@@ -87,6 +87,26 @@ def to_str(name: NonStrictName) -> str:
     return ret
 
 
+def to_canonical_uri(name: NonStrictName) -> str:
+    r"""
+    Convert an NDN Name to a canonical URI string without naming conventions.
+
+    :param name: the input NDN Name.
+    :type name: :any:`NonStrictName`
+    :return: the canonical URI.
+
+    :examples:
+        >>> from ndn.encoding.name import Name
+        >>> Name.to_canonical_uri('Σπυρίδων')
+        '/%CE%A3%CF%80%CF%85%CF%81%CE%AF%CE%B4%CF%89%CE%BD'
+    """
+    name = normalize(name)
+    ret = '/' + '/'.join(Component.to_canonical_uri(comp) for comp in name)
+    if name and name[-1] == b'\x08\x00':
+        ret += '/'
+    return ret
+
+
 def from_bytes(buf: BinaryStr) -> FormalName:
     r"""
     Decode the Name from its TLV encoded form.

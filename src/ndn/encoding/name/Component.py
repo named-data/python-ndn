@@ -322,6 +322,36 @@ def to_str(component: BinaryStr) -> str:
         return ret + "".join(decode(val) for val in component[offset:])
 
 
+def to_canonical_uri(component: BinaryStr) -> str:
+    """
+    Convert a Component into a canonical URI string without naming conventions.
+    Returns an empty string ``''`` for a 0-size Component.
+
+    :param component: the component.
+    :return: a canonical URI string.
+    """
+    offset = 0
+    typ, sz = parse_tl_num(component, offset)
+    offset += sz
+    length, sz = parse_tl_num(component, offset)
+    offset += sz
+    if len(component) != length + offset:
+        raise ValueError(f'{component} is malformed.')
+
+    ret = ""
+    if typ != TYPE_GENERIC:
+        ret = f"{typ}="
+
+    def decode(val: int) -> str:
+        ret = chr(val)
+        if ret in CHARSET and ret not in {'%', '='}:
+            return ret
+        else:
+            return f"%{val:02X}"
+
+    return ret + "".join(decode(val) for val in component[offset:])
+
+
 def to_number(component: BinaryStr) -> int:
     """
     Take the number encoded in the component out.

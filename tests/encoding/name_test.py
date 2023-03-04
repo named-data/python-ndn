@@ -311,3 +311,8 @@ class TestName:
 
         name = ['8=a', 'b', b'\x08\x01c', '\x1d']
         assert Name.normalize(name) == [b'\x08\x01a', b'\x08\x01b', b'\x08\x01c', b'\x08\x01\x1d']
+
+    @staticmethod
+    def test_canonical_uri():
+        assert Name.to_canonical_uri(Name.from_str('/hello/world')) == '/hello/world'
+        assert Name.to_canonical_uri(Name.from_str('/8=hello/seg=1')) == '/hello/50=%01'
