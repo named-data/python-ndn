@@ -22,14 +22,14 @@ import logging
 from hashlib import sha256
 from dataclasses import dataclass
 from .transport.face import Face
+from .transport.prefix_registerer import PrefixRegisterer
 from . import security as sec
 from . import encoding as enc
 from . import name_tree
 from . import types
 from . import utils
-from .app_support import nfd_mgmt
 from .encoding import ndnlp_v2 as ndnlp
-from .client_conf import read_client_conf, default_face, default_keychain
+from .client_conf import read_client_conf, default_face, default_keychain, default_registerer
 
 
 DEFAULT_LIFETIME = 4000
@@ -93,6 +93,10 @@ Validator function that validates Interest or Data signature against trust polic
 """
 
 
+async def pass_all(_name, _sig, _context):
+    return types.ValidResult.PASS
+
+
 @dataclass
 class PrefixTreeNode:
     callback: IntHandler = None
@@ -128,10 +132,6 @@ class PendingIntEntry:
             self.future.set_result((name, content, pkt_context))
         else:
             self.future.set_exception(types.ValidationFailure(name, meta_info, content, sig, valid))
-
-
-async def pass_all(_name, _sig, _context):
-    return ValidResult.PASS
 
 
 class InterestTreeNode:
@@ -198,11 +198,10 @@ class NDNApp:
     _pit: name_tree.NameTrie = None
     _fib: name_tree.NameTrie = None
     face: Face = None
+    registerer: PrefixRegisterer = None
     _autoreg_routes: list[enc.FormalName]
-    _prefix_register_semaphore: aio.Semaphore = None
-    _last_command_timestamp: int = 0
 
-    def __init__(self, face=None, client_conf=None):
+    def __init__(self, face=None, client_conf=None, registerer=None):
         config = client_conf if client_conf else {}
         if not face:
             if 'transport' not in config:
@@ -211,11 +210,15 @@ class NDNApp:
             self.face = face
         else:
             self.face = default_face(config['transport'])
+        if registerer is not None:
+            self.registerer = registerer
+        else:
+            self.registerer = default_registerer()
+        self.registerer.set_app(app=self)
         self.face.callback = self._receive
         self._pit = name_tree.NameTrie()
         self._fib = name_tree.NameTrie()
         self._autoreg_routes = []
-        self._prefix_register_semaphore = aio.Semaphore(1)
 
     @staticmethod
     def default_keychain(client_conf=None) -> sec.Keychain:
@@ -500,33 +503,7 @@ class NDNApp:
         :raises NetworkError: the face to NFD is down now.
         """
         name = enc.Name.normalize(name)
-
-        # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
-        async with self._prefix_register_semaphore:
-            for _ in range(10):
-                now = utils.timestamp()
-                if now > self._last_command_timestamp:
-                    self._last_command_timestamp = now
-                    break
-                await aio.sleep(0.001)
-            try:
-                _, reply, _ = await self.express(
-                    name=nfd_mgmt.make_command_v2('rib', 'register', self.face, name=name),
-                    app_param=b'', signer=sec.DigestSha256Signer(for_interest=True),
-                    validator=pass_all,
-                    lifetime=1000)
-                ret = nfd_mgmt.parse_response(reply)
-                if ret['status_code'] != 200:
-                    logging.error(f'Registration for {enc.Name.to_str(name)} failed: '
-                                  f'{ret["status_code"]} {ret["status_text"]}')
-                    return False
-                else:
-                    logging.debug(f'Registration for {enc.Name.to_str(name)} succeeded: '
-                                  f'{ret["status_code"]} {ret["status_text"]}')
-                    return True
-            except (types.InterestNack, types.InterestTimeout, types.InterestCanceled, types.ValidationFailure) as e:
-                logging.error(f'Registration for {enc.Name.to_str(name)} failed: {e.__class__.__name__}')
-                return False
+        return await self.registerer.register(name)
 
     async def unregister(self, name: enc.NonStrictName) -> bool:
         """
@@ -536,21 +513,7 @@ class NDNApp:
         :type name: :any:`NonStrictName`
         """
         name = enc.Name.normalize(name)
-        # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
-        async with self._prefix_register_semaphore:
-            for _ in range(10):
-                now = utils.timestamp()
-                if now > self._last_command_timestamp:
-                    self._last_command_timestamp = now
-                    break
-                await aio.sleep(0.001)
-            try:
-                await self.express(nfd_mgmt.make_command_v2('rib', 'unregister', self.face, name=name),
-                                   app_param=b'', signer=sec.DigestSha256Signer(for_interest=True),
-                                   validator=pass_all, lifetime=1000)
-                return True
-            except (types.InterestNack, types.InterestTimeout, types.InterestCanceled, types.ValidationFailure):
-                return False
+        return await self.registerer.unregister(name)
 
     def express_raw_interest(self,
                              final_name: enc.NonStrictName,

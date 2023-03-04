@@ -24,6 +24,8 @@ from .security import TpmFile, Keychain, KeychainSqlite3
 from .transport.face import Face
 from .transport.stream_face import UnixFace, TcpFace
 from .transport.udp_face import UdpFace
+from .transport.prefix_registerer import PrefixRegisterer
+from .transport.nfd_registerer import NfdRegister
 if sys.platform == 'darwin':
     from .security.tpm.tpm_osx_keychain import TpmOsxKeychain
 if sys.platform == 'win32':
@@ -121,3 +123,7 @@ def default_face(face: str) -> Face:
         return UdpFace(host, int(port))
     else:
         raise ValueError(f'Unrecognized face: {face}')
+
+
+def default_registerer() -> PrefixRegisterer:
+    return NfdRegister()
