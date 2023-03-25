@@ -215,7 +215,7 @@ class TestCongestionMark(NDNAppTestSuite):
         await face.input_packet(b'\x64\x1e\xfd\x03\x40\x01\x01\x50\x17'
                                 b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
         await face.consume_output(b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
-                                  b'\x16\x03\x1b\x01\xc8\x17\x00')
+                                  b'\x16\x03\x1b\x01\xc8\x17\x00', timeout=0.1)
 
     async def app_main(self):
         @self.app.route('/not')
