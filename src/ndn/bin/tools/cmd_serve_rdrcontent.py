@@ -19,7 +19,7 @@ import os
 import sys
 import argparse
 from ...encoding import Name, Component
-from ...app import NDNApp
+from ...appv2 import NDNApp
 from ...security import KeychainDigest
 from ...utils import timestamp
 
@@ -65,30 +65,33 @@ def execute(args: argparse.Namespace):
         print('Unable to read the input file')
         return -2
 
-    app = NDNApp(keychain=KeychainDigest())
+    app = NDNApp()
+    keychain = KeychainDigest()
     seg_cnt = (len(data) + size - 1) // size
-    packets = [app.prepare_data(data_name + [Component.from_segment(i)],
-                                data[i * size:(i + 1) * size],
-                                freshness_period=fresh,
-                                final_block_id=Component.from_segment(seg_cnt - 1))
+    packets = [app.make_data(data_name + [Component.from_segment(i)],
+                             data[i * size:(i + 1) * size],
+                             signer=keychain.get_signer({}),
+                             freshness_period=fresh,
+                             final_block_id=Component.from_segment(seg_cnt - 1))
                for i in range(seg_cnt)]
     print(f'Created {seg_cnt} chunks under name prefix {Name.to_str(data_name)}')
 
-    meta_packet = app.prepare_data(meta_name, Name.to_bytes(data_name),
-                                   freshness_period=fresh, final_block_id=Component.from_segment(0))
+    meta_packet = app.make_data(meta_name, Name.to_bytes(data_name),
+                                signer=keychain.get_signer({}),
+                                freshness_period=fresh, final_block_id=Component.from_segment(0))
     print(f'Created metadata packet under name {Name.to_str(meta_name)}')
 
     @app.route(name)
-    def on_interest(int_name, _int_param, _app_param):
+    def on_interest(int_name, _app_param, reply, _context):
         if len(int_name) == name_len or int_name[name_len] == METADATA_COMPONENT:
-            app.put_raw_packet(meta_packet)
+            reply(meta_packet)
         elif int_name[name_len] == version:
             if Component.get_type(int_name[-1]) == Component.TYPE_SEGMENT:
                 seg_no = Component.to_number(int_name[-1])
             else:
                 seg_no = 0
             if seg_no < seg_cnt:
-                app.put_raw_packet(packets[seg_no])
+                reply(packets[seg_no])
 
     print(f'Start serving {Name.to_str(name)} ...')
     app.run_forever()

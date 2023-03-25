@@ -19,7 +19,7 @@ import os
 import sys
 import argparse
 from ...encoding import Name, MetaInfo
-from ...app import NDNApp
+from ...appv2 import NDNApp
 from ...security import KeychainDigest
 
 
@@ -55,11 +55,12 @@ def execute(args: argparse.Namespace):
         print('Unable to read the input file')
         return -2
 
-    app = NDNApp(keychain=KeychainDigest())
+    app = NDNApp()
+    keychain = KeychainDigest()
 
     @app.route(name)
-    def on_interest(int_name, param, app_param):
-        print(f'>> I: {Name.to_str(int_name)}, {param}')
+    def on_interest(int_name, app_param, reply, context):
+        print(f'>> I: {Name.to_str(int_name)}, {context["int_param"]}')
         if app_param:
             print(f'AppParam: (size: {len(bytes(app_param))})')
             if args.output:
@@ -69,7 +70,7 @@ def execute(args: argparse.Namespace):
                     with open(os.path.expandvars(args.output), 'wb') as f:
                         f.write(bytes(app_param))
         content = text
-        app.put_data(name, content=content, freshness_period=fresh)
+        reply(app.make_data(name, signer=keychain.get_signer({}), content=content, freshness_period=fresh))
         print(f'<< D: {Name.to_str(name)}')
         print(MetaInfo(freshness_period=fresh))
         print(f'Content: (size: {len(content)})')

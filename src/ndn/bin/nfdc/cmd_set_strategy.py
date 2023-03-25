@@ -16,8 +16,8 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...app import NDNApp
-from ...app_support.nfd_mgmt import parse_response, make_command
+from ...appv2 import NDNApp
+from ...app_support.nfd_mgmt import parse_response, make_command_v2
 from .utils import express_interest
 
 
@@ -50,7 +50,7 @@ def execute(args: argparse.Namespace):
 
     async def remove_strategy():
         try:
-            cmd = make_command('strategy-choice', 'set', name=prefix, strategy=strategy)
+            cmd = make_command_v2('strategy-choice', 'set', name=prefix, strategy=strategy)
             res = await express_interest(app, cmd)
             msg = parse_response(res)
             print(f'{msg["status_code"]} {msg["status_text"]}')

@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...app import NDNApp
+from ...appv2 import NDNApp
 from ...encoding import Name
 from ...app_support.nfd_mgmt import FibStatus, RibStatus
 from .utils import express_interest

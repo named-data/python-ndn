@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...app import NDNApp
+from ...appv2 import NDNApp
 from ...encoding import Name, Component
 from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response
 from .utils import express_interest

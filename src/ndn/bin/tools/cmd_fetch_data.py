@@ -19,7 +19,7 @@ import os
 import sys
 import argparse
 from ...encoding import Name, InterestParam
-from ...app import NDNApp
+from ...appv2 import NDNApp, pass_all
 from ...security import KeychainDigest
 from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 
@@ -62,15 +62,17 @@ def execute(args: argparse.Namespace):
         print('Unable to read the input file')
         return -2
 
-    app = NDNApp(keychain=KeychainDigest())
+    app = NDNApp()
 
     async def after_start():
         try:
             print(f'Sending Interest {Name.to_str(name)},'
                   f' {InterestParam(must_be_fresh=args.fresh, can_be_prefix=args.prefix, lifetime=lifetime)}')
-            data_name, meta_info, content = await app.express_interest(
-                name, must_be_fresh=args.fresh, can_be_prefix=args.prefix, lifetime=lifetime,
+            data_name, content, context = await app.express(
+                name, validator=pass_all,
+                must_be_fresh=args.fresh, can_be_prefix=args.prefix, lifetime=lifetime,
                 app_param=app_param)
+            meta_info = context['meta_info']
 
             print(f'Received Data Name: {Name.to_str(data_name)}')
             print(meta_info)

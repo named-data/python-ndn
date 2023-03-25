@@ -16,8 +16,8 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...app import NDNApp
-from ...app_support.nfd_mgmt import make_command, parse_response
+from ...appv2 import NDNApp
+from ...app_support.nfd_mgmt import make_command_v2, parse_response
 from .utils import express_interest
 
 
@@ -38,7 +38,7 @@ def execute(args: argparse.Namespace):
     async def register_route():
         try:
             fid = int(face_id)
-            cmd = make_command('rib', 'register', name=route, face_id=fid)
+            cmd = make_command_v2('rib', 'register', name=route, face_id=fid)
             res = await express_interest(app, cmd)
             msg = parse_response(res)
             print(f'{msg["status_code"]} {msg["status_text"]}')

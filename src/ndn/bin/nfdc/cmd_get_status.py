@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import argparse
 import datetime
-from ...app import NDNApp
+from ...appv2 import NDNApp
 from ...app_support.nfd_mgmt import GeneralStatus
 from .utils import express_interest
 

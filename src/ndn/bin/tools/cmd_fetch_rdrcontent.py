@@ -19,7 +19,7 @@ import os
 import sys
 import argparse
 from ...encoding import Name, Component
-from ...app import NDNApp
+from ...appv2 import NDNApp, pass_all
 from ...security import KeychainDigest
 from ...types import InterestTimeout, InterestNack, InterestCanceled, ValidationFailure
 
@@ -71,7 +71,8 @@ def execute(args: argparse.Namespace):
         data_name = None
     name_len = len(name)
 
-    app = NDNApp(keychain=KeychainDigest())
+    app = NDNApp()
+    keychain = KeychainDigest()
 
     async def after_start():
         nonlocal data_name
@@ -104,11 +105,11 @@ def execute(args: argparse.Namespace):
     app.run_forever(after_start())
 
 
-async def retry(app, retry_times, name, can_be_prefix, must_be_fresh, timeout):
+async def retry(app: NDNApp, retry_times, name, can_be_prefix, must_be_fresh, timeout):
     trial_times = 0
     while True:
-        future = app.express_interest(name, can_be_prefix=can_be_prefix,
-                                      must_be_fresh=must_be_fresh, lifetime=timeout)
+        future = app.express(name, validator=pass_all, can_be_prefix=can_be_prefix,
+                             must_be_fresh=must_be_fresh, lifetime=timeout)
         try:
             return await future
         except (InterestTimeout, InterestNack):
@@ -117,8 +118,8 @@ async def retry(app, retry_times, name, can_be_prefix, must_be_fresh, timeout):
                 raise
 
 
-async def fetch_metadata(app, retry_times, meta_name, _name_len, fresh, timeout):
-    _, _, encoded_data_name = await retry(app, retry_times, meta_name, True, fresh, timeout)
+async def fetch_metadata(app: NDNApp, retry_times, meta_name, _name_len, fresh, timeout):
+    _, encoded_data_name, _ = await retry(app, retry_times, meta_name, True, fresh, timeout)
     try:
         data_name = Name.from_bytes(encoded_data_name)
     except (ValueError, IndexError):
@@ -127,13 +128,14 @@ async def fetch_metadata(app, retry_times, meta_name, _name_len, fresh, timeout)
     return data_name
 
 
-async def fetch_content(app, retry_times, data_name, fresh, timeout):
+async def fetch_content(app: NDNApp, retry_times, data_name, fresh, timeout):
     i = 0
     ret = []
     while True:
         seg_component = Component.from_segment(i)
-        _, meta, cur = await retry(app, retry_times, data_name + [seg_component], False, fresh, timeout)
+        _, cur, context = await retry(app, retry_times, data_name + [seg_component], False, fresh, timeout)
         ret.append(cur)
+        meta = context['meta_info']
         final = meta.final_block_id
         if final is None or final == seg_component:
             break

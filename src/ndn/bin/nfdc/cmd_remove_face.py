@@ -16,10 +16,10 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...app import NDNApp
+from ...appv2 import NDNApp
 from ...encoding import Name, Component
 from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response, \
-    make_command
+    make_command_v2
 from .utils import express_interest
 
 
@@ -36,7 +36,7 @@ def execute(args: argparse.Namespace):
 
     async def remove_face(fid):
         print(f'Removing face {fid} ...', end='')
-        cmd = make_command('faces', 'destroy', face_id=fid)
+        cmd = make_command_v2('faces', 'destroy', face_id=fid)
         res = await express_interest(app, cmd)
         msg = parse_response(res)
         print(f'\t{msg["status_code"]} {msg["status_text"]}')

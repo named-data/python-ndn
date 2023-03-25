@@ -15,13 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+from ...appv2 import NDNApp, pass_all
+from ...security import DigestSha256Signer
 from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 
 
-async def express_interest(app, name):
+async def express_interest(app: NDNApp, name):
     try:
-        _, _, data = await app.express_interest(
-            name, lifetime=1000, can_be_prefix=True, must_be_fresh=True)
+        _, data, context = await app.express(
+            name, validator=pass_all, app_param=b'', signer=DigestSha256Signer(True),
+            lifetime=1000, can_be_prefix=True, must_be_fresh=True)
         return data
     except InterestNack as e:
         print(f'Nacked with reason={e.reason}')
