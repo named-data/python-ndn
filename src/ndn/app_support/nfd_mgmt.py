@@ -90,10 +90,10 @@ class ControlParameters(TlvModel):
     cp = ModelField(0x68, ControlParametersValue)
 
 
-class ControlResponse(ControlParametersValue):
+class ControlResponse(TlvModel):
     status_code = UintField(0x66)
     status_text = BytesField(0x67, is_string=True)
-    body = IncludeBase(ControlParametersValue)
+    body = ModelField(0x68, ControlParametersValue)
 
 
 class FaceEventNotificationValue(TlvModel):
@@ -285,8 +285,11 @@ def parse_response(buf):
     buf = parse_and_check_tl(memoryview(buf), 0x65)
     cr = ControlResponse.parse(buf)
     ret = {}
-    for k in ControlResponse._encoded_fields:
-        val = getattr(cr, k.name)
+    ret['status_code'] = cr.status_code
+    ret['status_text'] = cr.status_text
+    params = cr.body
+    for k in ControlParametersValue._encoded_fields:
+        val = getattr(params, k.name)
         if isinstance(val, memoryview):
             val = bytes(val)
         ret[k.name] = val
