@@ -1,6 +1,4 @@
-# [Choice] Python version: 3, 3.8, 3.7, 3.6
-ARG VARIANT=3
-FROM ghcr.io/zjkmxy/nfd-codespace:22.02
+FROM ghcr.io/zjkmxy/yanfd-docker:22.12
 
 # [Optional] If your pip requirements rarely change, uncomment this section to add them to the image.
 # COPY requirements.txt /tmp/pip-tmp/
@@ -16,5 +14,3 @@ FROM ghcr.io/zjkmxy/nfd-codespace:22.02
 
 RUN pip3 --disable-pip-version-check --no-cache-dir install rstcheck sphinx-rtd-theme sphinx-autodoc-typehints \
    readthedocs-sphinx-ext && rm -rf /tmp/pip-tmp
-
-RUN ndnsec-keygen /test | ndnsec-install-cert -
