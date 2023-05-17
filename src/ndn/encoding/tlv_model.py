@@ -26,7 +26,8 @@ from .name import Name, Component
 
 
 __all__ = ['DecodeError', 'TlvModel', 'ProcedureArgument', 'OffsetMarker', 'UintField', 'BoolField',
-           'NameField', 'BytesField', 'ModelField', 'RepeatedField', 'IncludeBase', 'IncludeBaseError']
+           'NameField', 'BytesField', 'ModelField', 'RepeatedField', 'IncludeBase', 'IncludeBaseError',
+           'MapField']
 
 
 class DecodeError(Exception):
@@ -724,6 +725,8 @@ class TlvModel(metaclass=TlvModelMeta):
                 result.append((field.name, field.__get__(self, None).asdict()))
             elif isinstance(field, RepeatedField):
                 result.append((field.name, field.aslist(self)))
+            elif isinstance(field, MapField):
+                result.append((field.name, field.asdict(self)))
             elif isinstance(field, BytesField):
                 val = field.__get__(self, None)
                 if isinstance(val, str):
@@ -819,11 +822,25 @@ class TlvModel(metaclass=TlvModelMeta):
                 for j in range(field_pos, i):
                     ret._encoded_fields[j].skipping_process(markers, wire, offset_btl)
                 # Parse that field
-                val = ret._encoded_fields[i].parse_from(ret, markers, wire, offset, length, offset_btl)
-                ret._encoded_fields[i].__set__(ret, val)
+                cur_field = ret._encoded_fields[i]
+                val = cur_field.parse_from(ret, markers, wire, offset, length, offset_btl)
+                cur_field.__set__(ret, val)
                 # Set next field
-                if isinstance(ret._encoded_fields[i], RepeatedField):
+                if isinstance(cur_field, RepeatedField):
                     field_pos = i
+                elif isinstance(cur_field, MapField):
+                    # Parse the value part for a map
+                    field_pos = i
+                    offset += length
+
+                    offset_btl = offset
+                    typ, size_typ = parse_tl_num(wire, offset)
+                    offset += size_typ
+                    length, size_len = parse_tl_num(wire, offset)
+                    offset += size_len
+
+                    val = cur_field.parse_value(ret, markers, wire, offset, length, offset_btl)
+                    cur_field.__set__(ret, val)
                 else:
                     field_pos = i + 1
             else:
@@ -965,4 +982,88 @@ class RepeatedField(Field):
                 ret.append(bytes(x))
             else:
                 ret.append(x)
+        return ret
+
+
+class MapField(Field):
+    r"""
+    Field for an unordered string or int map of a specific type.
+    All elements will be directly encoded into TLV wire in order, sharing the same Type.
+    The ``type_num`` of ``element_type`` is used.
+
+    Type: :class:`list`
+
+    :vartype value_type: :any:`Field`
+    :ivar value_type: the type of values in the dict.
+
+        .. warning::
+
+            Please always create a new :any:`Field` instance.
+            Don't use an existing one.
+    """
+
+    def __init__(self, key_type: Field, value_type: Field):
+        # default should be None here to prevent unintended modification
+        if not isinstance(key_type, BytesField) and not isinstance(key_type, UintField):
+            raise TypeError('MapField only supports string and uint to be keys')
+        super().__init__(key_type.type_num, None)
+        self.key_type = key_type
+        self.value_type = value_type
+
+    def get_value(self, instance):
+        if self.name not in instance.__dict__:
+            instance.__dict__[self.name] = {}
+        return instance.__dict__[self.name]
+
+    def encoded_length(self, val, markers: dict) -> int:
+        if not val:
+            return 0
+
+        ret = 0
+        for i, (key, val) in enumerate(val.items()):
+            self.key_type.name = f'{self.name}[{i}#k]'
+            ret += self.key_type.encoded_length(key, markers)
+            self.value_type.name = f'{self.name}[{i}#v]'
+            ret += self.value_type.encoded_length(val, markers)
+
+        return ret
+
+    def encode_into(self, val, markers: dict, wire: VarBinaryStr, offset: int) -> int:
+        if val is None:
+            return 0
+        else:
+            origin_offset = offset
+            for i, (key, val) in enumerate(val.items()):
+                self.key_type.name = f'{self.name}[{i}#k]'
+                offset += self.key_type.encode_into(key, markers, wire, offset)
+                self.value_type.name = f'{self.name}[{i}#v]'
+                offset += self.value_type.encode_into(val, markers, wire, offset)
+            return offset - origin_offset
+
+    def parse_from(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        # parse_from only parses keys and will not update the value
+        dct = self.get_value(instance)
+        self.key_type.name = f'{self.name}[{len(dct)}#k]'
+        new_key = self.key_type.parse_from(instance, markers, wire, offset, length, offset_btl)
+        markers[f'{self.name}#last_key'] = new_key
+        return dct
+
+    def parse_value(self, instance, markers: dict, wire: BinaryStr, offset: int, length: int, offset_btl: int):
+        # parse_value parses the value associated with the key last parsed.
+        dct = self.get_value(instance)
+        last_key = markers.get(f'{self.name}#last_key')
+        self.value_type.name = f'{self.name}[{len(dct)}#v]'
+        val = self.value_type.parse_from(instance, markers, wire, offset, length, offset_btl)
+        dct[last_key] = val
+        return dct
+
+    def asdict(self, instance):
+        ret = {}
+        for key, val in self.__get__(instance, None).items():
+            if isinstance(val, TlvModel):
+                ret[key] = val.asdict()
+            elif isinstance(val, memoryview):
+                ret[key] = bytes(val)
+            else:
+                ret[key] = val
         return ret

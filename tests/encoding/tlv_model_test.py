@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 from enum import Enum, Flag
 from ndn.encoding import TlvModel, NameField, UintField, BytesField, BoolField, Component,\
-    RepeatedField, ModelField, Name, IncludeBase
+    RepeatedField, ModelField, Name, IncludeBase, MapField
 
 
 class TestEncodeDecode:
@@ -57,6 +57,23 @@ class TestEncodeDecode:
 
         array = WordArray.parse(b'\x01\x02\x00\x00\x01\x02\x00\x01\x01\x02\x00\x02')
         assert array.words == [0, 1, 2]
+
+    def test_map(self):
+        class ArgList(TlvModel):
+            params = MapField(BytesField(0x85, is_string=True), BytesField(0x87))
+
+        arg_list = ArgList()
+        arg_list.params = {
+            'key1': b'val1',
+            'key2': b'val2'
+        }
+        # The following line is OK because Python 3.9+ dicts are ordered
+        assert arg_list.encode() == b'\x85\x04key1\x87\x04val1\x85\x04key2\x87\x04val2'
+        arg_list = ArgList.parse(b'\x85\x04key1\x87\x04val1\x85\x04key2\x87\x04val2')
+        assert len(arg_list.params) == 2
+        assert bytes(arg_list.params['key1']) == b'val1'
+        assert bytes(arg_list.params['key2']) == b'val2'
+
 
     def test_nested(self):
         class Inner(TlvModel):
