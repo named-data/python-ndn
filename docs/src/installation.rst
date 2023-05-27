@@ -23,7 +23,7 @@ To setup a traditional python3 virtual environment with editable installation:
 
     python3 -m venv venv
     . venv/bin/activate
-    pip3 install -e ".[dev]"
+    pip3 install -e ".[dev,pyca]"
 
 Run all tests:
 

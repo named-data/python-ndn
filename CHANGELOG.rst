@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.3-3 (2023-05-26)
+++++++++++++++++++
+* Add NDNAppv2
+* Add NDN-DPDK Support
+* encoding: Add MapField
+
 0.3-2 (2022-06-11)
 ++++++++++++++++++
 * Bug fix.
