@@ -19,7 +19,7 @@ For development, `poetry <https://python-poetry.org/>`_ is recommended. You need
 
 And to install the development environment::
 
-    $ poetry install --all-extras --with docs
+    $ poetry install --all-extras
 
 To setup a traditional python3 virtual environment with editable installation:
 
@@ -27,7 +27,7 @@ To setup a traditional python3 virtual environment with editable installation:
 
     python3 -m venv venv
     . venv/bin/activate
-    pip3 install -e ".[dev]"
+    pip3 install -e ".[dev,docs]"
 
 Run all tests:
 
