@@ -18,10 +18,12 @@
 import asyncio as aio
 from Cryptodome.Util.asn1 import DerSequence
 from Cryptodome.PublicKey import ECC
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives import serialization
 from ndn.encoding import make_data, MetaInfo, parse_data, Name
 from ndn.security import Sha256WithEcdsaSigner, Sha256WithRsaSigner, HmacSha256Signer, \
     EccChecker, RsaChecker, HmacChecker
-from ndn.security.signer import PYCA_ENABLED
+from ndn.security import Ed25519Signer, Ed25519Checker
 
 
 class TestSha256WithEcdsaSigner:
@@ -180,26 +182,21 @@ class TestSha256WithRsaSigner:
         assert aio.run(validator(Name.from_str('/ndn/abc'), sig_ptrs))
 
 
-if PYCA_ENABLED:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-    from cryptography.hazmat.primitives import serialization
-    from ndn.security import Ed25519Signer, Ed25519Checker
-
-    class TestEd25519:
-        def test_verify(self):
-            pri_key = Ed25519PrivateKey.generate()
-            key = pri_key.private_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PrivateFormat.Raw,
-                encryption_algorithm=serialization.NoEncryption(),
-            )
-            pub_key = pri_key.public_key()
-            signer = Ed25519Signer("/K/KEY/x", key)
-            pkt = make_data("/test", MetaInfo(), b"test content", signer=signer)
-            _, _, _, sig_ptrs = parse_data(pkt)
-            pub_bits = pub_key.public_bytes(
-                encoding=serialization.Encoding.DER,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            )
-            validator = Ed25519Checker.from_key("/K/KEY/x", bytes(pub_bits))
-            assert aio.run(validator(Name.from_str("/test"), sig_ptrs))
+class TestEd25519:
+    def test_verify(self):
+        pri_key = Ed25519PrivateKey.generate()
+        key = pri_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        pub_key = pri_key.public_key()
+        signer = Ed25519Signer("/K/KEY/x", key)
+        pkt = make_data("/test", MetaInfo(), b"test content", signer=signer)
+        _, _, _, sig_ptrs = parse_data(pkt)
+        pub_bits = pub_key.public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        validator = Ed25519Checker.from_key("/K/KEY/x", bytes(pub_bits))
+        assert aio.run(validator(Name.from_str("/test"), sig_ptrs))

@@ -19,7 +19,9 @@ import abc
 from Cryptodome.Hash import SHA256, HMAC
 from Cryptodome.PublicKey import ECC, RSA
 from Cryptodome.Signature import DSS, pkcs1_15
-from ..signer import PYCA_ENABLED
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.serialization import load_der_public_key
 from ...encoding import FormalName, BinaryStr, NonStrictName, SignaturePtrs, Name, SignatureType
 from ...types import Validator
 from ...app_support.security_v2 import parse_certificate
@@ -115,25 +117,20 @@ class HmacChecker(KnownChecker):
         return verify_hmac(pub_key_bits, sig_ptrs)
 
 
-if PYCA_ENABLED:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-    from cryptography.exceptions import InvalidSignature
-    from cryptography.hazmat.primitives.serialization import load_der_public_key
+def verify_ed25519(pub_key: Ed25519PublicKey, sig_ptrs: SignaturePtrs) -> bool:
+    c = b''.join(bytes(blk) for blk in sig_ptrs.signature_covered_part)
+    try:
+        pub_key.verify(bytes(sig_ptrs.signature_value_buf), c)
+        return True
+    except InvalidSignature:
+        return False
 
-    def verify_ed25519(pub_key: Ed25519PublicKey, sig_ptrs: SignaturePtrs) -> bool:
-        c = b''.join(bytes(blk) for blk in sig_ptrs.signature_covered_part)
-        try:
-            pub_key.verify(bytes(sig_ptrs.signature_value_buf), c)
-            return True
-        except InvalidSignature:
+class Ed25519Checker(KnownChecker):
+    @classmethod
+    def _verify(cls, pub_key_bits, sig_ptrs) -> bool:
+        if sig_ptrs.signature_info.signature_type != SignatureType.ED25519:
             return False
-
-    class Ed25519Checker(KnownChecker):
-        @classmethod
-        def _verify(cls, pub_key_bits, sig_ptrs) -> bool:
-            if sig_ptrs.signature_info.signature_type != SignatureType.ED25519:
-                return False
-            pub_key = load_der_public_key(pub_key_bits)
-            if not isinstance(pub_key, Ed25519PublicKey):
-                return False
-            return verify_ed25519(pub_key, sig_ptrs)
+        pub_key = load_der_public_key(pub_key_bits)
+        if not isinstance(pub_key, Ed25519PublicKey):
+            return False
+        return verify_ed25519(pub_key, sig_ptrs)

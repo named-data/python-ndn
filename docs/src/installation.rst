@@ -13,9 +13,13 @@ Install the latest development version::
 Instructions for developer
 --------------------------
 
-For development, pipenv is recommended::
+For development, `poetry <https://python-poetry.org/>`_ is recommended. You need poetry-dynamic-versioning plugin::
 
-    $ pipenv install --dev
+    $ poetry self add "poetry-dynamic-versioning[plugin]"
+
+And to install the development environment::
+
+    $ poetry install --all-extras --with docs
 
 To setup a traditional python3 virtual environment with editable installation:
 
@@ -23,28 +27,25 @@ To setup a traditional python3 virtual environment with editable installation:
 
     python3 -m venv venv
     . venv/bin/activate
-    pip3 install -e ".[dev,pyca]"
+    pip3 install -e ".[dev]"
 
 Run all tests:
 
 .. code-block:: bash
 
-    pipenv run test
+    poetry run make test
 
 Run static analysis:
 
 .. code-block:: bash
 
-    pipenv run make lint
+    poetry run make lint
 
-Please use python 3.9+ to generate the documentation.
+Generate the documentation:
 
 .. code-block:: bash
 
-    pip3 install Sphinx sphinx-autodoc-typehints readthedocs-sphinx-ext \
-        sphinx-rtd-theme pycryptodomex pygtrie
-
-    cd docs && make html
-    open _build/html/index.html
+    poetry run make -C docs html
+    open docs/_build/html/index.html
 
 VSCode users can also use the development container obtained from the `.devcontainer` folder.

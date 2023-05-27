@@ -6,8 +6,8 @@ test-cov:
 
 upload:
 	rm -rf dist
-	python3 -m build
-	python3 -m twine upload dist/*
+	poetry build
+	poetry publish
 
 lint:
 	# exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
