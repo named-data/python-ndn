@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', 'pypy-3.9']
+        python-version: ['3.10', '3.11', 'pypy-3.10']
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -27,6 +27,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install ".[dev]"
+    - name: Fix cryptography in pypy3.10
+      if: ${{ matrix.python-version == 'pypy-3.10' }}
+      run: |
+        pip install cryptography -U --no-binary crptography
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
