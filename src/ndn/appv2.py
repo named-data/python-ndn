@@ -128,6 +128,12 @@ class PendingIntEntry:
                 valid = ValidResult.TIMEOUT
         else:
             valid = ValidResult.FAIL
+        if self.future.cancelled() or self.future.done():
+            # Don't know why but there was a race condition with timeout()
+            # The sequence was: Interest sent -> Data arrived -> timeout() -> satisfy()
+            # Cannot reproduce the scenario. Especially, delay in validator() does not trigger the race condition
+            # But anyway, let me add a guard check here.
+            return
         if valid == ValidResult.PASS or valid == ValidResult.ALLOW_BYPASS:
             self.future.set_result((name, content, pkt_context))
         else:
