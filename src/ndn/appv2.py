@@ -525,9 +525,13 @@ class NDNApp:
                              final_name: enc.NonStrictName,
                              interest_param: enc.InterestParam,
                              raw_interest: enc.BinaryStr,
-                             validator: Validator
+                             validator: Validator,
+                             no_response: bool = False
                              ) -> typing.Coroutine[any, None,
                                                    tuple[enc.FormalName, typing.Optional[enc.BinaryStr], PktContext]]:
+        if no_response:
+            self.face.send(raw_interest)
+            return None
         if validator is None:
             raise ValueError('Data Validator must not be None when expressing an Interest.')
         final_name = enc.Name.normalize(final_name)
@@ -578,7 +582,10 @@ class NDNApp:
             del self._pit[prefix]
 
     def _on_nack(self, name: enc.FormalName, nack_reason: int):
-        node = self._pit[name]
+        try:
+            node = self._pit[name]
+        except KeyError:
+            node = None
         if node:
             if node.nack_interest(nack_reason):
                 del self._pit[name]
@@ -633,7 +640,8 @@ class NDNApp:
                 kwargs['nonce'] = utils.gen_nonce()
             interest_param = enc.InterestParam.from_dict(kwargs)
         interest, final_name = enc.make_interest(name, interest_param, app_param, signer=signer, need_final_name=True)
-        return self.express_raw_interest(final_name, interest_param, interest, validator)
+        no_response = kwargs.get('no_response', False)
+        return self.express_raw_interest(final_name, interest_param, interest, validator, no_response)
 
     def route(self, name: enc.NonStrictName, validator: typing.Optional[Validator] = None):
         r"""

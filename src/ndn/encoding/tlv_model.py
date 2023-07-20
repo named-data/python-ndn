@@ -593,8 +593,8 @@ class NameField(Field):
 
     Type: :any:`NonStrictName`
     """
-    def __init__(self, default=None):
-        super().__init__(Name.TYPE_NAME, default)
+    def __init__(self, default=None, type_number=Name.TYPE_NAME):
+        super().__init__(type_number, default)
 
     def encoded_length(self, val, markers: dict) -> int:
         if val is None:
