@@ -46,7 +46,7 @@ pygtrie = "^2.5.0"
 aenum = "^3.1.12"
 lark = "^1.1.5"
 aiohttp = "^3.8.4"
-cryptography = "^40.0.2"
+cryptography = ">=40.0.2,<42.0.0"
 
 # Extra dependencies [dev]
 pytest = { version = "^7.1.2", optional = true }
