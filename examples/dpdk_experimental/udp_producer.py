@@ -34,13 +34,13 @@ if len(sys.argv) < 6:
     print('Insufficient argument')
     sys.exit(-1)
 
-gpl_url = sys.argv[1]
+gql_url = sys.argv[1]
 self_addr = sys.argv[2]
 self_port = int(sys.argv[3])
 dpdk_addr = sys.argv[4]
 dpdk_port = int(sys.argv[5])
 
-face = NdnDpdkUdpFace(gpl_url, self_addr, self_port, dpdk_addr, dpdk_port)
+face = NdnDpdkUdpFace(gql_url, self_addr, self_port, dpdk_addr, dpdk_port)
 registerer = DpdkRegisterer(face)
 
 app = appv2.NDNApp(face=face, registerer=registerer)
