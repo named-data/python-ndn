@@ -16,12 +16,9 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import abc
-from Cryptodome.Hash import SHA256, HMAC
+from Cryptodome.Hash import SHA256, HMAC, SHA512
 from Cryptodome.PublicKey import ECC, RSA
-from Cryptodome.Signature import DSS, pkcs1_15
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.serialization import load_der_public_key
+from Cryptodome.Signature import DSS, pkcs1_15, eddsa
 from ...encoding import FormalName, BinaryStr, NonStrictName, SignaturePtrs, Name, SignatureType
 from ...types import Validator
 from ...app_support.security_v2 import parse_certificate
@@ -117,20 +114,24 @@ class HmacChecker(KnownChecker):
         return verify_hmac(pub_key_bits, sig_ptrs)
 
 
-def verify_ed25519(pub_key: Ed25519PublicKey, sig_ptrs: SignaturePtrs) -> bool:
-    c = b''.join(bytes(blk) for blk in sig_ptrs.signature_covered_part)
+def verify_ed25519(pub_key: ECC.EccKey, sig_ptrs: SignaturePtrs) -> bool:
+    verifier = eddsa.new(pub_key, 'rfc8032')
+    h = SHA512.new()
+    for content in sig_ptrs.signature_covered_part:
+        h.update(content)
     try:
-        pub_key.verify(bytes(sig_ptrs.signature_value_buf), c)
+        verifier.verify(h, bytes(sig_ptrs.signature_value_buf))
         return True
-    except InvalidSignature:
+    except ValueError:
         return False
+
 
 class Ed25519Checker(KnownChecker):
     @classmethod
     def _verify(cls, pub_key_bits, sig_ptrs) -> bool:
         if sig_ptrs.signature_info.signature_type != SignatureType.ED25519:
             return False
-        pub_key = load_der_public_key(pub_key_bits)
-        if not isinstance(pub_key, Ed25519PublicKey):
+        pub_key = ECC.import_key(pub_key_bits)
+        if not isinstance(pub_key, ECC.EccKey):
             return False
         return verify_ed25519(pub_key, sig_ptrs)

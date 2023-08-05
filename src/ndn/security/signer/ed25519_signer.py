@@ -15,7 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from Cryptodome.PublicKey import ECC
+from Cryptodome.Hash import SHA512
+from Cryptodome.Signature import eddsa
 from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr, BinaryStr
 
 
@@ -23,8 +25,15 @@ class Ed25519Signer(Signer):
     key_locator_name: NonStrictName
 
     def __init__(self, key_locator_name: NonStrictName, key_bits: BinaryStr):
+        """
+        Create an Ed25519Signer
+
+        .. note::
+            `key_bits` must be DER format. If you have a 32B raw key bits,
+            prepend it with `b'0.\x02\x01\x000\x05\x06\x03+ep\x04"\x04 '`.
+        """
         self.key_locator_name = key_locator_name
-        self.key = Ed25519PrivateKey.from_private_bytes(key_bits)
+        self.key = ECC.import_key(bytes(key_bits))
 
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.ED25519
@@ -36,7 +45,10 @@ class Ed25519Signer(Signer):
 
     def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         # Copying is needed as cryptography library only support bytes
-        c = b''.join(bytes(blk) for blk in contents)
-        signature = self.key.sign(c)
+        h = SHA512.new()
+        for blk in contents:
+            h.update(blk)
+        signer = eddsa.new(self.key, 'rfc8032')
+        signature = signer.sign(h)
         wire[:] = signature
         return len(signature)

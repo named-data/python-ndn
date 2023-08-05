@@ -1,4 +1,3 @@
-import cryptography
 from .sha256_rsa_signer import Sha256WithRsaSigner
 from .sha256_digest_signer import DigestSha256Signer
 from .sha256_ecdsa_signer import Sha256WithEcdsaSigner
