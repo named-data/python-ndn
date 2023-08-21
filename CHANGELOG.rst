@@ -1,6 +1,19 @@
 Changelog
 =========
 
+0.4-1 (2023-08-21)
+++++++++++++++++++
+* Update dependencies: drop cryptography.
+* Add ECIES support.
+
+0.4 (2023-07-21)
+++++++++++++++++
+* Migrate from pipenv to poetry
+* Upgrade Python requirement to 3.10
+* Fix a race condition in NDNAppv2
+* Add support to State-Vector-Sync (SVS)
+
+
 0.3-3 (2023-05-26)
 ++++++++++++++++++
 * Add NDNAppv2
