@@ -57,7 +57,7 @@ class SvsInst:
     running: bool
     ndn_app: app.NDNApp | None
 
-    next_sync_timing: float
+    next_sync_timing: float = 0.0
     timer_rst_event: aio.Event | None
     int_signer: enc.Signer
     int_validator: app.Validator
@@ -161,7 +161,7 @@ class SvsInst:
         while self.running:
             try:
                 # Timer reset event
-                await aio.wait_for(self.timer_rst_event.wait(), timeout=self.next_sync_timing - time.time())
+                await aio.wait_for(self.timer_rst_event.wait(), timeout=max(self.next_sync_timing - time.time(), 0))
                 self.timer_rst_event.clear()
             except aio.CancelledError:
                 break
