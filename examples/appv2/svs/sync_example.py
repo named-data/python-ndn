@@ -58,7 +58,7 @@ async def fetch_missing_data():
         fetch_signal.clear()
         del local_sv[enc.Name.to_bytes(name_node_id)]
         for node_id, seq in local_sv.items():
-            fetched_seq = fetched_dict.get(node_id, -1)
+            fetched_seq = fetched_dict.get(node_id, 0)
             node_name = enc.Name.from_bytes(node_id) + group_prefix
             if fetched_seq < seq:
                 fetched_dict[node_id] = seq
@@ -78,7 +78,7 @@ async def fetch_missing_data():
 
 
 async def generate_data():
-    seq = 0
+    seq = 1
     while running:
         data = f'[{text_node_id}] DATA {seq}'.encode()
         name = node_name + [enc.Component.from_sequence_num(seq)]

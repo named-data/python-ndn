@@ -67,7 +67,7 @@ class SvsInst:
                  on_missing_data: OnMissingDataFunc, sync_int_signer: enc.Signer,
                  sync_int_validator: app.Validator,
                  sync_interval: float = 30, suppression_interval: float = 0.2,
-                 last_used_seq_num: int = -1):
+                 last_used_seq_num: int = 0):
         self.base_prefix = enc.Name.normalize(base_prefix)
         self.self_node_id = enc.Name.to_bytes(self_node_id)
         self.sync_interval = sync_interval
@@ -123,7 +123,7 @@ class SvsInst:
         need_notif = len(rsv_dict.keys() - self.local_sv.keys()) > 0
         need_fetch = False
         for rsv_id, rsv_seq in rsv_dict.items():
-            lsv_seq = self.local_sv.get(rsv_id, -1)
+            lsv_seq = self.local_sv.get(rsv_id, 0)
             if lsv_seq < rsv_seq:
                 # Remote is latest
                 need_fetch = True
@@ -154,7 +154,7 @@ class SvsInst:
 
     def aggregate(self, rsv_dict: dict[bytes, int]):
         for rsv_id, rsv_seq in rsv_dict.items():
-            asv_seq = self.local_sv.get(rsv_id, -1)
+            asv_seq = self.local_sv.get(rsv_id, 0)
             self.agg_sv[rsv_id] = max(asv_seq, rsv_seq)
 
     async def on_timer(self):
@@ -175,7 +175,7 @@ class SvsInst:
                     self.state = SvsState.SyncSteady
                     necessary = False
                     for lsv_id, lsv_seq in self.local_sv.items():
-                        if self.agg_sv.get(lsv_id, -1) < lsv_seq:
+                        if self.agg_sv.get(lsv_id, 0) < lsv_seq:
                             necessary = True
                             break
                 if necessary:
