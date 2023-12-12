@@ -47,8 +47,10 @@ class Cng:
     NCRYPT_ECDSA_P521_ALGORITHM = BCRYPT_ECDSA_P521_ALGORITHM
     BCRYPT_OBJECT_LENGTH = c.c_wchar_p('ObjectLength')
     BCRYPT_HASH_LENGTH = c.c_wchar_p('HashDigestLength')
-    MS_PLATFORM_KEY_STORAGE_PROVIDER = c.c_wchar_p('Microsoft Platform Crypto Provider')
-    MS_KEY_STORAGE_PROVIDER = c.c_wchar_p('Microsoft Software Key Storage Provider')
+    MS_PLATFORM_KEY_STORAGE_PROVIDER = c.c_wchar_p(
+        'Microsoft Platform Crypto Provider')
+    MS_KEY_STORAGE_PROVIDER = c.c_wchar_p(
+        'Microsoft Software Key Storage Provider')
     BCRYPT_ECCPUBLIC_BLOB = c.c_wchar_p('ECCPUBLICBLOB')
     BCRYPT_ECCPRIVATE_BLOB = c.c_wchar_p('ECCPRIVATEBLOB')
 
@@ -79,7 +81,12 @@ class Win32(Platform):
 
     def default_transport(self):
         # Note: %TEMP% won't be redirected even when the executable is a MSIX/MicrosoftStore app
-        return 'unix://' + os.path.expandvars(r'%TEMP%\nfd.sock')
+        oldPath = os.path.expandvars(r'%TEMP%\nfd.sock')
+        newPath = os.path.expandvars(r'%TEMP%\nfd\nfd.sock')
+        if not os.path.exists(newPath) and os.path.exists(oldPath):
+            # Try to be compatible to old NFD
+            return 'unix://' + oldPath
+        return 'unix://' + newPath
 
     def default_pib_scheme(self):
         return 'pib-sqlite3'

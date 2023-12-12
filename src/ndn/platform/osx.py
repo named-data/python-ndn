@@ -121,7 +121,10 @@ class Darwin(Platform):
                 '/etc/ndn/client.conf']
 
     def default_transport(self):
-        return 'unix:///var/run/nfd.sock'
+        if not os.path.exists('/var/run/nfd/nfd.sock') and os.path.exists('/var/run/nfd.sock'):
+            # Try to be compatible to old NFD
+            return 'unix:///var/run/nfd.sock'
+        return 'unix:///var/run/nfd/nfd.sock'
 
     def default_pib_scheme(self):
         return 'pib-sqlite3'
