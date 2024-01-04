@@ -28,7 +28,10 @@ class Linux(Platform):
                 '/etc/ndn/client.conf']
 
     def default_transport(self):
-        return 'unix:///run/nfd.sock'
+        if not os.path.exists('/run/nfd/nfd.sock') and os.path.exists('/run/nfd.sock'):
+            # Try to be compatible to old NFD
+            return 'unix:///run/nfd.sock'
+        return 'unix:///run/nfd/nfd.sock'
 
     def default_pib_scheme(self):
         return 'pib-sqlite3'
