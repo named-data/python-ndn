@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from typing import Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..utils import timestamp
 from ..encoding import Component, Name, ModelField, TlvModel, ContentType, BytesField,\
     SignatureInfo, TypeNumber, RepeatedField, IncludeBase, MetaInfo, VarBinaryStr,\
@@ -112,17 +112,17 @@ def new_cert(key_name, issuer_id_component, pub_key, signer, start_time, end_tim
 
 
 def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
-    end_time = datetime.utcnow()
+    end_time = datetime.now(timezone.utc)
     end_time = end_time.replace(year=end_time.year + 20)
     return new_cert(key_name, SELF_COMPONENT, pub_key, signer,
                     datetime.fromisoformat('1970-01-01T00:00:00'), end_time)
 
 
 def sign_req(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
     end_time = start_time + timedelta(days=10)
     return new_cert(key_name, SIGN_REQ_COMPONENT, pub_key, signer,
-                    datetime.utcnow(), end_time)
+                    datetime.now(timezone.utc), end_time)
 
 
 def derive_cert(key_name, issuer_id, pub_key, signer, start_time, expire_sec) -> Tuple[FormalName, VarBinaryStr]:

@@ -435,3 +435,10 @@ class TestDataParse:
         for part in sig.signature_covered_part:
             algo.update(part)
         assert sig.signature_value_buf == algo.digest()
+
+    @staticmethod
+    def test_none_meta_info():
+        wire = b'\x06\x0f\x07\x06\x08\x01\x41\x08\x01\x31\x16\x03\x1b\x01\xc8\x17\x00'
+        _, meta_info, _, _ = parse_data(wire)
+        assert meta_info is not None
+        assert meta_info.content_type == ContentType.BLOB

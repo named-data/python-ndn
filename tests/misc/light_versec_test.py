@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import pytest
 from tempfile import TemporaryDirectory
 from ndn.encoding import Component
@@ -321,7 +321,7 @@ class TestLvsSemantics:
             la_author_cert_name, la_author_cert = derive_cert(la_author_id.default_key().name,
                                                               Component.from_str('la-signer'),
                                                               la_cert_data.content, la_signer,
-                                                              datetime.utcnow(), 100)
+                                                              datetime.now(timezone.utc), 100)
             keychain.import_cert(la_id.default_key().name, la_author_cert_name, la_author_cert)
 
             ny_id = keychain.touch_identity('/ny')
@@ -334,7 +334,7 @@ class TestLvsSemantics:
             ny_author_cert_name, ny_author_cert = derive_cert(ny_author_id.default_key().name,
                                                               Component.from_str('ny-signer'),
                                                               ny_cert_data.content, ny_signer,
-                                                              datetime.utcnow(), 100)
+                                                              datetime.now(timezone.utc), 100)
             keychain.import_cert(ny_id.default_key().name, ny_author_cert_name, ny_author_cert)
 
             lvs = r'''

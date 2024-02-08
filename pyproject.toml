@@ -41,11 +41,11 @@ include = [{ path = "tests", format = "sdist" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pycryptodomex = "^3.18.0"
+pycryptodomex = "^3.20.0"
 pygtrie = "^2.5.0"
 aenum = "^3.1.12"
-lark = "^1.1.7"
-aiohttp = "^3.8.5"
+lark = "^1.1.9"
+aiohttp = "^3.9.3"
 
 # Extra dependencies [dev]
 pytest = { version = "^7.1.2", optional = true }

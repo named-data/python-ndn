@@ -501,6 +501,8 @@ def parse_data(wire: BinaryStr, with_tl: bool = True) -> Data:
     markers = {}
     ret = DataPacketValue.parse(wire, markers)
     params = ret.meta_info
+    if params is None:
+        params = MetaInfo()
     sig_ptrs = SignaturePtrs(
         signature_info=ret.signature_info,
         signature_covered_part=ret._sig_cover_part.get_arg(markers),
