@@ -112,13 +112,13 @@ class NdnDpdkUdpFace(NdnDpdkFace):
 
         def error_received(self, exc: Exception):
             self.close.set_result(True)
-            logging.warning(exc)
+            logging.getLogger(__name__).warning(exc)
 
         def connection_lost(self, exc):
             if not self.close.done():
                 self.close.set_result(True)
             if exc:
-                logging.warning(exc)
+                logging.getLogger(__name__).warning(exc)
 
         def shutdown(self):
             if self.transport is not None:

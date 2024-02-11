@@ -20,7 +20,7 @@ import sys
 import argparse
 from ...encoding import Name, Component
 from ...appv2 import NDNApp, pass_all
-from ...security import KeychainDigest
+# from ...security import KeychainDigest
 from ...types import InterestTimeout, InterestNack, InterestCanceled, ValidationFailure
 
 
@@ -72,7 +72,7 @@ def execute(args: argparse.Namespace):
     name_len = len(name)
 
     app = NDNApp()
-    keychain = KeychainDigest()
+    # keychain = KeychainDigest()
 
     async def after_start():
         nonlocal data_name

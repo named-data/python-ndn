@@ -18,8 +18,8 @@
 from typing import Tuple
 from datetime import datetime, timedelta, timezone
 from ..utils import timestamp
-from ..encoding import Component, Name, ModelField, TlvModel, ContentType, BytesField,\
-    SignatureInfo, TypeNumber, RepeatedField, IncludeBase, MetaInfo, VarBinaryStr,\
+from ..encoding import Component, Name, ModelField, TlvModel, ContentType, BytesField, \
+    SignatureInfo, TypeNumber, RepeatedField, IncludeBase, MetaInfo, VarBinaryStr, \
     get_tl_num_size, write_tl_num, parse_and_check_tl, FormalName
 from ..encoding.ndn_format_0_3 import DataPacketValue
 

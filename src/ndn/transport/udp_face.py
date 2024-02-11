@@ -53,13 +53,13 @@ class UdpFace(IpFace):
 
             def error_received(self, exc: Exception) -> None:
                 self.close.set_result(True)
-                logging.warning(exc)
+                logging.getLogger(__name__).warning(exc)
 
             def connection_lost(self, exc):
                 if not self.close.done():
                     self.close.set_result(True)
                 if exc:
-                    logging.warning(exc)
+                    logging.getLogger(__name__).warning(exc)
 
         loop = aio.get_running_loop()
         self.running = True

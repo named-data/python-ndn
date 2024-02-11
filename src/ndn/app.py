@@ -49,8 +49,10 @@ class NDNApp:
     data_validator: Validator = None
     _autoreg_routes: List[Tuple[FormalName, Route, Optional[Validator], bool, bool]]
     _prefix_register_semaphore: aio.Semaphore = None
+    logger: logging.Logger
 
     def __init__(self, face=None, keychain=None):
+        self.logger = logging.getLogger(__name__)
         config = read_client_conf() if not face or not keychain else {}
         if face is not None:
             self.face = face
@@ -74,13 +76,13 @@ class NDNApp:
         :param typ: the Type.
         :param data: the Value of the packet with TL.
         """
-        # if logging.getLogger().isEnabledFor(logging.DEBUG):
-        #     logging.debug('Packet received %s, %s' % (typ, bytes(data)))
+        # if self.logger.isEnabledFor(logging.DEBUG):
+        #     self.logger.debug('Packet received %s, %s' % (typ, bytes(data)))
         if typ == LpTypeNumber.LP_PACKET:
             try:
                 nack_reason, fragment = parse_lp_packet(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode received packet')
+                self.logger.warning('Unable to decode received packet')
                 return
             data = fragment
             typ, _ = parse_tl_num(data)
@@ -91,32 +93,32 @@ class NDNApp:
             try:
                 name, _, _, _ = parse_interest(data, with_tl=True)
             except (DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode the fragment of LpPacket')
+                self.logger.warning('Unable to decode the fragment of LpPacket')
                 return
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
             self._on_nack(name, nack_reason)
         else:
             if typ == TypeNumber.INTEREST:
                 try:
                     name, param, app_param, sig = parse_interest(data, with_tl=True)
                 except (DecodeError, TypeError, ValueError, struct.error):
-                    logging.warning('Unable to decode received packet')
+                    self.logger.warning('Unable to decode received packet')
                     return
-                if logging.getLogger().isEnabledFor(logging.DEBUG):
-                    logging.debug('Interest received %s' % Name.to_str(name))
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug('Interest received %s' % Name.to_str(name))
                 await self._on_interest(name, param, app_param, sig, raw_packet=data)
             elif typ == TypeNumber.DATA:
                 try:
                     name, meta_info, content, sig = parse_data(data, with_tl=True)
                 except (DecodeError, TypeError, ValueError, struct.error):
-                    logging.warning('Unable to decode received packet')
+                    self.logger.warning('Unable to decode received packet')
                     return
-                if logging.getLogger().isEnabledFor(logging.DEBUG):
-                    logging.debug('Data received %s' % Name.to_str(name))
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug('Data received %s' % Name.to_str(name))
                 await self._on_data(name, meta_info, content, sig, raw_packet=data)
             else:
-                logging.warning('Unable to decode received packet')
+                self.logger.warning('Unable to decode received packet')
 
     def put_raw_packet(self, data: BinaryStr):
         r"""
@@ -291,12 +293,12 @@ class NDNApp:
                     after_start.cancel()
             raise
         task = aio.create_task(starting_task())
-        logging.debug('Connected to NFD node, start running...')
+        self.logger.debug('Connected to NFD node, start running...')
         try:
             await self.face.run()
             ret = True
         except aio.CancelledError:
-            logging.info('Shutting down')
+            self.logger.info('Shutting down')
             ret = False
         finally:
             self.face.shutdown()
@@ -314,7 +316,7 @@ class NDNApp:
         """
         Manually shutdown the face to NFD.
         """
-        logging.info('Manually shutdown')
+        self.logger.info('Manually shutdown')
         self.face.shutdown()
 
     def run_forever(self, after_start: Awaitable = None):
@@ -334,7 +336,7 @@ class NDNApp:
         try:
             aio.run(self.main_loop(after_start))
         except KeyboardInterrupt:
-            logging.info('Receiving Ctrl+C, exit')
+            self.logger.info('Receiving Ctrl+C, exit')
 
     def route(self, name: NonStrictName, validator: Optional[Validator] = None,
               need_raw_packet: bool = False, need_sig_ptrs: bool = False):
@@ -429,15 +431,15 @@ class NDNApp:
                     lifetime=1000)
                 ret = parse_response(reply)
                 if ret['status_code'] != 200:
-                    logging.error(f'Registration for {Name.to_str(name)} failed: '
-                                  f'{ret["status_code"]} {ret["status_text"]}')
+                    self.logger.error(f'Registration for {Name.to_str(name)} failed: '
+                                      f'{ret["status_code"]} {ret["status_text"]}')
                     return False
                 else:
-                    logging.debug(f'Registration for {Name.to_str(name)} succeeded: '
-                                  f'{ret["status_code"]} {ret["status_text"]}')
+                    self.logger.debug(f'Registration for {Name.to_str(name)} succeeded: '
+                                      f'{ret["status_code"]} {ret["status_text"]}')
                     return True
             except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
-                logging.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
+                self.logger.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
                 return False
 
     async def unregister(self, name: NonStrictName) -> bool:
@@ -510,15 +512,15 @@ class NDNApp:
                            app_param: Optional[BinaryStr], sig: SignaturePtrs, raw_packet: BinaryStr):
         trie_step = self._prefix_tree.longest_prefix(name)
         if not trie_step:
-            logging.warning('No route: %s' % name)
+            self.logger.warning('No route: %s' % name)
             return
         node = trie_step.value
         if node.callback is None:
-            logging.warning('No callback: %s' % name)
+            self.logger.warning('No callback: %s' % name)
             return
         if app_param is not None or sig.signature_info is not None:
             if not await params_sha256_checker(name, sig):
-                logging.warning('Drop malformed Interest: %s' % name)
+                self.logger.warning('Drop malformed Interest: %s' % name)
                 return
 
         # In case the validator blocks the pipeline, create a task
@@ -529,7 +531,7 @@ class NDNApp:
             else:
                 valid = True
             if not valid:
-                logging.warning('Drop unvalidated Interest: %s' % name)
+                self.logger.warning('Drop unvalidated Interest: %s' % name)
                 return
             if node.extra_param:
                 kwargs = {}

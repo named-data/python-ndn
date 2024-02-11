@@ -20,8 +20,8 @@ from enum import Enum, Flag
 from typing import Optional
 from ..transport.face import Face
 from ..utils import timestamp, gen_nonce_64
-from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField,\
-    SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num, IncludeBase, parse_and_check_tl,\
+from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField, \
+    SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num, parse_and_check_tl, \
     RepeatedField
 from ..security import DigestSha256Signer
 

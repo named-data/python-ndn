@@ -37,7 +37,7 @@ def lvs_validator(checker: Checker, app: NDNApp, trust_anchor: BinaryStr,
                 or not sig_ptrs.signature_info.key_locator.name):
             return False
         cert_name = sig_ptrs.signature_info.key_locator.name
-        logging.debug(f'LVS Checking {Name.to_str(name)} <- {Name.to_str(cert_name)} ...')
+        logging.getLogger(__name__).debug(f'LVS Checking {Name.to_str(name)} <- {Name.to_str(cert_name)} ...')
         return checker.check(name, cert_name)
 
     def sanity_check():

@@ -212,7 +212,7 @@ class TpmCng(Tpm):
     def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
         cng = Cng()
         with ReleaseGuard() as defer:
-            logging.debug('Generating CNG Key %s' % key_type)
+            logging.getLogger(__name__).debug('Generating CNG Key %s' % key_type)
             key_name = self.construct_key_name(id_name, b'', key_id_type='random')
             name_hash = Name.to_bytes(key_name).hex()
 

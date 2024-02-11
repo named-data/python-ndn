@@ -450,7 +450,7 @@ class KeychainSqlite3(Keychain):
     @staticmethod
     def initialize(path: str, tpm_scheme: str, tpm_path: str = '') -> bool:
         if os.path.exists(path):
-            logging.fatal(f'PIB database {path} already exists.')
+            logging.getLogger(__name__).fatal(f'PIB database {path} already exists.')
             return False
         # Make sure the directory exists
         base_dir = os.path.dirname(path)

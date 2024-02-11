@@ -206,8 +206,10 @@ class NDNApp:
     face: Face = None
     registerer: PrefixRegisterer = None
     _autoreg_routes: list[enc.FormalName]
+    logger: logging.Logger
 
     def __init__(self, face=None, client_conf=None, registerer=None):
+        self.logger = logging.getLogger(__name__)
         config = client_conf if client_conf else {}
         if not face:
             if 'transport' not in config:
@@ -241,13 +243,13 @@ class NDNApp:
         :param typ: the Type.
         :param data: the Value of the packet with TL.
         """
-        # if logging.getLogger().isEnabledFor(logging.DEBUG):
-        #     logging.debug('Packet received %s, %s' % (typ, bytes(data)))
+        # if self.logger.isEnabledFor(logging.DEBUG):
+        #     self.logger.debug('Packet received %s, %s' % (typ, bytes(data)))
         if typ == enc.LpTypeNumber.LP_PACKET:
             try:
                 lp_pkt = enc.parse_lp_packet_v2(data, with_tl=True)
             except (enc.DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode received packet')
+                self.logger.warning('Unable to decode received packet')
                 return
             if lp_pkt.nack is not None:
                 nack_reason = lp_pkt.nack.nack_reason
@@ -264,35 +266,36 @@ class NDNApp:
             try:
                 name, _, _, _ = enc.parse_interest(data, with_tl=True)
             except (enc.DecodeError, TypeError, ValueError, struct.error):
-                logging.warning('Unable to decode the fragment of LpPacket')
+                self.logger.warning('Unable to decode the fragment of LpPacket')
                 return
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                logging.debug('NetworkNack received %s, reason=%s' % (enc.Name.to_str(name), nack_reason))
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug('NetworkNack received %s, reason=%s' % (enc.Name.to_str(name), nack_reason))
             self._on_nack(name, nack_reason)
         else:
             if typ == enc.TypeNumber.INTEREST:
                 try:
                     name, param, app_param, sig = enc.parse_interest(data, with_tl=True)
                 except (enc.DecodeError, TypeError, ValueError, struct.error):
-                    logging.warning('Unable to decode received packet')
+                    self.logger.warning('Unable to decode received packet')
                     return
-                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                if self.logger.isEnabledFor(logging.DEBUG):
                     if pit_token:
-                        logging.debug(f'Interest received {enc.Name.to_str(name)} w/ token={bytes(pit_token).hex()}')
+                        self.logger.debug(
+                            f'Interest received {enc.Name.to_str(name)} w/ token={bytes(pit_token).hex()}')
                     else:
-                        logging.debug(f'Interest received {enc.Name.to_str(name)}')
+                        self.logger.debug(f'Interest received {enc.Name.to_str(name)}')
                 await self._on_interest(name, pit_token, param, app_param, sig, raw_packet=data)
             elif typ == enc.TypeNumber.DATA:
                 try:
                     name, meta_info, content, sig = enc.parse_data(data, with_tl=True)
                 except (enc.DecodeError, TypeError, ValueError, struct.error):
-                    logging.warning('Unable to decode received packet')
+                    self.logger.warning('Unable to decode received packet')
                     return
-                if logging.getLogger().isEnabledFor(logging.DEBUG):
-                    logging.debug(f'Data received {enc.Name.to_str(name)}')
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug(f'Data received {enc.Name.to_str(name)}')
                 await self._on_data(name, meta_info, content, sig, raw_packet=data)
             else:
-                logging.warning('Unable to decode received packet')
+                self.logger.warning('Unable to decode received packet')
 
     @staticmethod
     def make_data(name: enc.NonStrictName, content: typing.Optional[enc.BinaryStr],
@@ -327,16 +330,16 @@ class NDNApp:
                            raw_packet: enc.BinaryStr):
         trie_step = self._fib.longest_prefix(name)
         if not trie_step:
-            logging.warning('No route: %s' % name)
+            self.logger.warning('No route: %s' % name)
             return
         node: PrefixTreeNode = trie_step.value
         if node.callback is None:
-            logging.warning('No callback: %s' % name)
+            self.logger.warning('No callback: %s' % name)
             return
         sig_required = app_param is not None or sig.signature_info is not None
         if sig_required:
             if not await sec.params_sha256_checker(name, sig):
-                logging.warning('Drop malformed Interest: %s' % name)
+                self.logger.warning('Drop malformed Interest: %s' % name)
                 return
 
         # Use context to handle misc parameters
@@ -355,7 +358,7 @@ class NDNApp:
         def reply(data: enc.BinaryStr) -> bool:
             now = utils.timestamp()
             if now > deadline:
-                logging.warning(f'Deadline passed, unable to reply to {enc.Name.to_str(name)}')
+                self.logger.warning(f'Deadline passed, unable to reply to {enc.Name.to_str(name)}')
                 return False
             if pit_token is None:
                 self._put_raw_packet(data)
@@ -377,7 +380,7 @@ class NDNApp:
             if valid == ValidResult.PASS or valid == ValidResult.ALLOW_BYPASS:
                 node.callback(name, app_param, reply, context)
             else:
-                logging.warning('Drop unvalidated Interest: %s' % name)
+                self.logger.warning('Drop unvalidated Interest: %s' % name)
                 return
         aio.create_task(submit_interest())
 
@@ -689,7 +692,7 @@ class NDNApp:
         """
         Manually shutdown the face to NFD.
         """
-        logging.info('Manually shutdown')
+        self.logger.info('Manually shutdown')
         self.face.shutdown()
 
     async def main_loop(self, after_start: typing.Awaitable = None) -> bool:
@@ -720,12 +723,12 @@ class NDNApp:
                     after_start.cancel()
             raise
         task = aio.create_task(starting_task())
-        logging.debug('Connected to NFD node, start running...')
+        self.logger.debug('Connected to NFD node, start running...')
         try:
             await self.face.run()
             ret = True
         except aio.CancelledError:
-            logging.info('Shutting down')
+            self.logger.info('Shutting down')
             ret = False
         finally:
             self.face.shutdown()
@@ -750,4 +753,4 @@ class NDNApp:
         try:
             aio.run(self.main_loop(after_start))
         except KeyboardInterrupt:
-            logging.info('Receiving Ctrl+C, exit')
+            self.logger.info('Receiving Ctrl+C, exit')

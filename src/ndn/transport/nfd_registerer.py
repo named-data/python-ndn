@@ -54,15 +54,16 @@ class NfdRegister(PrefixRegisterer):
                     lifetime=1000)
                 ret = nfd_mgmt.parse_response(reply)
                 if ret['status_code'] != 200:
-                    logging.error(f'Registration for {enc.Name.to_str(name)} failed: '
-                                  f'{ret["status_code"]} {ret["status_text"]}')
+                    logging.getLogger(__name__).error(f'Registration for {enc.Name.to_str(name)} failed: '
+                                                      f'{ret["status_code"]} {ret["status_text"]}')
                     return False
                 else:
-                    logging.debug(f'Registration for {enc.Name.to_str(name)} succeeded: '
-                                  f'{ret["status_code"]} {ret["status_text"]}')
+                    logging.getLogger(__name__).debug(f'Registration for {enc.Name.to_str(name)} succeeded: '
+                                                      f'{ret["status_code"]} {ret["status_text"]}')
                     return True
             except (types.InterestNack, types.InterestTimeout, types.InterestCanceled, types.ValidationFailure) as e:
-                logging.error(f'Registration for {enc.Name.to_str(name)} failed: {e.__class__.__name__}')
+                logging.getLogger(__name__).error(
+                    f'Registration for {enc.Name.to_str(name)} failed: {e.__class__.__name__}')
                 return False
 
     async def unregister(self, name: enc.NonStrictName) -> bool:

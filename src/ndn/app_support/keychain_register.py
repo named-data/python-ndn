@@ -26,13 +26,14 @@ class KcHandler:
     ident: sec.AbstractIdentity
 
     def on_int(self, int_name: enc.FormalName, _app_param, reply: ReplyFunc, pkt_ctx):
+        logger = logging.getLogger(__name__)
         id_name = self.ident.name
         if not enc.Name.is_prefix(id_name, int_name):
             return
         can_be_prefix = pkt_ctx['int_param'].can_be_prefix
         # can_be_prefix = True if using KEY name, False if using CERT name
         if len(int_name) != len(id_name) + (2 if can_be_prefix else 4):
-            logging.warning(f'Invalid key fetching Interest: {enc.Name.to_str(int_name)}')
+            logger.warning(f'Invalid key fetching Interest: {enc.Name.to_str(int_name)}')
             return
         try:
             key_name = int_name[:len(id_name)+2]
@@ -46,12 +47,12 @@ class KcHandler:
             else:
                 cert = key[int_name]
             if cert is not None:
-                logging.info(f'KeychainRegister replied with: {enc.Name.to_str(cert.name)}')
+                logger.info(f'KeychainRegister replied with: {enc.Name.to_str(cert.name)}')
                 reply(cert.data)
             else:
-                logging.warning(f'No certificate for key: {enc.Name.to_str(int_name)}')
+                logger.warning(f'No certificate for key: {enc.Name.to_str(int_name)}')
         except KeyError:
-            logging.warning(f'Fetching not existing key/cert: {enc.Name.to_str(int_name)}')
+            logger.warning(f'Fetching not existing key/cert: {enc.Name.to_str(int_name)}')
 
     def __init__(self, ident: sec.AbstractIdentity):
         self.ident = ident

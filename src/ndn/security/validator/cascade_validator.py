@@ -84,6 +84,7 @@ class CascadeChecker:
         self.anchor_key = bytes(key_bits)
         if not self._verify_sig(self.anchor_key, sig_ptrs):
             raise ValueError('Trust anchor is not properly self-signed')
+        self.logger = logging.getLogger(__name__)
 
     async def validate(self, name: FormalName, sig_ptrs: SignaturePtrs) -> bool:
         if (not sig_ptrs.signature_info or not sig_ptrs.signature_info.key_locator
@@ -91,24 +92,24 @@ class CascadeChecker:
             return False
         # Obtain public key
         cert_name = sig_ptrs.signature_info.key_locator.name
-        logging.debug(f'Verifying {Name.to_str(name)} <- {Name.to_str(cert_name)} ...')
+        self.logger.debug(f'Verifying {Name.to_str(name)} <- {Name.to_str(cert_name)} ...')
         if cert_name == self.anchor_name:
-            logging.debug('Use trust anchor.')
+            self.logger.debug('Use trust anchor.')
             key_bits = self.anchor_key
         else:
             if key_bits := self.storage.load(cert_name):
-                logging.debug('Use cached public key.')
+                self.logger.debug('Use cached public key.')
             else:
-                logging.debug('Cascade fetching public key ...')
+                self.logger.debug('Cascade fetching public key ...')
                 # Try to fetch
                 try:
                     _, _, key_bits = await self.app.express_interest(
                         name=cert_name, must_be_fresh=True, can_be_prefix=False,
                         validator=self.next_level)
                 except (ValidationFailure, InterestTimeout, InterestNack):
-                    logging.debug('Public key not valid.')
+                    self.logger.debug('Public key not valid.')
                     return False
-                logging.debug('Public key fetched.')
+                self.logger.debug('Public key fetched.')
                 if key_bits:
                     self.storage.save(cert_name, key_bits)
         # Validate signature

@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from enum import Enum, Flag
-from ndn.encoding import TlvModel, NameField, UintField, BytesField, BoolField, Component,\
+from ndn.encoding import TlvModel, NameField, UintField, BytesField, BoolField, Component, \
     RepeatedField, ModelField, Name, IncludeBase, MapField
 
 
@@ -73,7 +73,6 @@ class TestEncodeDecode:
         assert len(arg_list.params) == 2
         assert bytes(arg_list.params['key1']) == b'val1'
         assert bytes(arg_list.params['key2']) == b'val2'
-
 
     def test_nested(self):
         class Inner(TlvModel):

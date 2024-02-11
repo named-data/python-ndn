@@ -33,7 +33,7 @@ async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs) -> bool:
             for blk in covered_part:
                 sha256_algo.update(blk)
             ret = sha256_algo.digest() == sig_value
-        logging.debug('Digest check %s -> %s' % (Name.to_str(name), ret))
+        logging.getLogger(__name__).debug('Digest check %s -> %s' % (Name.to_str(name), ret))
         return ret
     else:
         return True
@@ -50,7 +50,7 @@ async def params_sha256_checker(name: FormalName, sig: SignaturePtrs) -> bool:
         for blk in covered_part:
             sha256_algo.update(blk)
         ret = sha256_algo.digest() == sig_value
-    logging.debug('Interest params-sha256 check %s -> %s' % (Name.to_str(name), ret))
+    logging.getLogger(__name__).debug('Interest params-sha256 check %s -> %s' % (Name.to_str(name), ret))
     return ret
 
 

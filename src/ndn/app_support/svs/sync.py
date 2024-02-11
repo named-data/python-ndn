@@ -33,7 +33,7 @@ OnMissingDataFunc = typing.Callable[["SvsInst"], None]
 r"""
 Called when there is a missing event.
 MUST BE NON-BLOCKING. Therefore, it is not allowed to fetch the missing data in this callback.
-It can start a task or trigger a signal to fetch missing data. 
+It can start a task or trigger a signal to fetch missing data.
 """
 
 
@@ -83,6 +83,7 @@ class SvsInst:
         self.int_signer = sync_int_signer
         self.int_validator = sync_int_validator
         self.timer_task = None
+        self.logger = logging.getLogger(__name__)
 
     def sample_sync_timer(self):
         dev = secrets.randbits(16) / 327680 * self.sync_interval
@@ -95,12 +96,12 @@ class SvsInst:
     def sync_handler(self, name: enc.FormalName, _app_param: enc.BinaryStr | None,
                      _reply: app.ReplyFunc, _context: app.PktContext) -> None:
         if len(name) != len(self.base_prefix) + 2:
-            logging.error(f'Received invalid Sync Interest: {enc.Name.to_str(name)}')
+            self.logger.error(f'Received invalid Sync Interest: {enc.Name.to_str(name)}')
             return
         try:
             remote_sv_pkt = StateVecWrapper.parse(name[-2]).val
         except (enc.DecodeError, IndexError) as e:
-            logging.error(f'Unable to decode state vector [{enc.Name.to_str(name)}]: {e}')
+            self.logger.error(f'Unable to decode state vector [{enc.Name.to_str(name)}]: {e}')
             return
 
         if remote_sv_pkt is None or not remote_sv_pkt.entries:
@@ -116,7 +117,7 @@ class SvsInst:
             rsv_id = enc.Name.to_bytes(rsv.node_id)
             rsv_seq = rsv.seq_no
             if rsv_id == self.self_node_id and rsv_seq > self.self_seq:
-                logging.error(f'Remote side has more local data for local node.')
+                self.logger.error('Remote side has more local data for local node.')
                 return
             rsv_dict[rsv_id] = rsv_seq
 
@@ -128,11 +129,11 @@ class SvsInst:
                 # Remote is latest
                 need_fetch = True
                 self.local_sv[rsv_id] = rsv_seq
-                logging.debug(f'Missing data for: [{enc.Name.to_str(rsv_id)}]: {lsv_seq} < {rsv_seq}')
+                self.logger.debug(f'Missing data for: [{enc.Name.to_str(rsv_id)}]: {lsv_seq} < {rsv_seq}')
             elif lsv_seq > rsv_seq:
                 # Local is latest
                 need_notif = True
-                logging.debug(f'Outdated remote on: [{enc.Name.to_str(rsv_id)}]: {rsv_seq} < {lsv_seq}')
+                self.logger.debug(f'Outdated remote on: [{enc.Name.to_str(rsv_id)}]: {rsv_seq} < {lsv_seq}')
 
         if need_notif or self.state == SvsState.SyncSuppression:
             # Set the aggregation timer

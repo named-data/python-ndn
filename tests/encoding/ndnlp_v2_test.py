@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from ndn.encoding import parse_network_nack, parse_interest, make_network_nack, make_interest,\
+from ndn.encoding import parse_network_nack, parse_interest, make_network_nack, make_interest, \
     NackReason, Name, InterestParam
 
 
