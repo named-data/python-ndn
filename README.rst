@@ -12,7 +12,7 @@ It supports Python >=3.10 and PyPy3.10 >=7.3.12.
 
 Please see our documentation_ if you have any issues.
 
-.. |Test Badge| image:: https://github.com/named-data/python-ndn/workflows/test/badge.svg
+.. |Test Badge| image:: https://github.com/named-data/python-ndn/actions/workflows/test.yml/badge.svg
     :target: https://github.com/named-data/python-ndn
     :alt: Test Status
 
