@@ -27,10 +27,9 @@ classifiers = [
     "Topic :: Internet",
     "Topic :: System :: Networking",
     "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 packages = [{ include = "ndn", from = "src" }]
 include = [{ path = "tests", format = "sdist" }]
@@ -41,11 +40,11 @@ include = [{ path = "tests", format = "sdist" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pycryptodomex = "^3.20.0"
+pycryptodomex = "^3.21.0"
 pygtrie = "^2.5.0"
-aenum = "^3.1.12"
-lark = "^1.1.9"
-aiohttp = "^3.9.3"
+aenum = "^3.1.15"
+lark = "^1.2.2"
+aiohttp = "^3.10.9"
 
 # Extra dependencies [dev]
 pytest = { version = "^7.1.2", optional = true }
