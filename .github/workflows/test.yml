@@ -19,25 +19,25 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
-    - name: Install poetry
-      run: pipx install poetry
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'poetry'  # caching poetry dependencies
+    - name: Upgrade pip
+      run: |
+        python -m pip install --upgrade pip
     - name: Install dependencies
       run: |
-        poetry install --all-extras
+        pip install ".[dev]"
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        poetry run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        poetry run flake8 src --exclude=src/ndn/contrib --count --ignore=F403,F405,W503,E226 \
+        flake8 src --exclude=src/ndn/contrib --count --ignore=F403,F405,W503,E226 \
           --exit-zero --max-complexity=20 --max-line-length=120 --statistics
-        poetry run flake8 tests --count --ignore=F403,F405,W503,E226,E222,W504 \
+        flake8 tests --count --ignore=F403,F405,W503,E226,E222,W504 \
           --exit-zero --max-complexity=50 --max-line-length=120 --statistics
     - name: Test with pytest
       run: |
-        poetry run pytest tests
+        pytest tests
