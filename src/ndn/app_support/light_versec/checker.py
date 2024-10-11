@@ -21,15 +21,17 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import Callable, Iterator
-from ...encoding import Name, BinaryStr, FormalName, NonStrictName, Component
+
+from ...encoding import BinaryStr, Component, FormalName, Name, NonStrictName
 from ...security import Keychain
 from ..security_v2 import parse_certificate
 from . import binary as bny
 from .compiler import top_order
 
 
-__all__ = ['UserFn', 'LvsModelError', 'Checker', 'DEFAULT_USER_FNS']
+__all__ = ["UserFn", "LvsModelError", "Checker", "DEFAULT_USER_FNS"]
 
 
 UserFn = Callable[[BinaryStr, list[BinaryStr]], bool]
@@ -44,6 +46,7 @@ class LvsModelError(Exception):
     """
     Raised when the input LVS model is malformed.
     """
+
     pass
 
 
@@ -71,8 +74,11 @@ class Checker:
 
     def _sanity_check(self):
         """Basic sanity check. Also collect info for other testing."""
-        if self.model.version > bny.VERSION:
-            raise LvsModelError(f'Unrecognized LVS model version {self.model.version}')
+        if (
+            self.model.version is None
+            or not bny.MIN_SUPPORTED_VERSION <= self.model.version <= bny.VERSION
+        ):
+            raise LvsModelError(f"Unsupported LVS model version {self.model.version}")
         self._model_fns = set()
         self._trust_roots = set()
         in_deg_nodes = set()
@@ -81,39 +87,50 @@ class Checker:
 
         def dfs(cur, par):
             if cur >= len(self.model.nodes):
-                raise LvsModelError(f'Non-existing node id {cur}')
+                raise LvsModelError(f"Non-existing node id {cur}")
             node = self.model.nodes[cur]
             if node.id != cur:
-                raise LvsModelError(f'Malformed node id {cur}')
+                raise LvsModelError(f"Malformed node id {cur}")
             if par and node.parent != par:
-                raise LvsModelError(f'Node {cur} has a wrong parent')
+                raise LvsModelError(f"Node {cur} has a wrong parent")
             for ve in node.v_edges:
                 if ve.dest is None or not ve.value:
-                    raise LvsModelError(f'Node {cur} has a malformed edge')
+                    raise LvsModelError(f"Node {cur} has a malformed edge")
                 dfs(ve.dest, cur)
             for pe in node.p_edges:
                 if pe.dest is None or pe.tag is None:
-                    raise LvsModelError(f'Node {cur} has a malformed edge')
+                    raise LvsModelError(f"Node {cur} has a malformed edge")
                 dfs(pe.dest, cur)
                 for cons in pe.cons_sets:
                     for op in cons.options:
-                        branch = [not not op.value, op.tag is not None, op.fn is not None].count(True)
+                        branch = [
+                            not not op.value,
+                            op.tag is not None,
+                            op.fn is not None,
+                        ].count(True)
                         if branch != 1:
-                            raise LvsModelError(f'Edge {cur}->{pe.dest} has a malformed condition')
+                            raise LvsModelError(
+                                f"Edge {cur}->{pe.dest} has a malformed condition"
+                            )
                         if op.fn is not None:
                             if not op.fn.fn_id:
-                                raise LvsModelError(f'Edge {cur}->{pe.dest} has a malformed condition')
+                                raise LvsModelError(
+                                    f"Edge {cur}->{pe.dest} has a malformed condition"
+                                )
                             self._model_fns.add(op.fn.fn_id)
             for key_node_id in node.sign_cons:
                 if key_node_id >= len(self.model.nodes):
-                    raise LvsModelError(f'Node {cur} is signed by a non-existing key {key_node_id}')
+                    raise LvsModelError(
+                        f"Node {cur} is signed by a non-existing key {key_node_id}"
+                    )
                 in_deg_nodes.add(key_node_id)
                 adj_lst[cur].append(key_node_id)
 
         dfs(self.model.start_id, None)
         top_order(nodes_id_lst, adj_lst)
-        self._trust_roots = {n for n in in_deg_nodes
-                             if not self.model.nodes[n].sign_cons}
+        self._trust_roots = {
+            n for n in in_deg_nodes if not self.model.nodes[n].sign_cons
+        }
 
     def validate_user_fns(self) -> bool:
         """Check if all user functions required by the model is defined."""
@@ -131,7 +148,7 @@ class Checker:
             if node.rule_name:
                 ret = ret | set(node.rule_name)
             else:
-                ret = ret | {'#_' + str(cur)}
+                ret = ret | {"#_" + str(cur)}
         return ret
 
     def save(self) -> bytes:
@@ -152,12 +169,22 @@ class Checker:
         return Checker(model, user_fns)
 
     def _context_to_name(self, context: dict[int, BinaryStr]) -> dict[str, BinaryStr]:
-        named_tag = {self._symbols[tag]: val for tag, val in context.items() if tag in self._symbols}
-        annon_tag = {str(tag): val for tag, val in context.items() if tag not in self._symbols}
+        named_tag = {
+            self._symbols[tag]: val
+            for tag, val in context.items()
+            if tag in self._symbols
+        }
+        annon_tag = {
+            str(tag): val for tag, val in context.items() if tag not in self._symbols
+        }
         return named_tag | annon_tag
 
-    def _check_cons(self, value: BinaryStr, context: dict[int, BinaryStr],
-                    cons_set: list[bny.PatternConstraint]) -> bool:
+    def _check_cons(
+        self,
+        value: BinaryStr,
+        context: dict[int, BinaryStr],
+        cons_set: list[bny.PatternConstraint],
+    ) -> bool:
         for cons in cons_set:
             satisfied = False
             for op in cons.options:
@@ -172,7 +199,7 @@ class Checker:
                 else:
                     fn_id = op.fn.fn_id
                     if fn_id not in self.user_fns:
-                        raise LvsModelError(f'User function {fn_id} is undefined')
+                        raise LvsModelError(f"User function {fn_id} is undefined")
                     args = [context.get(arg.tag, arg.value) for arg in op.fn.args]
                     if self.user_fns[fn_id](value, args):
                         satisfied = True
@@ -181,7 +208,9 @@ class Checker:
                 return False
         return True
 
-    def _match(self, name: FormalName, context: dict[int, BinaryStr]) -> Iterator[tuple[int, dict[int, BinaryStr]]]:
+    def _match(
+        self, name: FormalName, context: dict[int, BinaryStr]
+    ) -> Iterator[tuple[int, dict[int, BinaryStr]]]:
         cur = self.model.start_id
         edge_index = -1
         edge_indices = []
@@ -239,7 +268,9 @@ class Checker:
                         del context[last_tag]
                 cur = node.parent
 
-    def match(self, name: NonStrictName) -> Iterator[tuple[list[str], dict[str, BinaryStr]]]:
+    def match(
+        self, name: NonStrictName
+    ) -> Iterator[tuple[list[str], dict[str, BinaryStr]]]:
         """
         Iterate all matches of a given name.
 
@@ -257,7 +288,7 @@ class Checker:
             if node.rule_name:
                 rule_name = node.rule_name
             else:
-                rule_name = ['#_' + str(node_id)]
+                rule_name = ["#_" + str(node_id)]
             yield rule_name, self._context_to_name(context)
 
     def check(self, pkt_name: NonStrictName, key_name: NonStrictName) -> bool:
@@ -302,14 +333,19 @@ class Checker:
                     if self.check(pkt_name, cert_name):
                         cert = parse_certificate(key[cert_name].data)
                         # This is to avoid self-signed certificate
-                        if (not cert.signature_info or not cert.signature_info.key_locator
-                                or not cert.signature_info.key_locator.name):
+                        if (
+                            not cert.signature_info
+                            or not cert.signature_info.key_locator
+                            or not cert.signature_info.key_locator.name
+                        ):
                             continue
                         if self.check(cert_name, cert.signature_info.key_locator.name):
                             return cert_name
 
 
 DEFAULT_USER_FNS = {
-    '$eq': lambda c, args: all(x == c for x in args),
-    '$eq_type': lambda c, args: all(Component.get_type(x) == Component.get_type(c) for x in args),
+    "$eq": lambda c, args: all(x == c for x in args),
+    "$eq_type": lambda c, args: all(
+        Component.get_type(x) == Component.get_type(c) for x in args
+    ),
 }

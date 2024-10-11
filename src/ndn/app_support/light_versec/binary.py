@@ -4,7 +4,7 @@
 # But this code is implemented independently without using any line of the
 # original one, and released under Apache License.
 #
-# Copyright (C) 2019-2022 The python-ndn authors
+# Copyright (C) 2019-2024 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -23,31 +23,43 @@
 import ndn.encoding as enc
 
 
-__all__ = ['VERSION', 'TypeNumber', 'UserFnArg', 'UserFnCall', 'ConstraintOption', 'PatternConstraint',
-           'PatternEdge', 'ValueEdge', 'Node', 'TagSymbol', 'LvsModel']
+__all__ = [
+    "VERSION",
+    "TypeNumber",
+    "UserFnArg",
+    "UserFnCall",
+    "ConstraintOption",
+    "PatternConstraint",
+    "PatternEdge",
+    "ValueEdge",
+    "Node",
+    "TagSymbol",
+    "LvsModel",
+]
 
 
-VERSION = 0x00010000
+MIN_SUPPORTED_VERSION = 0x00011000
+VERSION = 0x00011000
 
 
 class TypeNumber:
-    COMPONENT_VALUE = 0x01
-    PATTERN_TAG = 0x02
-    NODE_ID = 0x03
-    USER_FN_ID = 0x04
-    IDENTIFIER = 0x05
-    USER_FN_CALL = 0x11
-    FN_ARGS = 0x12
-    CONS_OPTION = 0x21
-    CONSTRAINT = 0x22
-    VALUE_EDGE = 0x31
-    PATTERN_EDGE = 0x32
-    KEY_NODE_ID = 0x33
-    PARENT_ID = 0x34
-    VERSION = 0x40
-    NODE = 0x41
-    TAG_SYMBOL = 0x42
-    NAMED_PATTERN_NUM = 0x43
+    COMPONENT_VALUE = 0x21
+    PATTERN_TAG = 0x23
+    NODE_ID = 0x25
+    USER_FN_ID = 0x27
+    IDENTIFIER = 0x29
+    USER_FN_CALL = 0x31
+    FN_ARGS = 0x33
+    CONS_OPTION = 0x41
+    CONSTRAINT = 0x43
+    VALUE_EDGE = 0x51
+    PATTERN_EDGE = 0x53
+    KEY_NODE_ID = 0x55
+    PARENT_ID = 0x57
+    VERSION = 0x61
+    NODE = 0x63
+    TAG_SYMBOL = 0x67
+    NAMED_PATTERN_NUM = 0x69
 
 
 class UserFnArg(enc.TlvModel):
@@ -72,13 +84,17 @@ class ConstraintOption(enc.TlvModel):
 
 
 class PatternConstraint(enc.TlvModel):
-    options = enc.RepeatedField(enc.ModelField(TypeNumber.CONS_OPTION, ConstraintOption))
+    options = enc.RepeatedField(
+        enc.ModelField(TypeNumber.CONS_OPTION, ConstraintOption)
+    )
 
 
 class PatternEdge(enc.TlvModel):
     dest = enc.UintField(TypeNumber.NODE_ID)
     tag = enc.UintField(TypeNumber.PATTERN_TAG)
-    cons_sets = enc.RepeatedField(enc.ModelField(TypeNumber.CONSTRAINT, PatternConstraint))
+    cons_sets = enc.RepeatedField(
+        enc.ModelField(TypeNumber.CONSTRAINT, PatternConstraint)
+    )
 
 
 class ValueEdge(enc.TlvModel):
@@ -106,3 +122,60 @@ class LvsModel(enc.TlvModel):
     named_pattern_cnt = enc.UintField(TypeNumber.NAMED_PATTERN_NUM)
     nodes = enc.RepeatedField(enc.ModelField(TypeNumber.NODE, Node))
     symbols = enc.RepeatedField(enc.ModelField(TypeNumber.TAG_SYMBOL, TagSymbol))
+
+
+# The following are for reference only and there is no commitment to implement them exactly as described.
+# The implemented format is specified by the class LvsModel above.
+__ABNF_FOR_REFERENCE__ = r"""
+LvsModel = LVS-MODEL-TYPE TLV-LENGTH
+         Version
+         StartId
+         NamedPatternCnt
+         *Node
+         *TagSymbol
+
+Version = VERSION-TYPE TLV-LENGTH NonNegativeInteger
+StartId = NODE-ID-TYPE TLV-LENGTH NonNegativeInteger
+NamedPatternCnt = NAMED-PATTERN-NUM-TYPE TLV-LENGTH NonNegativeInteger
+
+Node = NODE-TYPE TLV-LENGTH
+         NodeId
+         [Parent]
+         *RuleName
+         *ValueEdge
+         *PatternEdge
+         *SignConstraint
+
+NodeId = NODE-TYPE TLV-LENGTH NonNegativeInteger
+Parent = NODE-TYPE TLV-LENGTH NonNegativeInteger
+SignConstraint = KEY-NODE-ID-TYPE TLV-LENGTH NonNegativeInteger
+RuleName = IDENTIFIER-TYPE TLV-LENGTH CNAME
+CNAME = ("_" / ALPHA) *("_" / ALPHA / DIGIT)
+
+ValueEdge = VALUE-EDGE-TYPE TLV-LENGTH
+              Destination
+              Value
+Destination = NodeId
+Value = COMPONENT-VALUE-TYPE TLV-LENGTH NameComponent
+
+PatternEdge = PATTERN-EDGE-TYPE TLV-LENGTH
+                Destination
+                Tag
+                *Constraint
+Tag = PATTERN-TAG-TYPE TLV-LENGTH NonNegativeInteger
+
+Constraint = CONSTRAINT-TYPE TLV-LENGTH *ConstraintOption
+ConstraintOption = CONS-OPTION-TYPE TLV-LENGTH (Value / Tag / UserFnCall)
+
+UserFnCall = USER-FN-CALL-TYPE TLV-LENGTH
+               FnId
+               *UserFnArg
+FnId = USER-FN-ID-TYPE TLV-LENGTH CNAME
+UserFnArg = USER-FN-ARG-TYPE TLV-LENGTH (Value / Tag)
+
+TagSymbol = TAG-SYMBOL-TYPE TLV-LENGTH
+              Tag
+              Identifier
+
+Identifier = IDENTIFIER-TYPE TLV-LENGTH CNAME
+"""
