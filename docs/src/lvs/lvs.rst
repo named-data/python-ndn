@@ -195,7 +195,7 @@ User Functions
 
 User functions are named in the format of ``$function``.
 They should be provided as a dictionary via Checker's construction function by the application code using the trust schema.
-The name ``function`` of one user function should be the dictionary key and the corresponding function definition should be the dictionary value. 
+The name ``function`` of one user function should be the dictionary key and the corresponding function definition should be the dictionary value.
 A user function can take arguments of type component values and patterns.
 For example, ``$fn("component", pattern)`` is a valid function call.
 When used as a component constraint,
@@ -215,7 +215,7 @@ For example, there is a user function called ``fn``. It should be defined and pr
     user_fn={"fn": fn}
     checker=Checker(lvs_model,user_fn)
 
-In the trust schema, the user function can be called as 
+In the trust schema, the user function can be called as
 
 .. code-block:: text
 
@@ -283,9 +283,9 @@ Tutorial
 
 Suppose that there is a blog platform that contains three roles: admin, author and reader. It follows these specifications:
 1. The prefix of this platform is ``/ndn/blog``. The trust anchor is ``/ndn/blog/KEY/<key-id>/<issuer>/<cert-id>``.
-2. There is a root certificate in this platform. 
-3. Admin has its certificate signed by root certificate. 
-4. The certificates of both author and reader are signed by admin's certificate. 
+2. There is a root certificate in this platform.
+3. Admin has its certificate signed by root certificate.
+4. The certificates of both author and reader are signed by admin's certificate.
 5. The IDs of both author and reader should be a 6-digit number.
 6. Both author and admin can post the articles.
 7. The name of a posted article should be ``/ndn/blog/ID/post/<year>/<id>``. The "year" must be a 4-digit number.
@@ -302,14 +302,14 @@ Based on the above specifications, the trust schema can be written as:
     #root: #platform/#KEY
     // Admin's certificate definition. The non-sharp patterns, role and adminID, are sent from the application. Each pattern can match an arbitrary components, but the matched components for the same pattern should be the same. The constraint shows that the component "_role" must be "admin". The underscore means that the matched components for the pattern "_role" may not be identical in the chain. The admin's certificate must be signed by the root certificate.
     #admin: #platform/_role/adminID/#KEY & {_role: "admin"} <= #root
-    // author's certificate definition. The ID is verified by a user function. Both constraints must be met. It can only be signed by the admin's certificate. 
+    // author's certificate definition. The ID is verified by a user function. Both constraints must be met. It can only be signed by the admin's certificate.
     #author: #platform/_role/ID/#KEY & {_role: "author", ID: $isValidID()} <= #admin
-    // author's and reader's certificate definition. The role can be either "reader" or "author". The ID is verified by a user function. Both constraints must be met. It can only be signed by the admin's certificate. 
+    // author's and reader's certificate definition. The role can be either "reader" or "author". The ID is verified by a user function. Both constraints must be met. It can only be signed by the admin's certificate.
     #user: #platform/_role/ID/#KEY & {_role: "reader"|"author", ID: $isValidID()} <= #admin
     // article's trust schema. The component "year" is verified by a user function. The article can be signed by the admin's certificate or one author's certificate.
     #article: #platform/ID/"post"/year/articleID & {year: $isValidYear()} <= #admin | #author
 
-To build the checker of the above trust schema, we must define the user functions by using lambda expressions first. 
+To build the checker of the above trust schema, we must define the user functions by using lambda expressions first.
 
 .. code-block:: python3
 
@@ -343,7 +343,7 @@ With the string of trust schema and the user function dictionary, we can compile
 With the function ``check``, we can check whether one name is valid under one certificate name. Here are some testing examples.
 
 .. code-block:: python3
-    
+
     # Admin's certificate can be signed by the root certificate
     print(checker.check('/ndn/blog/admin/000001/KEY/1/root/1',
                         '/ndn/blog/KEY/1/self/1'))  # => True
@@ -385,3 +385,4 @@ References
     package
     details
     demonstration
+    binary-format
