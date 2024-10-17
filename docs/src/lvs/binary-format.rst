@@ -53,7 +53,7 @@ This page describes version ``0x00011000``.
                 FnId
                 *UserFnArg
     FnId = USER-FN-ID-TYPE TLV-LENGTH "$" CNAME
-    UserFnArg = USER-FN-ARG-TYPE TLV-LENGTH (Value / Tag)
+    UserFnArg = FN-ARGS-TYPE TLV-LENGTH (Value / Tag)
 
     TagSymbol = TAG-SYMBOL-TYPE TLV-LENGTH
                 Tag

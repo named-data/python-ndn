@@ -69,7 +69,11 @@ Generating tree
     :align: center
     :width: 100%
 
-Each node is a name prefix, and edge becoming the condition to 
+Each node is a name prefix, and edge becoming the condition to the nodes.
+
+.. note::
+    In the figure we omitted ununsed branch ``"KEY"/_/_/_`` from the root, but the compiler will generate it.
+    So, the total number of nodes is 26.
 
 Fixing signing constraints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,16 +91,16 @@ and model the name pattern tree into a TLV encodable model.
 
 Checker
 ~~~~~~~~
-In order to check a name ``/lvs-test/article/alice/post1/v=2`` can be signed by 
-name ``/lvs-test/author/alice/KEY/%BDA%D6%DE%EA%09%3C%E0/admin/v=1647807153833``, 
-Checker first matches ``/lvs-test/article/alice/post1/v=2`` against the name 
+In order to check a name ``/lvs-test/article/alice/post1/v=2`` can be signed by
+name ``/lvs-test/author/alice/KEY/%BDA%D6%DE%EA%09%3C%E0/admin/v=1647807153833``,
+Checker first matches ``/lvs-test/article/alice/post1/v=2`` against the name
 pattern tree, which gives the uppermost branch of the pattern tree.
 
-Along the matching, checker fills the symbols with ``author = "alice"`` 
+Along the matching, checker fills the symbols with ``author = "alice"``
 and ``post = "post1"``.
 The end of this branch indicates the node identifier (e.g., ``x``) for this branch.
 
-Then the checker matches the ``/lvs-test/author/alice/KEY/...`` 
+Then the checker matches the ``/lvs-test/author/alice/KEY/...``
 against the name pattern tree, which gives the second branch from the top.
 When matching along this branch, checker uses "alice" for ``1``'s value.
 The end of this branch has the same node identifier ``x``, thereby the checking succeeds.
