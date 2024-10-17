@@ -297,7 +297,7 @@ Based on the above specifications, the trust schema can be written as:
     // The platform prefix definition. The pair of quotes means that it can only be matched by the identical component.
     #platform: "ndn"/"blog"
     // The certificate name suffix definition. Each underscore can be matched by an arbitrary pattern except that contains slash.
-    #KEY="KEY"/_/_/_
+    #KEY: "KEY"/_/_/_
     // The root certificate definition, i.e., /ndn/blog/KEY/<key-id>/<issuer>/<cert-id>.
     #root: #platform/#KEY
     // Admin's certificate definition. The non-sharp patterns, role and adminID, are sent from the application. Each pattern can match an arbitrary components, but the matched components for the same pattern should be the same. The constraint shows that the component "_role" must be "admin". The underscore means that the matched components for the pattern "_role" may not be identical in the chain. The admin's certificate must be signed by the root certificate.
@@ -327,7 +327,7 @@ With the string of trust schema and the user function dictionary, we can compile
 
     lvs_text = r'''
     #platform: "ndn"/"blog"
-    #KEY="KEY"/_/_/_
+    #KEY: "KEY"/_/_/_
     #root: #platform/#KEY
     #admin: #platform/_role/adminID/#KEY & {_role: "admin"} <= #root
     #author: #platform/_role/ID/#KEY & {_role: "author", ID: $isValidID()} <= #admin

@@ -28,10 +28,10 @@ This page describes version ``0x00011000``.
             *PatternEdge
             *SignConstraint
 
-    NodeId = NODE-TYPE TLV-LENGTH NonNegativeInteger
-    Parent = NODE-TYPE TLV-LENGTH NonNegativeInteger
+    NodeId = NODE-ID-TYPE TLV-LENGTH NonNegativeInteger
+    Parent = PARENT-ID-TYPE TLV-LENGTH NonNegativeInteger
     SignConstraint = KEY-NODE-ID-TYPE TLV-LENGTH NonNegativeInteger
-    RuleName = IDENTIFIER-TYPE TLV-LENGTH CNAME
+    RuleName = IDENTIFIER-TYPE TLV-LENGTH "#" CNAME
     CNAME = ("_" / ALPHA) *("_" / ALPHA / DIGIT)
 
     ValueEdge = VALUE-EDGE-TYPE TLV-LENGTH
@@ -52,7 +52,7 @@ This page describes version ``0x00011000``.
     UserFnCall = USER-FN-CALL-TYPE TLV-LENGTH
                 FnId
                 *UserFnArg
-    FnId = USER-FN-ID-TYPE TLV-LENGTH CNAME
+    FnId = USER-FN-ID-TYPE TLV-LENGTH "$" CNAME
     UserFnArg = USER-FN-ARG-TYPE TLV-LENGTH (Value / Tag)
 
     TagSymbol = TAG-SYMBOL-TYPE TLV-LENGTH
