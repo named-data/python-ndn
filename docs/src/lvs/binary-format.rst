@@ -163,10 +163,28 @@ When loading a compiled LVS model, the following sanity check should be made bef
 The following sanity checks are recommended but not required.
 
 - After the application finishes providing user functions, check all user functions used in the programs are given.
-  - If the implementation chooses not to do so, it should let the verifcation fail whenever an unknown user function is triggered.
-- After the application finishes providing trust anchors, check all leaf nodes without signing constraint are provided with a trust anchor.
-  - If the implementation chooses not to do so, it should let the verifcation fail whenever reaches a leaf node without sign constraint.
-- No unreachable nodes. (python-ndn does not check this)
+
+  + If the implementation chooses not to do so, it should let the verifcation fail whenever an unknown user function is triggered.
+
+- After the application finishes providing trust anchors, check all roots of signing constraint are provided with a trust anchor.
+
+  + A node is a *root of signing constraint* if it is both
+
+    * (a) specified as a signing constraint of another node, and
+    * (b) a node without any signing constraint attached to it
+
+  + If the implementation chooses not to do so, it should let the verifcation fail whenever reaches a leaf node without sign constraint.
+
+- *[Optional]* No unreachable nodes from the tree root. (python-ndn does not check this)
+
+
+.. note::
+    In the current version, there are some nodes that neither have signing constraints nor be specified as signing constraints.
+    They exist due to the limitation of current compiler.
+    No packet should match them.
+    The checker may optionally remove them from the tree.
+    Please make sure the checker does not misconsider them as trust anchors.
+
 
 User Functions
 ~~~~~~~~~~~~~~
