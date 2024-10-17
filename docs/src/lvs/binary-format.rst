@@ -7,7 +7,7 @@ This page describes version ``0x00011000``.
 
 .. code-block:: abnf
 
-    LvsModel = LVS-MODEL-TYPE TLV-LENGTH
+    LvsModel =
          Version
          StartId
          NamedPatternCnt
@@ -181,3 +181,5 @@ python-ndn provides the following built-in functions:
 
 - ``$eq``: compares two components.
 - ``$eq_type``: compares the type of two components.
+
+The details of user functions is up to specific implementation.
