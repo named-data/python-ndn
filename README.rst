@@ -5,7 +5,7 @@ python-ndn
 |Code Size|
 |Release Badge|
 |Doc Badge|
-
+#Add some comments to explain the links and lines on this code for better understanding
 A Named Data Networking client library with AsyncIO support in Python 3.
 
 It supports Python >=3.10 and PyPy3.10 >=7.3.12.
