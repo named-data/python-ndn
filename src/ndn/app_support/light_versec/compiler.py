@@ -61,6 +61,8 @@ def top_order(nodes: set[T], graph: dict[T, list[T]]) -> list[T]:
         if not cur_round:
             remaining_nodes = nodes - set(ret)
             raise SemanticError(f'Loop detected for {remaining_nodes}')
+        # Sort for stable build. Allowed since T can only be `str` or `int`
+        cur_round.sort()
         for n in cur_round:
             for n2 in graph[n]:
                 in_degs[n2] -= 1
@@ -219,7 +221,7 @@ class Compiler:
     def _replicate_rules(self):
         self.rep_rules = {}
         for rule in self.lvs.rules:
-            sign_cons = [s.id for s in rule.sign_cons]
+            sign_cons = sorted([s.id for s in rule.sign_cons])
             if not rule.comp_cons:
                 cur_chains = [self.RuleChain(id=rule.id.id, name=[], cons_set=[], sign_cons=sign_cons)]
             else:
@@ -230,6 +232,7 @@ class Compiler:
                     for chain in cur_chains:
                         chain.name.append(comp)
                 else:
+                    # Note: this repeats temporary tag numbers, which needs to be fixed before emit.
                     new_chains = [self.RuleChain(id=rule.id.id,
                                                  name=chain.name+ref_chain.name,
                                                  cons_set=chain.cons_set+ref_chain.cons_set,
@@ -253,7 +256,8 @@ class Compiler:
         for rc in context:
             if depth == len(rc.name):
                 node.rule_name.append(rc.id)
-                # Here we violate the type. Will fix it later
+                # Here we violate the type (expected list[int], actual list[str]).
+                # Will fix it later in `_fix_signing_references`
                 node.sign_cons.extend(rc.sign_cons)
                 if rc.id not in self.rule_node_ids:
                     self.rule_node_ids[rc.id] = [node.id]
@@ -266,7 +270,8 @@ class Compiler:
         v_move = set(rc.name[depth].c for rc in context
                      if isinstance(rc.name[depth], psr.ComponentValue))
         node.v_edges = []
-        for v in v_move:
+        v_move_list = sorted(list(v_move))
+        for v in v_move_list:
             new_context = [rc for rc in context
                            if isinstance(rc.name[depth], psr.ComponentValue)
                            and rc.name[depth].c == v]
@@ -277,7 +282,7 @@ class Compiler:
         # Pattern movements
         p_moves = [rc.pattern_movement(depth, previous_tags) + (rc,) for rc in context
                    if isinstance(rc.name[depth], psr.Pattern)]
-        p_move_strs = set(pm[2] for pm in p_moves)
+        p_move_strs = sorted(list(set(pm[2] for pm in p_moves)))
         for pm_str in p_move_strs:
             new_context = [pm[3] for pm in p_moves if pm[2] == pm_str]
             assert len(new_context) > 0
@@ -294,6 +299,9 @@ class Compiler:
         return node.id
 
     def _fix_signing_references(self):
+        """
+        Convert signing constraints from string node-ID to integer node-ID
+        """
         for node in self.node_pool:
             sign_cons = node.sign_cons
             if not sign_cons:
@@ -303,7 +311,7 @@ class Compiler:
                 if rid not in self.rule_node_ids:
                     raise SemanticError(f'Signed by a non-existing key {rid}')
                 new_sign_cons.extend(self.rule_node_ids[rid])
-            node.sign_cons = new_sign_cons
+            node.sign_cons = sorted(new_sign_cons)
 
     def compile(self) -> bny.LvsModel:
         self._sort_rule_references()
@@ -311,7 +319,10 @@ class Compiler:
         self._replicate_rules()
         self.node_pool = []
         self.rule_node_ids = {}
-        rule_chains = sum(self.rep_rules.values(), [])
+        # Sort replicated rules for compilation stability
+        sorted_rep_rules = list(self.rep_rules.items())
+        sorted_rep_rules.sort(key=lambda tup: tup[0])
+        rule_chains = sum([v for (k, v) in sorted_rep_rules], start=[])
         start_node = self._generate_node(0, rule_chains, None, set())
         self._fix_signing_references()
         ret = bny.LvsModel()
@@ -319,12 +330,14 @@ class Compiler:
         ret.start_id = start_node
         ret.named_pattern_cnt = len(self.named_pats)
         ret.nodes = self.node_pool
-        ret.symbols = []
+        symbols = []
         for pname, number in self.named_pats.items():
             symbol = bny.TagSymbol()
             symbol.ident = pname
             symbol.tag = int(number)
-            ret.symbols.append(symbol)
+            symbols.append(symbol)
+        symbols.sort(key=lambda sym: sym.tag)
+        ret.symbols = symbols
         return ret
 
 
