@@ -101,16 +101,16 @@ Every node has an integer ID, which equals to the index it occurs in the LVS mod
 In current compiler implemented in python-ndn, it is ``0`` to indicate that the first Node is the root,
 but there is no guarantee in future and a checker should not rely on this convention.
 
-Every pattern edge is also assigned with a number.
-If the number is lower than ``NamedPatternCnt``, then it is a named pattern edge.
-If it is larger than or equal to ``NamedPatternCnt``, then it is a temporary named pattern ``_``.
+Every pattern edge is also assigned with a number, which starts from ``1``.
+If the number is lower than or equal to ``NamedPatternCnt``, then it is a named pattern edge.
+If it is larger than ``NamedPatternCnt``, then it is a temporary named pattern ``_``.
 Note that since TLV encoding does not support negative numbers, we use ``NamedPatternCnt`` to differentiate temporary and normal named patterns.
 A checker does not need to tell whether a pattern edge is named or not,
-if it only checks the signature validity, since every temporary pattern edge is assigned with a different tag.
+if it only checks the signature validity, since every occurrence of a temporary pattern edge is assigned with a different tag.
 Tag symbol information is only needed if the checker needs the name identifiers of named patterns.
 
 ``TagSymbol`` describes the identifiers for each named pattern edge.
-It is ununsed and can be safely discarded if a checker does not dump error reason after verification fails.
+It is unused and can be safely discarded if a checker does not dump error reason after verification fails.
 The TLV-Type is still marked as critical for sanity check reason expressed in the next section.
 
 Node
@@ -119,13 +119,13 @@ Node
 ``NodeId`` always equal to the index it occurs in the LVS model, starting from ``0``.
 
 ``RuleName`` is the identifier used to identify this node in the original LVS schema.
-It is ununsed if a checker does not dump error reason after verification fails.
+It is unused if a checker does not dump error reason after verification fails.
 
 ``ValueEdge`` and ``PatternEdge`` are edges to children under its subtree.
 A ``ValueEdge`` requests an exact match; a ``PatternEdge`` specifies a match of a constraint set,
 and assigns the component value to the corresponding pattern variable.
 A checker must always check ``ValueEdge`` for exact matches before it uses ``PatternEdge`` to match.
-When multiple ``PatternEdge`` can match, the first one occuring in the file should hit.
+When multiple ``PatternEdge`` can match, the first one occurring in the file should hit.
 
 ``SignConstraint`` indicates zero or more node IDs.
 When a packet name matches the current node, the signing key should match one of the nodes specified by ``SignConstraint``.
@@ -164,7 +164,7 @@ The following sanity checks are recommended but not required.
 
 - After the application finishes providing user functions, check all user functions used in the programs are given.
 
-  + If the implementation chooses not to do so, it should let the verifcation fail whenever an unknown user function is triggered.
+  + If the implementation chooses not to do so, it should let the verification fail whenever an unknown user function is triggered.
 
 - After the application finishes providing trust anchors, check all roots of signing constraint are provided with a trust anchor.
 
@@ -173,7 +173,7 @@ The following sanity checks are recommended but not required.
     * (a) specified as a signing constraint of another node, and
     * (b) a node without any signing constraint attached to it
 
-  + If the implementation chooses not to do so, it should let the verifcation fail whenever reaches a leaf node without sign constraint.
+  + If the implementation chooses not to do so, it should let the verification fail whenever reaches a leaf node without sign constraint.
 
 - *[Optional]* No unreachable nodes from the tree root. (python-ndn does not check this)
 

@@ -78,6 +78,7 @@ class Compiler:
     named_pats: dict[str, str]
     node_pool: list[bny.Node]
     rule_node_ids: dict[str, list[int]]
+    temp_tag_index: int = 0
 
     @dataclass
     class RuleChain:
@@ -292,7 +293,9 @@ class Compiler:
                 edge.tag = tag
             else:
                 # TLV integer is required to be unsigned, so we use maximum named pattern + x for temporary pattern -x
-                edge.tag = len(self.named_pats) - tag
+                self.temp_tag_index += 1
+                edge.tag = self.temp_tag_index
+                # edge.tag = len(self.named_pats) - tag
             edge.cons_sets = next(pm[1] for pm in p_moves if pm[2] == pm_str)
             edge.dest = self._generate_node(depth + 1, new_context, node.id, previous_tags | {tag})
             node.p_edges.append(edge)
@@ -323,6 +326,7 @@ class Compiler:
         sorted_rep_rules = list(self.rep_rules.items())
         sorted_rep_rules.sort(key=lambda tup: tup[0])
         rule_chains = sum([v for (k, v) in sorted_rep_rules], start=[])
+        self.temp_tag_index = len(self.named_pats)
         start_node = self._generate_node(0, rule_chains, None, set())
         self._fix_signing_references()
         ret = bny.LvsModel()

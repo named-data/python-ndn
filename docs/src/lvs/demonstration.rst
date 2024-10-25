@@ -65,6 +65,14 @@ Therefore, no rule replication is needed.
 Generating tree
 ~~~~~~~~~~~~~~~
 
+.. warning::
+    The figures in this page are out-of-dated. Unfortunately I am not able to fix them now.
+    Please check with the actual result of code.
+    More specifically, note the following things:
+
+        - There is a ``#KEY`` branch attach to the root, which is omitted in the figure.
+        - Temporary pattern edges do not share tag IDs.
+
 .. image:: /_static/lvs-ptree.svg
     :align: center
     :width: 100%
