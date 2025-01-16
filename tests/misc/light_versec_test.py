@@ -78,15 +78,6 @@ class TestLvsBasic:
 
 class TestLvsSanity:
     @staticmethod
-    def test_redefinition():
-        lvs = r'''
-        #rule: "a"/b/"c"
-        #rule: d/"e"/f
-        '''
-        with pytest.raises(SemanticError):
-            Checker(compile_lvs(lvs), {})
-
-    @staticmethod
     def test_refer_to_temp():
         lvs = r'''
         #_r1: "a"/b/"c"
@@ -166,6 +157,17 @@ class TestLvsSanity:
 
 
 class TestLvsSemantics:
+    @staticmethod
+    def test_redefinition():
+        lvs = r'''
+        #rule: "a"/b/"c"
+        #rule: d/"e"/f
+        '''
+        checker = Checker(compile_lvs(lvs), {})
+        assert len(list(checker.match('/a/b/c'))) == 1
+        assert len(list(checker.match('/d/e/f'))) == 1
+        assert len(list(checker.match('/a/e/c'))) == 2
+
     @staticmethod
     def test_temp_pattern():
         lvs = r'''
@@ -377,3 +379,39 @@ class TestLvsSemantics:
             '''
             checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
             assert checker.suggest("/article/eco/day1", keychain) == ny_author_cert_name
+
+    @staticmethod
+    def test_complicated_redef():
+        lvs = r'''
+            #network: network & { network: "ndn" | "yoursunny" }
+            #CERT: "KEY"/_/_/_
+            #sitename: s1
+            #sitename: s1/s2
+            #sitename: s1/s2/s3
+
+            #routername: #network/#sitename/"%C1.Router"/routerid
+            #rootcert: #network/#CERT
+            #sitecert: #network/#sitename/#CERT <= #rootcert
+            #operatorcert: #network/#sitename/"%C1.Operator"/opid/#CERT <= #sitecert
+            #routercert: #routername/#CERT <= #operatorcert
+            #lsdbdata: #routername/"nlsr"/"lsdb"/lsatype/version/segment <= #routercert
+            '''
+        checker = Checker(compile_lvs(lvs), {})
+        assert len(list(checker.match('/ndn/KEY/1/self/1'))) == 1
+        assert len(list(checker.match('/ndn/ucla/KEY/1/self/1'))) == 1
+        assert len(list(checker.match('/ndn/ucla/cs/KEY/1/self/1'))) == 1
+        assert len(list(checker.match('/ndn/ucla/cs/irl/KEY/1/self/1'))) == 1
+        assert len(list(checker.match('/ndn/ucla/cs/irl/should-fail/KEY/1/self/1'))) == 0
+
+        assert checker.check('/ndn/ucla/KEY/2/ndn/3', '/ndn/KEY/1/self/1')
+        # Operator
+        assert checker.check('/ndn/ucla/%C1.Operator/13/KEY/2/ndn/3', '/ndn/ucla/KEY/2/ndn/3')
+        assert checker.check('/ndn/ucla/cs/%C1.Operator/13/KEY/2/ndn/3', '/ndn/ucla/cs/KEY/2/ndn/3')
+        # Operator is also matched as a site
+        assert checker.check('/ndn/ucla/%C1.Operator/13/KEY/2/ndn/3', '/ndn/KEY/1/self/1')
+        # No cross-site issuance
+        assert not checker.check('/ndn/ucla/%C1.Operator/13/KEY/2/ndn/3', '/ndn/arizona/KEY/2/ndn/3')
+        assert not checker.check('/ndn/ucla/%C1.Operator/13/KEY/2/ndn/3', '/yoursunny/ucla/KEY/2/ndn/3')
+        # But super-zone can sign sub-zone
+        assert checker.check('/ndn/ucla/cs/%C1.Operator/13/KEY/2/ndn/3', '/ndn/ucla/KEY/2/ndn/3')
+        assert not checker.check('/ndn/ucla/cs/%C1.Operator/13/KEY/2/ndn/3', '/ndn/ucla/ee/KEY/2/ndn/3')

@@ -140,10 +140,13 @@ class Compiler:
         rule_id_set = set()
         temp_rule_number = 1
         for rule in self.lvs.rules:
-            if rule.id.id[1] != '_':
-                if rule.id.id in rule_id_set:
-                    raise SemanticError(f'Rule {rule.id.id} is redefined')
-            else:
+            # if rule.id.id[1] != '_':
+            #     if rule.id.id in rule_id_set:
+            #         raise SemanticError(f'Rule {rule.id.id} is redefined')
+            # else:
+            #     rule.id.id += f'#{temp_rule_number}'
+            #     temp_rule_number += 1
+            if rule.id.id[1] == '_':
                 rule.id.id += f'#{temp_rule_number}'
                 temp_rule_number += 1
             rule_id_set.add(rule.id.id)
@@ -242,7 +245,10 @@ class Compiler:
                                   for chain in cur_chains]
                     assert len(new_chains) > 0
                     cur_chains = new_chains
-            self.rep_rules[rule.id.id] = cur_chains
+            if rule.id.id not in self.rep_rules:
+                self.rep_rules[rule.id.id] = cur_chains
+            else:
+                self.rep_rules[rule.id.id] += cur_chains
 
     def _generate_node(self, depth: int, context: list[RuleChain], parent: Optional[int],
                        previous_tags: set[int]) -> int:
