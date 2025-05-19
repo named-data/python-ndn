@@ -116,11 +116,8 @@ class HmacChecker(KnownChecker):
 
 def verify_ed25519(pub_key: ECC.EccKey, sig_ptrs: SignaturePtrs) -> bool:
     verifier = eddsa.new(pub_key, 'rfc8032')
-    h = SHA512.new()
-    for content in sig_ptrs.signature_covered_part:
-        h.update(content)
     try:
-        verifier.verify(h, bytes(sig_ptrs.signature_value_buf))
+        verifier.verify(b''.join(sig_ptrs.signature_covered_part), bytes(sig_ptrs.signature_value_buf))
         return True
     except ValueError:
         return False
