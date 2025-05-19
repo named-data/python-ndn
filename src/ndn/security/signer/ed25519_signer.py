@@ -45,10 +45,7 @@ class Ed25519Signer(Signer):
 
     def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         # Copying is needed as cryptography library only support bytes
-        h = SHA512.new()
-        for blk in contents:
-            h.update(blk)
         signer = eddsa.new(self.key, 'rfc8032')
-        signature = signer.sign(h)
+        signature = signer.sign(b''.join(contents))
         wire[:] = signature
         return len(signature)
