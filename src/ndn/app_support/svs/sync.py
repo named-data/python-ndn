@@ -43,6 +43,15 @@ class SvsState(Enum):
 
 
 class SvsInst:
+    """
+    State Vector Sync protocol instance.
+
+    This class implements SVS v1 protocol:
+    <https://github.com/named-data/StateVectorSync/blob/9bc93797412a03e1eebbc9d4390840b3f187292a/Specification.md>
+
+    It is incompatible with other SVS protocol versions.
+    """
+
     on_missing: OnMissingDataFunc
     sync_interval: float
     suppression_interval: float
