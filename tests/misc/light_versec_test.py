@@ -380,6 +380,8 @@ class TestLvsSemantics:
             checker = Checker(compile_lvs(lvs), DEFAULT_USER_FNS)
             assert checker.suggest("/article/eco/day1", keychain) == ny_author_cert_name
 
+            keychain.shutdown()
+
     @staticmethod
     def test_complicated_redef():
         lvs = r'''
