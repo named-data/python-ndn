@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import os
-import aenum
 import socket
 import asyncio as aio
 import ctypes as c
@@ -27,9 +26,7 @@ class SockaddrUn(c.Structure):
     _fields_ = [("sun_family", c.c_ushort), ("sun_path", c.c_char * 108)]
 
 
-aenum.extend_enum(socket.AddressFamily, "AF_UNIX", 1)
-AF_UNIX = socket.AddressFamily(1)
-NULL = 0
+AF_UNIX = int(getattr(socket.AddressFamily, "AF_UNIX", 1))
 
 
 class Cng:
@@ -105,7 +102,7 @@ class Win32(Platform):
     @staticmethod
     def _iocp_connect(proactor, conn, address):
         # _overlapped.WSAConnect(conn.fileno(), address)
-        addr = SockaddrUn(AF_UNIX.value, address.encode() + b"\0")
+        addr = SockaddrUn(AF_UNIX, address.encode() + b"\0")
         winsock = c.windll.ws2_32
         winsock.connect(conn.fileno(), addr, 110)
 
