@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from Cryptodome.PublicKey import ECC
-from Cryptodome.Hash import SHA512
 from Cryptodome.Signature import eddsa
 from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr, BinaryStr
 

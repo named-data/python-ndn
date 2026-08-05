@@ -106,12 +106,12 @@ class TestDataValidationFalure(NDNAppTestSuite):
         return types.ValidResult.FAIL
 
     async def face_proc(self, face: DummyFace):
-        await face.consume_output(b'\x05\x1b\x07\x10\x08\x03not\x08\timportant\n\x04\x00\x00\x00\x00\x0c\x01\x05')
+        await face.consume_output(b'\x05\x1b\x07\x10\x08\x03not\x08\timportant\n\x04\x00\x00\x00\x00\x0c\x01\xfa')
         await face.input_packet(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
 
     async def app_main(self):
         with pytest.raises(types.ValidationFailure) as e:
-            await self.app.express('/not/important', validator=self.validator, nonce=0, lifetime=5)
+            await self.app.express('/not/important', validator=self.validator, nonce=0, lifetime=250)
         assert e.value.name == enc.Name.from_str('/not/important')
         assert e.value.content == b'test'
         assert e.value.result == types.ValidResult.FAIL
@@ -119,16 +119,16 @@ class TestDataValidationFalure(NDNAppTestSuite):
 
 class TestInterestCanBePrefix(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
-        await face.consume_output(b'\x05\x0a\x07\x05\x08\x03not\x0c\x01\x05'
-                                  b'\x05\x0c\x07\x05\x08\x03not\x21\x00\x0c\x01\x05'
-                                  b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+        await face.consume_output(b'\x05\x0a\x07\x05\x08\x03not\x0c\x01\xfa'
+                                  b'\x05\x0c\x07\x05\x08\x03not\x21\x00\x0c\x01\xfa'
+                                  b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa')
         await face.input_packet(b'\x06\x1d\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test')
-        await aio.sleep(0.1)
+        await aio.sleep(0.4)
 
     async def app_main(self):
-        future1 = self.app.express('/not', app.pass_all, nonce=None, lifetime=5, can_be_prefix=False)
-        future2 = self.app.express('/not', app.pass_all, nonce=None, lifetime=5, can_be_prefix=True)
-        future3 = self.app.express('/not/important', app.pass_all, nonce=None, lifetime=5, can_be_prefix=False)
+        future1 = self.app.express('/not', app.pass_all, nonce=None, lifetime=250, can_be_prefix=False)
+        future2 = self.app.express('/not', app.pass_all, nonce=None, lifetime=250, can_be_prefix=True)
+        future3 = self.app.express('/not/important', app.pass_all, nonce=None, lifetime=250, can_be_prefix=False)
         name2, content2, _ = await future3
         name1, content1, _ = await future2
         with pytest.raises(types.InterestTimeout):
@@ -142,7 +142,7 @@ class TestInterestCanBePrefix(NDNAppTestSuite):
 class TestRoute(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.ignore_output(0)
-        await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+        await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa')
         await face.consume_output(b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
                                   b'\x16\x03\x1b\x01\xc8\x17\x00')
 
@@ -164,7 +164,7 @@ class TestInvalidInterest(NDNAppTestSuite):
         await face.input_packet(b'\x05`\x072\x08\x03not\x08\timportant'
                                 b'\x02 E\x8a\xeaxI}[\xb1\xcd\xf0\x01\xbe'
                                 b'\xdb\xe9\x03\x085\xb1g+K\xa8jK,\xd0\xad'
-                                b')\x07\x83\x96\xbb\x0c\x01\x05$\x00,\x03'
+                                b')\x07\x83\x96\xbb\x0c\x01\xfa$\x00,\x03'
                                 b'\x1b\x01\x00. !\x93!zG[%\xcfs\xe89\\\x8f'
                                 b'^\xd3\xa4\xb9\x13\xaa\x7f\xa6?\xd7\x13aVyS\xdc\x1dW\xea')
         await aio.sleep(0.005)
@@ -178,14 +178,14 @@ class TestInvalidInterest(NDNAppTestSuite):
 class TestRoute2(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.ignore_output(0)
-        await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+        await face.input_packet(b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa')
         await face.consume_output(b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
                                   b'\x16\x03\x1b\x01\xc8\x17\x00')
 
     async def app_main(self):
         @self.app.route('/not')
         def on_interest(name, _app_param, reply: app.ReplyFunc, context):
-            assert context['raw_packet'] == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05'
+            assert context['raw_packet'] == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa'
             assert not context['sig_ptrs'].signature_info
             reply(self.app.make_data(name, b'test', signer=sec.NullSigner()))
 
@@ -213,14 +213,14 @@ class TestCongestionMark(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.ignore_output(0)
         await face.input_packet(b'\x64\x1e\xfd\x03\x40\x01\x01\x50\x17'
-                                b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+                                b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa')
         await face.consume_output(b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
                                   b'\x16\x03\x1b\x01\xc8\x17\x00', timeout=0.5)
 
     async def app_main(self):
         @self.app.route('/not')
         def on_interest(name, _app_param, reply: app.ReplyFunc, context):
-            assert context['raw_packet'] == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05'
+            assert context['raw_packet'] == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa'
             assert not context['sig_ptrs'].signature_info
             reply(self.app.make_data(name, b'test', signer=sec.NullSigner()))
 
@@ -230,21 +230,21 @@ class TestImplicitSha256(NDNAppTestSuite):
         await face.consume_output(b'\x05\x2d\x07\x28\x08\x04test\x01\x20'
                                   b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
                                   b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
-                                  b'\x0c\x01\x05'
+                                  b'\x0c\x01\xfa'
                                   b'\x05\x2d\x07\x28\x08\x04test\x01\x20'
                                   b'\x54\x88\xf2\xc1\x1b\x56\x6d\x49\xe9\x90\x4f\xb5\x2a\xa6\xf6\xf9'
                                   b'\xe6\x6a\x95\x41\x68\x10\x9c\xe1\x56\xee\xa2\xc9\x2c\x57\xe4\xc2'
-                                  b'\x0c\x01\x05')
+                                  b'\x0c\x01\xfa')
         await face.input_packet(b'\x06\x13\x07\x06\x08\x04test\x14\x03\x18\x01\x00\x15\x04test')
-        await aio.sleep(0.1)
+        await aio.sleep(0.4)
 
     async def app_main(self):
         fut1 = self.app.express(
             '/test/sha256digest=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
-            validator=app.pass_all, nonce=None, lifetime=5)
+            validator=app.pass_all, nonce=None, lifetime=250)
         fut2 = self.app.express(
             '/test/sha256digest=5488f2c11b566d49e9904fb52aa6f6f9e66a954168109ce156eea2c92c57e4c2',
-            validator=app.pass_all, nonce=None, lifetime=5)
+            validator=app.pass_all, nonce=None, lifetime=250)
         name2, content2, _ = await fut2
         with pytest.raises(types.InterestTimeout):
             await fut1
@@ -256,7 +256,7 @@ class TestPitToken(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         await face.ignore_output(0)
         await face.input_packet(b'\x64\x1f\x62\x04\x01\x02\x03\x04\x50\x17'
-                                b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\x05')
+                                b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa')
         await face.consume_output(b'\x64\x2e\x62\x04\x01\x02\x03\x04\x50\x26'
                                   b'\x06\x24\x07\x10\x08\x03not\x08\timportant\x14\x03\x18\x01\x00\x15\x04test'
                                   b'\x16\x03\x1b\x01\xc8\x17\x00')

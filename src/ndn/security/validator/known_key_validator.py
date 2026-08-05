@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import abc
-from Cryptodome.Hash import SHA256, HMAC, SHA512
+from Cryptodome.Hash import SHA256, HMAC
 from Cryptodome.PublicKey import ECC, RSA
 from Cryptodome.Signature import DSS, pkcs1_15, eddsa
 from ...encoding import FormalName, BinaryStr, NonStrictName, SignaturePtrs, Name, SignatureType

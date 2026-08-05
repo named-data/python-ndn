@@ -21,7 +21,6 @@ import sys
 
 import lark
 from ndn.app_support.light_versec import compile_lvs, SemanticError
-from ndn.app_support.light_versec.binary import *
 
 
 def add_parser(subparsers):
