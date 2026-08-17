@@ -62,27 +62,44 @@ Field-kind inference from Python annotation
 +--------------------------------------------+----------+------------------+
 | Dict[K, V]                                 | map      | MapField         |
 +--------------------------------------------+----------+------------------+
+| None  + field_type='offset_marker'         | (zero)   | OffsetMarker     |
++--------------------------------------------+----------+------------------+
+| bytes + field_type='sig_value'             | (special)| SignatureValue   |
++--------------------------------------------+----------+------------------+
+| NDNName + field_type='interest_name'       | (special)| InterestNameField|
++--------------------------------------------+----------+------------------+
 
 Supported metadata keys
 -----------------------
-``'tlv_type'``      int   TLV type number (required for every TLV field)
-``'fixed_len'``     int   Force uint value width: 1, 2, 4, or 8 bytes
-``'ignore_critical' bool  Suppress DecodeError for nested model parsing
-``'field_type'``    str   Explicit kind override when inference is insufficient
+``'tlv_type'``       int   TLV type number (required except for offset_marker)
+``'fixed_len'``      int   Force uint value width: 1, 2, 4, or 8 bytes
+``'ignore_critical'  bool  Suppress DecodeError for nested model parsing
+``'field_type'``     str   Explicit kind override when inference is insufficient
 
 For **map** fields (``Dict[K, V]``):
-``'val_tlv_type'``    int  TLV type for map values (required)
+``'val_tlv_type'``     int  TLV type for map values (required)
 
-Map fields encode each entry as a key TLV followed immediately by a value TLV,
-both written directly into the parent wire (no outer wrapper). On parse the same
-two-phase scan is used: matching the key type triggers immediate consumption of
-the next TLV as the corresponding value. The runtime type is :class:`dict`,
-which preserves insertion order in Python 3.7+.
+For **sig_value** fields:
+``'cover_start'``      str  Name of the offset_marker field where sig coverage begins
+``'digest_cover_start' str  Same or different offset_marker; where digest coverage begins
+``'digest_cover_end'`` str  Offset_marker after sig_value; where digest coverage ends
+
+Signature machinery markers (set by caller before tlv_encode / tlv_parse):
+``markers['##signer']``        Signer instance; absent means unsigned
+``markers['##need_digest']``   True ⟹ insert/compute ParametersSha256DigestComponent
+
+Signature machinery markers (set by tlv_encode / tlv_parse internally):
+``markers['##sig_covered_part']``   list[memoryview | bytes]: regions covered by sig
+``markers['##sig_value_buf']``      writable memoryview into the placeholder bytes
+``markers['##shrink_len']``         int: bytes trimmed from end after sig finalization
+``markers['##digest_buf']``         writable memoryview into the digest component value
+``markers[fname]``                  int: recorded byte offset for each offset_marker field
 """
 import dataclasses
 import struct
 import typing
 from enum import Enum, Flag
+from hashlib import sha256
 
 from .tlv_type import BinaryStr, VarBinaryStr, is_binary_str
 from .tlv_var import write_tl_num, parse_tl_num, get_tl_num_size
@@ -90,7 +107,13 @@ from .name import Name, Component
 from .tlv_model import DecodeError
 
 
-__all__ = ['tlv_encode', 'tlv_parse', 'NDNName', 'DecodeError']
+__all__ = [
+    'tlv_encode', 'tlv_parse', 'NDNName', 'DecodeError',
+    'tlv_get_arg', 'tlv_set_arg',
+]
+
+# Kinds that occupy zero wire bytes and may not have a 'tlv_type' metadata key.
+_ZERO_WIRE_KINDS = frozenset({'offset_marker'})
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +222,161 @@ def _map_val_meta(metadata: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Interest-name helpers (used by both pass-1 and pass-2)
+# ---------------------------------------------------------------------------
+
+def _encoded_length_interest_name(fname: str, val, metadata: dict,
+                                   markers: dict) -> int:
+    """
+    Size pass for an Interest Name field.
+
+    Mirrors ``InterestNameField.encoded_length``.  If ``markers['##need_digest']``
+    is truthy and the name does not already contain a
+    ``ParametersSha256DigestComponent``, 34 extra bytes are reserved for one.
+    """
+    if val is None:
+        return 0
+    type_num = metadata['tlv_type']
+    need_digest = markers.get('##need_digest', False)
+
+    # Normalize to a list of component bytes.
+    if isinstance(val, str):
+        name = Name.from_str(val)
+    elif is_binary_str(val):
+        name = Name.decode(val)[0]
+    else:
+        name = list(val)
+    for i, comp in enumerate(name):
+        if isinstance(comp, str):
+            name[i] = Component.from_str(Component.escape_str(comp))
+        elif not is_binary_str(comp):
+            raise TypeError(f'{fname}: invalid name component {comp!r}')
+
+    # Locate an existing ParametersSha256DigestComponent (at most one allowed).
+    digest_pos = None
+    if need_digest:
+        for i, comp in enumerate(name):
+            if Component.get_type(comp) == Component.TYPE_PARAMETERS_SHA256:
+                if digest_pos is None:
+                    digest_pos = i
+                else:
+                    raise ValueError(
+                        f'{fname}: multiple ParametersSha256DigestComponent in name')
+
+    markers[f'{fname}##digest_pos'] = digest_pos
+    markers[f'{fname}##preprocessed_name'] = name
+
+    comp_total = sum(len(c) for c in name)
+    if need_digest and digest_pos is None:
+        # Reserve space for a new digest component: T(1B) + L(1B) + V(32B).
+        comp_total += (get_tl_num_size(Component.TYPE_PARAMETERS_SHA256)
+                       + get_tl_num_size(32) + 32)
+
+    markers[f'{fname}##name_value_len'] = comp_total
+    return get_tl_num_size(type_num) + get_tl_num_size(comp_total) + comp_total
+
+
+def _encode_into_interest_name(fname: str, val, metadata: dict, markers: dict,
+                                wire: VarBinaryStr, offset: int) -> int:
+    """
+    Write pass for an Interest Name field.
+
+    Mirrors ``InterestNameField.encode_into``.  Appends non-digest name
+    components to ``markers['##sig_covered_part']`` (wire slices) and stores
+    the writable digest-value buffer in ``markers['##digest_buf']``.
+    """
+    if val is None:
+        return 0
+    type_num = metadata['tlv_type']
+    name = markers[f'{fname}##preprocessed_name']
+    comp_total = markers[f'{fname}##name_value_len']
+    digest_pos = markers[f'{fname}##digest_pos']
+    need_digest = markers.get('##need_digest', False)
+    sig_covered_part = markers.setdefault('##sig_covered_part', [])
+
+    origin = offset
+    t_sz = write_tl_num(type_num, wire, offset);  offset += t_sz
+    l_sz = write_tl_num(comp_total, wire, offset); offset += l_sz
+    cover_start = offset
+
+    for i, comp in enumerate(name):
+        comp_len = len(comp)
+        wire[offset:offset + comp_len] = comp
+        if i == digest_pos:
+            if offset > cover_start:
+                sig_covered_part.append(wire[cover_start:offset])
+            # Value of the digest component sits after T + L (each 1 byte for
+            # TYPE_PARAMETERS_SHA256=2 < 253 and length=32 < 253).
+            c_t_sz = get_tl_num_size(Component.TYPE_PARAMETERS_SHA256)
+            c_l_sz = get_tl_num_size(32)
+            markers['##digest_buf'] = wire[offset + c_t_sz + c_l_sz:offset + comp_len]
+            cover_start = offset + comp_len
+        offset += comp_len
+
+    if offset > cover_start:
+        sig_covered_part.append(wire[cover_start:offset])
+
+    if need_digest and digest_pos is None:
+        # Append a new ParametersSha256DigestComponent at the end of the name.
+        c_t_sz = write_tl_num(Component.TYPE_PARAMETERS_SHA256, wire, offset)
+        offset += c_t_sz
+        c_l_sz = write_tl_num(32, wire, offset)
+        offset += c_l_sz
+        markers['##digest_buf'] = wire[offset:offset + 32]
+        # Keep the preprocessed name up-to-date for get_final_name use.
+        name.append(bytes(wire[offset - c_t_sz - c_l_sz:offset + 32]))
+        offset += 32
+
+    return offset - origin
+
+
+# ---------------------------------------------------------------------------
+# Post-encoding finalization (signature + SHA-256 digest)
+# ---------------------------------------------------------------------------
+
+def _finalize_encode(markers: dict, mv, model_end: int) -> int:
+    """
+    Called by :func:`tlv_encode` after all bytes have been written.
+
+    1. Asks the signer to fill in the signature-value placeholder, updates the
+       inline length byte if the actual signature is shorter (ECDSA), and
+       records ``markers['##shrink_len']``.
+    2. If ``markers['##need_digest']`` is set, computes ``SHA-256`` over the
+       digest-covered range and writes it into the name's digest-component
+       placeholder (``markers['##digest_buf']``).
+
+    Returns *shrink_size* (0 for fixed-length signature schemes like HMAC/EdDSA).
+    All offsets in *markers* are absolute positions within *mv*.
+    """
+    signer = markers.get('##signer')
+    shrink_size = 0
+
+    if signer is not None and '##sig_value_buf' in markers:
+        sig_value_buf = markers['##sig_value_buf']
+        alloc_size = len(sig_value_buf)
+        real_size = signer.write_signature_value(
+            sig_value_buf, markers.get('##sig_covered_part', []))
+        shrink_size = alloc_size - real_size
+        markers['##shrink_len'] = shrink_size
+        if shrink_size > 0:
+            if alloc_size >= 253:
+                raise ValueError(
+                    f'Signature with variable length ≥ 253 bytes is not supported '
+                    f'(allocated {alloc_size})')
+            markers['##sig_wire_l_field'][0] = real_size
+
+    if markers.get('##need_digest') and '##digest_buf' in markers:
+        d_start_field = markers.get('##_digest_cover_start_field')
+        d_end_field   = markers.get('##_digest_cover_end_field')
+        d_start = markers[d_start_field] if (d_start_field and d_start_field in markers) else 0
+        d_end   = markers[d_end_field]   if (d_end_field   and d_end_field   in markers) else model_end
+        d_end  -= shrink_size
+        markers['##digest_buf'][:] = sha256(bytes(mv[d_start:d_end])).digest()
+
+    return shrink_size
+
+
+# ---------------------------------------------------------------------------
 # Encoding — pass 1: size computation
 # ---------------------------------------------------------------------------
 
@@ -228,6 +406,23 @@ def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict
     subclasses.  Returns 0 when the field is absent (*val* is ``None``/falsy
     for bool).
     """
+    # Zero-wire kinds: handled before looking up tlv_type.
+    if kind == 'offset_marker':
+        return 0
+
+    if kind == 'sig_value':
+        signer = markers.get('##signer')
+        if signer is None:
+            return 0
+        type_num = metadata['tlv_type']
+        sig_size = signer.get_signature_value_size()
+        markers[f'{fname}##sig_size'] = sig_size
+        markers.setdefault('##sig_covered_part', [])
+        return get_tl_num_size(type_num) + get_tl_num_size(sig_size) + sig_size
+
+    if kind == 'interest_name':
+        return _encoded_length_interest_name(fname, val, metadata, markers)
+
     type_num = metadata['tlv_type']
 
     # BoolField: present if truthy, absent otherwise
@@ -323,10 +518,10 @@ def _encoded_length_model(obj, markers: dict) -> int:
     hints = typing.get_type_hints(cls)
     total = 0
     for f in dataclasses.fields(cls):
-        if 'tlv_type' not in f.metadata:
-            continue
         ann = hints[f.name]
         kind = _infer_kind(ann, f.metadata)
+        if kind not in _ZERO_WIRE_KINDS and 'tlv_type' not in f.metadata:
+            continue
         total += _encoded_length_field(
             f.name, getattr(obj, f.name), kind, ann, f.metadata, markers)
     markers['##encoded_length'] = total
@@ -346,6 +541,37 @@ def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
     Returns the number of bytes written.  Must be called after the matching
     :func:`_encoded_length_field` call so that ``markers`` is populated.
     """
+    # Zero-wire kinds: handled before looking up tlv_type.
+    if kind == 'offset_marker':
+        markers[fname] = offset
+        return 0
+
+    if kind == 'sig_value':
+        signer = markers.get('##signer')
+        if signer is None:
+            return 0
+        type_num = metadata['tlv_type']
+        sig_size = markers[f'{fname}##sig_size']
+        # Collect the covered region: from cover_start up to current offset.
+        cover_start_field = metadata.get('cover_start')
+        cover_start = markers.get(cover_start_field, 0) if cover_start_field else 0
+        markers.setdefault('##sig_covered_part', []).append(wire[cover_start:offset])
+        # Store digest-coverage field names for _finalize_encode.
+        for mkey in ('digest_cover_start', 'digest_cover_end'):
+            if mkey in metadata:
+                markers[f'##_{mkey}_field'] = metadata[mkey]
+        # Write T + L (stored for in-place shrink) + placeholder V.
+        t_sz = write_tl_num(type_num, wire, offset)
+        l_off = offset + t_sz
+        l_sz = write_tl_num(sig_size, wire, l_off)
+        markers['##sig_wire_l_field'] = wire[l_off:l_off + l_sz]
+        v_start = l_off + l_sz
+        markers['##sig_value_buf'] = wire[v_start:v_start + sig_size]
+        return t_sz + l_sz + sig_size
+
+    if kind == 'interest_name':
+        return _encode_into_interest_name(fname, val, metadata, markers, wire, offset)
+
     type_num = metadata['tlv_type']
 
     if kind == 'bool':
@@ -439,10 +665,10 @@ def _encode_into_model(obj, markers: dict, wire: VarBinaryStr, offset: int) -> N
     cls = type(obj)
     hints = typing.get_type_hints(cls)
     for f in dataclasses.fields(cls):
-        if 'tlv_type' not in f.metadata:
-            continue
         ann = hints[f.name]
         kind = _infer_kind(ann, f.metadata)
+        if kind not in _ZERO_WIRE_KINDS and 'tlv_type' not in f.metadata:
+            continue
         offset += _encode_into_field(
             f.name, getattr(obj, f.name), kind, ann, f.metadata, markers, wire, offset)
 
@@ -474,11 +700,18 @@ def tlv_encode(obj, wire=None, offset: int = 0, markers: dict = None):
     total = _encoded_length_model(obj, markers)
     if wire is None:
         buf = bytearray(total)
-        _encode_into_model(obj, markers, memoryview(buf), 0)
+        mv = memoryview(buf)
+        _encode_into_model(obj, markers, mv, 0)
+        shrink = _finalize_encode(markers, mv, total)
+        if shrink:
+            # Can't resize bytearray while memoryview exports are live (the sig/digest
+            # slices in markers still reference mv).  Return a trimmed copy instead.
+            return bytearray(mv[:total - shrink])
         return buf
     mv = memoryview(wire)
     _encode_into_model(obj, markers, mv, offset)
-    return mv[offset:offset + total]
+    shrink = _finalize_encode(markers, mv, offset + total)
+    return mv[offset:offset + total - shrink]
 
 
 # ---------------------------------------------------------------------------
@@ -566,7 +799,7 @@ def _parse_value(fname: str, kind: str, annotation, metadata: dict,
     raise TypeError(f'Unknown kind {kind!r} for {fname!r}')
 
 
-def tlv_parse(cls, wire, ignore_critical: bool = False):
+def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
     """
     Parse a TLV-encoded buffer into a fresh dataclass instance.
 
@@ -585,9 +818,14 @@ def tlv_parse(cls, wire, ignore_critical: bool = False):
                  (:class:`bytes`, :class:`bytearray`, or :class:`memoryview`).
     :param ignore_critical: suppress :exc:`DecodeError` for unknown critical
                             TLV types.
+    :param markers: optional dict for out-of-band state (offset_marker positions,
+                    sig/digest buffers).  A fresh ``{}`` is used when ``None``.
     :return: populated dataclass instance.
     :raises DecodeError: unknown critical TLV type encountered.
     """
+    if markers is None:
+        markers = {}
+
     # Wrap in memoryview for zero-copy slicing throughout the parse
     if isinstance(wire, memoryview):
         mv = wire
@@ -597,10 +835,10 @@ def tlv_parse(cls, wire, ignore_critical: bool = False):
     hints = typing.get_type_hints(cls)
     ordered = []
     for f in dataclasses.fields(cls):
-        if 'tlv_type' not in f.metadata:
-            continue
         ann = hints[f.name]
         kind = _infer_kind(ann, f.metadata)
+        if kind not in _ZERO_WIRE_KINDS and 'tlv_type' not in f.metadata:
+            continue
         ordered.append((f.name, f.metadata, kind, ann))
 
     obj = _make_default_instance(cls)
@@ -617,8 +855,17 @@ def tlv_parse(cls, wire, ignore_critical: bool = False):
         found = False
         for i in range(field_pos, len(ordered)):
             fname, meta, kind, ann = ordered[i]
+            if kind == 'offset_marker':
+                continue                        # never matches a wire TLV type
+
             if meta['tlv_type'] != typ:
                 continue
+
+            # Advance any offset_markers between field_pos and i.
+            for j in range(field_pos, i):
+                jname, _, jkind, _ = ordered[j]
+                if jkind == 'offset_marker':
+                    markers[jname] = offset_btl
 
             if kind == 'repeated':
                 elem_ann = _element_annotation(ann)
@@ -662,6 +909,31 @@ def tlv_parse(cls, wire, ignore_critical: bool = False):
                 dct[key] = val
                 field_pos = i                   # stay at i to accept more pairs
 
+            elif kind == 'sig_value':
+                # Extract sig buffer; append covered region to ##sig_covered_part.
+                sig_buf = mv[offset:offset + length]
+                markers['##sig_value_buf'] = sig_buf
+                cover_start_field = meta.get('cover_start')
+                if cover_start_field is not None:
+                    cover_start = markers.get(cover_start_field)
+                    if cover_start is not None:
+                        markers.setdefault('##sig_covered_part', []).append(
+                            mv[cover_start:offset_btl])
+                object.__setattr__(obj, fname, sig_buf)
+                field_pos = i + 1
+
+            elif kind == 'interest_name':
+                # Decode name; split into sig-covered components and digest buf.
+                name = Name.decode(mv, offset_btl)[0]
+                sig_cp = markers.setdefault('##sig_covered_part', [])
+                for comp in name:
+                    if Component.get_type(comp) == Component.TYPE_PARAMETERS_SHA256:
+                        markers['##digest_buf'] = Component.get_value(comp)
+                    else:
+                        sig_cp.append(comp)
+                object.__setattr__(obj, fname, name)
+                field_pos = i + 1
+
             else:
                 val = _parse_value(fname, kind, ann, meta,
                                    mv, offset, length, offset_btl, ignore_critical)
@@ -679,3 +951,27 @@ def tlv_parse(cls, wire, ignore_critical: bool = False):
         offset += length
 
     return obj
+
+
+# ---------------------------------------------------------------------------
+# Marker helpers (convenience wrappers for the markers dict)
+# ---------------------------------------------------------------------------
+
+def tlv_get_arg(markers: dict, key: str, default=None):
+    """
+    Read a value from the *markers* dict used by :func:`tlv_encode` /
+    :func:`tlv_parse`.
+
+    Equivalent to ``markers.get(key, default)``.
+    """
+    return markers.get(key, default)
+
+
+def tlv_set_arg(markers: dict, key: str, val) -> None:
+    """
+    Write a value into the *markers* dict used by :func:`tlv_encode` /
+    :func:`tlv_parse`.
+
+    Equivalent to ``markers[key] = val``.
+    """
+    markers[key] = val

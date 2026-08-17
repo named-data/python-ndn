@@ -18,15 +18,18 @@
 """Tests for the dataclass-based TLV v2 API (tlv_encode / tlv_parse)."""
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
+from hashlib import sha256
 from typing import Dict, List, Optional
 
 import pytest
 
 from ndn.encoding import (
-    tlv_encode, tlv_parse, NDNName, DecodeError,
+    tlv_encode, tlv_parse, NDNName, DecodeError, tlv_get_arg, tlv_set_arg,
     # v1 equivalents used for binary-compatibility checks
     TlvModel, UintField, BoolField, BytesField, NameField, ModelField,
     RepeatedField, Name, Component,
+    # Signer interface
+    Signer,
 )
 
 
@@ -937,3 +940,299 @@ class TestMapField:
         wire = tlv_encode(obj)
         p = tlv_parse(_StrBytesMap, wire)
         assert isinstance(p.entries['k'], memoryview)
+
+
+# ---------------------------------------------------------------------------
+# Signature machinery tests
+# ---------------------------------------------------------------------------
+
+# ── Simple fixed-length mock signer (HMAC-like) ──────────────────────────────
+
+class _HmacSigner(Signer):
+    """Deterministic 32-byte 'HMAC' signer using SHA-256(key || content)."""
+    SIG_SIZE = 32
+
+    def __init__(self, key: bytes = b'secret'):
+        self._key = key
+
+    def write_signature_info(self, sig_info):
+        sig_info.signature_type = 4  # HMAC_WITH_SHA256
+
+    def get_signature_value_size(self) -> int:
+        return self.SIG_SIZE
+
+    def write_signature_value(self, wire, contents) -> int:
+        h = sha256(self._key)
+        for blk in contents:
+            h.update(bytes(blk))
+        sig = h.digest()
+        wire[:] = sig
+        return len(sig)
+
+    def verify(self, sig: bytes, contents) -> bool:
+        buf = bytearray(self.SIG_SIZE)
+        mv = memoryview(buf)
+        self.write_signature_value(mv, contents)
+        return bytes(buf) == bytes(sig)
+
+
+# ── Variable-length mock signer (ECDSA-like, sometimes shorter) ───────────────
+
+class _EcdsaSigner(Signer):
+    """Always signs with 71 bytes, but reports max 72 (tests shrink path)."""
+    MAX_SIZE = 72
+    REAL_SIZE = 71
+
+    def write_signature_info(self, sig_info):
+        sig_info.signature_type = 3  # SHA256_WITH_ECDSA
+
+    def get_signature_value_size(self):
+        return self.MAX_SIZE
+
+    def write_signature_value(self, wire, contents):
+        for i in range(self.REAL_SIZE):
+            wire[i] = i & 0xFF
+        return self.REAL_SIZE
+
+
+# ── Data-like model (no digest, no interest-name) ────────────────────────────
+
+@dataclass
+class _SigInfo:
+    signature_type: int = field(default=None, metadata={'tlv_type': 0x1b, 'fixed_len': 1})
+
+
+@dataclass
+class _DataValue:
+    _sig_cover_start: None = field(default=None, metadata={'field_type': 'offset_marker'})
+    name:             NDNName = field(default=None, metadata={'tlv_type': 0x07})
+    content:          Optional[bytes] = field(default=None, metadata={'tlv_type': 0x15})
+    signature_info:   Optional[_SigInfo] = field(default=None, metadata={'tlv_type': 0x16})
+    signature_value:  Optional[bytes] = field(default=None, metadata={
+        'tlv_type': 0x17,
+        'field_type': 'sig_value',
+        'cover_start': '_sig_cover_start',
+    })
+
+
+# ── Interest-like model (interest_name + digest) ──────────────────────────────
+
+@dataclass
+class _InterestValue:
+    name:                NDNName = field(default=None, metadata={
+                             'tlv_type': 0x07, 'field_type': 'interest_name'})
+    nonce:               Optional[int] = field(default=None, metadata={
+                             'tlv_type': 0x0a, 'fixed_len': 4})
+    _sig_cover_start:    None = field(default=None, metadata={'field_type': 'offset_marker'})
+    application_parameters: Optional[bytes] = field(default=None, metadata={'tlv_type': 0x24})
+    signature_info:      Optional[_SigInfo] = field(default=None, metadata={'tlv_type': 0x2c})
+    signature_value:     Optional[bytes] = field(default=None, metadata={
+                             'tlv_type': 0x2e,
+                             'field_type': 'sig_value',
+                             'cover_start': '_sig_cover_start',
+                             'digest_cover_start': '_sig_cover_start',
+                             'digest_cover_end':   '_digest_cover_end',
+                         })
+    _digest_cover_end:   None = field(default=None, metadata={'field_type': 'offset_marker'})
+
+
+class TestSignatureMachinery:
+    # ── offset_marker ──────────────────────────────────────────────────────────
+
+    def test_offset_marker_produces_no_bytes(self):
+        @dataclass
+        class M:
+            _mark: None = field(default=None, metadata={'field_type': 'offset_marker'})
+            v: int = field(default=None, metadata={'tlv_type': 0x01})
+
+        wire = tlv_encode(M(v=7))
+        assert wire == bytes(tlv_encode(_Inner(val=7)))   # only the uint TLV, no extra bytes
+
+    def test_offset_marker_records_position_during_encode(self):
+        @dataclass
+        class M:
+            a: int = field(default=None, metadata={'tlv_type': 0x01})
+            _mark: None = field(default=None, metadata={'field_type': 'offset_marker'})
+            b: int = field(default=None, metadata={'tlv_type': 0x03})
+
+        markers = {}
+        tlv_encode(M(a=1, b=2), markers=markers)
+        # 'a' occupies 3 bytes (T=1, L=1, V=1), so _mark records offset 3.
+        assert markers['_mark'] == 3
+
+    def test_offset_marker_records_position_during_parse(self):
+        @dataclass
+        class M:
+            a: int = field(default=None, metadata={'tlv_type': 0x01})
+            _mark: None = field(default=None, metadata={'field_type': 'offset_marker'})
+            b: int = field(default=None, metadata={'tlv_type': 0x03})
+
+        wire = tlv_encode(M(a=1, b=2))
+        markers = {}
+        tlv_parse(M, wire, markers=markers)
+        # offset_btl of 'b' = 3 (after 'a'), so _mark records 3.
+        assert markers.get('_mark') == 3
+
+    # ── sig_value / Data-like encoding ────────────────────────────────────────
+
+    def test_data_encode_produces_signature(self):
+        signer = _HmacSigner()
+        obj = _DataValue(name='/test', content=b'hello')
+        obj.signature_info = _SigInfo()
+        signer.write_signature_info(obj.signature_info)
+
+        markers = {'##signer': signer}
+        wire = tlv_encode(obj, markers=markers)
+
+        # Signature value TLV must be present.
+        assert 0x17 in bytes(wire)
+        # Wire must end with 32 sig bytes (preceded by TL 17 20).
+        assert wire[-34:-32] == b'\x17\x20'
+
+    def test_data_encode_decode_roundtrip(self):
+        signer = _HmacSigner()
+        obj = _DataValue(name='/test/data', content=b'payload')
+        obj.signature_info = _SigInfo()
+        signer.write_signature_info(obj.signature_info)
+
+        markers = {'##signer': signer}
+        wire = tlv_encode(obj, markers=markers)
+
+        parse_markers = {}
+        p = tlv_parse(_DataValue, wire, markers=parse_markers)
+        assert Name.to_str(p.name) == '/test/data'
+        assert bytes(p.content) == b'payload'
+        assert p.signature_info.signature_type == 4  # HMAC_WITH_SHA256
+
+    def test_data_signature_verifies(self):
+        signer = _HmacSigner()
+        obj = _DataValue(name='/verify/me', content=b'data')
+        obj.signature_info = _SigInfo()
+        signer.write_signature_info(obj.signature_info)
+
+        enc_markers = {'##signer': signer}
+        wire = tlv_encode(obj, markers=enc_markers)
+        enc_covered = enc_markers['##sig_covered_part']
+
+        parse_markers = {}
+        p = tlv_parse(_DataValue, wire, markers=parse_markers)
+        parse_covered = parse_markers.get('##sig_covered_part', [])
+        sig_buf = parse_markers['##sig_value_buf']
+
+        assert signer.verify(bytes(sig_buf), parse_covered)
+
+    def test_data_signature_is_deterministic(self):
+        """Same object encoded twice with the same signer → identical wires."""
+        signer = _HmacSigner()
+        obj1 = _DataValue(name='/det/test', content=b'hello')
+        obj1.signature_info = _SigInfo()
+        signer.write_signature_info(obj1.signature_info)
+
+        obj2 = _DataValue(name='/det/test', content=b'hello')
+        obj2.signature_info = _SigInfo()
+        signer.write_signature_info(obj2.signature_info)
+
+        w1 = tlv_encode(obj1, markers={'##signer': signer})
+        w2 = tlv_encode(obj2, markers={'##signer': signer})
+        assert bytes(w1) == bytes(w2)
+
+    def test_ecdsa_signer_shrinks_wire(self):
+        signer = _EcdsaSigner()
+        obj = _DataValue(name='/shrink', content=b'x')
+        obj.signature_info = _SigInfo()
+        signer.write_signature_info(obj.signature_info)
+
+        markers = {'##signer': signer}
+        wire = tlv_encode(obj, markers=markers)
+
+        # Allocated 72 bytes, actual 71 → last byte trimmed.
+        assert markers['##shrink_len'] == 1
+        # The sig_value TLV's L byte should now read 71 (0x47).
+        sig_tlv_idx = bytes(wire).index(0x17)  # find sig_value type byte
+        assert wire[sig_tlv_idx + 1] == 71
+
+    def test_unsigned_data_produces_no_sig_tlv(self):
+        obj = _DataValue(name='/unsigned', content=b'ok')
+        wire = tlv_encode(obj)
+        assert b'\x17' not in bytes(wire)
+
+    # ── interest_name + digest ────────────────────────────────────────────────
+
+    def test_interest_name_without_digest(self):
+        obj = _InterestValue(name='/plain/interest', nonce=42)
+        wire = tlv_encode(obj)
+        p = tlv_parse(_InterestValue, wire)
+        assert Name.to_str(p.name) == '/plain/interest'
+        assert p.nonce == 42
+
+    def test_interest_with_digest_appended(self):
+        """When ##need_digest is True and no digest component exists, one is appended."""
+        app_param = b'\x01\x02\x03'
+        obj = _InterestValue(name='/digest/test', application_parameters=app_param)
+        obj.signature_info = _SigInfo()
+        signer = _HmacSigner()
+        signer.write_signature_info(obj.signature_info)
+
+        markers = {'##signer': signer, '##need_digest': True}
+        wire = tlv_encode(obj, markers=markers)
+
+        # Parse back and check digest component exists in name.
+        p = tlv_parse(_InterestValue, wire)
+        name_str = Name.to_str(p.name)
+        assert 'params-sha256=' in name_str
+
+    def test_interest_digest_value_is_sha256(self):
+        """The ParametersSha256DigestComponent must equal SHA-256 of the digest-covered part."""
+        from ndn.encoding.name import Component as C
+        app_param = b'\xde\xad\xbe\xef'
+        obj = _InterestValue(name='/verify/digest', application_parameters=app_param)
+        obj.signature_info = _SigInfo()
+        signer = _HmacSigner()
+        signer.write_signature_info(obj.signature_info)
+
+        markers = {'##signer': signer, '##need_digest': True}
+        wire = tlv_encode(obj, markers=markers)
+
+        # Locate the ParametersSha256DigestComponent in the encoded name.
+        p = tlv_parse(_InterestValue, wire)
+        digest_comp = None
+        for comp in p.name:
+            if C.get_type(comp) == C.TYPE_PARAMETERS_SHA256:
+                digest_comp = comp
+                break
+        assert digest_comp is not None
+
+        digest_val = bytes(C.get_value(digest_comp))
+        # Determine what the digest should cover: find where _sig_cover_start landed.
+        raw = bytes(wire)
+        sig_cover_start = markers.get('_sig_cover_start', 0)
+        d_end_field = '_digest_cover_end'
+        sig_cover_end = markers.get(d_end_field, len(raw))
+        expected = sha256(raw[sig_cover_start:sig_cover_end]).digest()
+        assert digest_val == expected
+
+    def test_interest_sig_covered_part_set_on_parse(self):
+        """After parsing an Interest, ##sig_covered_part is populated."""
+        obj = _InterestValue(name='/parse/sig', application_parameters=b'\x00')
+        obj.signature_info = _SigInfo()
+        signer = _HmacSigner()
+        signer.write_signature_info(obj.signature_info)
+
+        markers = {'##signer': signer, '##need_digest': True}
+        wire = tlv_encode(obj, markers=markers)
+
+        parse_markers = {}
+        tlv_parse(_InterestValue, wire, markers=parse_markers)
+        assert '##sig_covered_part' in parse_markers
+        assert len(parse_markers['##sig_covered_part']) > 0
+
+    # ── tlv_get_arg / tlv_set_arg ─────────────────────────────────────────────
+
+    def test_tlv_get_arg_missing_returns_default(self):
+        m = {}
+        assert tlv_get_arg(m, 'x', 42) == 42
+
+    def test_tlv_set_arg_stores_value(self):
+        m = {}
+        tlv_set_arg(m, 'key', 'value')
+        assert tlv_get_arg(m, 'key') == 'value'
