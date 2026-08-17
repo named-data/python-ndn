@@ -18,7 +18,7 @@
 """Tests for the dataclass-based TLV v2 API (tlv_encode / tlv_parse)."""
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import pytest
 
@@ -839,3 +839,101 @@ class TestBinaryCompatibility:
         p2 = V1.parse(wire_from_v2)
         assert Name.to_str(p2.name) == '/test'
         assert p2.count == 7
+
+
+# ---------------------------------------------------------------------------
+# MapField tests
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _StrBytesMap:
+    entries: Dict[str, bytes] = field(default_factory=dict, metadata={
+        'tlv_type':     0x21,
+        'val_tlv_type': 0x23,
+    })
+
+
+@dataclass
+class _Inner2:
+    value: int = field(default=None, metadata={'tlv_type': 0x01})
+
+
+@dataclass
+class _StrModelMap:
+    entries: Dict[str, _Inner2] = field(default_factory=dict, metadata={
+        'tlv_type':     0x21,
+        'val_tlv_type': 0x22,
+    })
+
+
+class TestMapField:
+    def test_str_bytes_roundtrip(self):
+        obj = _StrBytesMap(entries={'alpha': b'\x01\x02', 'beta': b'\x03'})
+        wire = tlv_encode(obj)
+        p = tlv_parse(_StrBytesMap, wire)
+        assert list(p.entries.keys()) == ['alpha', 'beta']
+        assert bytes(p.entries['alpha']) == b'\x01\x02'
+        assert bytes(p.entries['beta']) == b'\x03'
+
+    def test_insertion_order_preserved(self):
+        """Dict round-trip must preserve the original key insertion order."""
+        obj = _StrBytesMap(entries={'z': b'\x00', 'a': b'\x01', 'm': b'\x02'})
+        p = tlv_parse(_StrBytesMap, tlv_encode(obj))
+        assert list(p.entries.keys()) == ['z', 'a', 'm']
+
+    def test_empty_map_produces_no_bytes(self):
+        obj = _StrBytesMap(entries={})
+        assert tlv_encode(obj) == b''
+
+    def test_none_map_produces_no_bytes(self):
+        obj = _StrBytesMap(entries=None)
+        assert tlv_encode(obj) == b''
+
+    def test_none_map_defaults_to_empty_on_parse(self):
+        """Parsing wire with no map TLVs leaves entries as the default_factory value."""
+        p = tlv_parse(_StrBytesMap, b'')
+        assert p.entries == {}
+
+    def test_str_model_map_roundtrip(self):
+        obj = _StrModelMap(entries={'x': _Inner2(value=7), 'y': _Inner2(value=99)})
+        wire = tlv_encode(obj)
+        p = tlv_parse(_StrModelMap, wire)
+        assert list(p.entries.keys()) == ['x', 'y']
+        assert p.entries['x'].value == 7
+        assert p.entries['y'].value == 99
+
+    def test_v1_compat_wire(self):
+        """v2 map encoding must be byte-for-byte identical to v1 MapField."""
+        from ndn.encoding import MapField, BytesField
+
+        class V1Map(TlvModel):
+            entries = MapField(BytesField(0x21, is_string=True), BytesField(0x23))
+
+        v1 = V1Map()
+        v1.entries['alpha'] = b'\x01\x02'
+        v1.entries['beta']  = b'\x03'
+        v1_wire = bytes(v1.encode())
+
+        v2 = _StrBytesMap(entries={'alpha': b'\x01\x02', 'beta': b'\x03'})
+        v2_wire = bytes(tlv_encode(v2))
+
+        assert v1_wire == v2_wire
+
+    def test_v1_produced_wire_parsed_by_v2(self):
+        from ndn.encoding import MapField, BytesField
+
+        class V1Map(TlvModel):
+            entries = MapField(BytesField(0x21, is_string=True), BytesField(0x23))
+
+        v1 = V1Map()
+        v1.entries['hello'] = b'\xde\xad'
+        wire = bytes(v1.encode())
+
+        p = tlv_parse(_StrBytesMap, wire)
+        assert bytes(p.entries['hello']) == b'\xde\xad'
+
+    def test_bytes_values_are_memoryview_zero_copy(self):
+        obj = _StrBytesMap(entries={'k': b'\xca\xfe'})
+        wire = tlv_encode(obj)
+        p = tlv_parse(_StrBytesMap, wire)
+        assert isinstance(p.entries['k'], memoryview)

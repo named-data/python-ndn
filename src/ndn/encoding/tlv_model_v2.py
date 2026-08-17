@@ -60,6 +60,8 @@ Field-kind inference from Python annotation
 +--------------------------------------------+----------+------------------+
 | List[T]                                    | repeated | RepeatedField    |
 +--------------------------------------------+----------+------------------+
+| Dict[K, V]                                 | map      | MapField         |
++--------------------------------------------+----------+------------------+
 
 Supported metadata keys
 -----------------------
@@ -67,6 +69,15 @@ Supported metadata keys
 ``'fixed_len'``     int   Force uint value width: 1, 2, 4, or 8 bytes
 ``'ignore_critical' bool  Suppress DecodeError for nested model parsing
 ``'field_type'``    str   Explicit kind override when inference is insufficient
+
+For **map** fields (``Dict[K, V]``):
+``'val_tlv_type'``    int  TLV type for map values (required)
+
+Map fields encode each entry as a key TLV followed immediately by a value TLV,
+both written directly into the parent wire (no outer wrapper). On parse the same
+two-phase scan is used: matching the key type triggers immediate consumption of
+the next TLV as the corresponding value. The runtime type is :class:`dict`,
+which preserves insertion order in Python 3.7+.
 """
 import dataclasses
 import struct
@@ -133,6 +144,8 @@ def _infer_kind(annotation, metadata: dict) -> str:
 
     if origin is list:
         return 'repeated'
+    if origin is dict:
+        return 'map'
     if annotation is NDNName:
         return 'name'
     # bool must be checked before int since bool is a subclass of int
@@ -161,6 +174,28 @@ def _element_annotation(annotation):
     annotation = _unwrap_optional(annotation)
     args = typing.get_args(annotation)
     return args[0] if args else bytes
+
+
+def _map_annotations(annotation):
+    """Extract (K, V) from Dict[K, V]; falls back to (str, bytes)."""
+    annotation = _unwrap_optional(annotation)
+    args = typing.get_args(annotation)
+    if len(args) == 2:
+        return args[0], args[1]
+    return str, bytes
+
+
+def _map_key_meta(metadata: dict) -> dict:
+    """Build a synthetic metadata dict for a map key sub-field."""
+    return {'tlv_type': metadata['tlv_type']}
+
+
+def _map_val_meta(metadata: dict) -> dict:
+    """Build a synthetic metadata dict for a map value sub-field."""
+    m = {'tlv_type': metadata['val_tlv_type']}
+    if 'ignore_critical' in metadata:
+        m['ignore_critical'] = metadata['ignore_critical']
+    return m
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +298,22 @@ def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict
                 f'{fname}[{i}]', ele, elem_kind, elem_ann, metadata, markers)
         return total
 
+    if kind == 'map':
+        if not val:
+            return 0
+        key_ann, val_ann = _map_annotations(annotation)
+        key_meta = _map_key_meta(metadata)
+        vl_meta  = _map_val_meta(metadata)
+        key_kind = _infer_kind(key_ann, key_meta)
+        vl_kind  = _infer_kind(val_ann, vl_meta)
+        total = 0
+        for i, (k, v) in enumerate(val.items()):
+            total += _encoded_length_field(
+                f'{fname}[{i}#k]', k, key_kind, key_ann, key_meta, markers)
+            total += _encoded_length_field(
+                f'{fname}[{i}#v]', v, vl_kind,  val_ann, vl_meta,  markers)
+        return total
+
     raise TypeError(f'Unknown field kind {kind!r} for {fname!r}')
 
 
@@ -359,6 +410,24 @@ def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
         for i, ele in enumerate(val):
             total += _encode_into_field(
                 f'{fname}[{i}]', ele, elem_kind, elem_ann, metadata, markers,
+                wire, offset + total)
+        return total
+
+    if kind == 'map':
+        if not val:
+            return 0
+        key_ann, val_ann = _map_annotations(annotation)
+        key_meta = _map_key_meta(metadata)
+        vl_meta  = _map_val_meta(metadata)
+        key_kind = _infer_kind(key_ann, key_meta)
+        vl_kind  = _infer_kind(val_ann, vl_meta)
+        total = 0
+        for i, (k, v) in enumerate(val.items()):
+            total += _encode_into_field(
+                f'{fname}[{i}#k]', k, key_kind, key_ann, key_meta, markers,
+                wire, offset + total)
+            total += _encode_into_field(
+                f'{fname}[{i}#v]', v, vl_kind,  val_ann, vl_meta,  markers,
                 wire, offset + total)
         return total
 
@@ -562,6 +631,37 @@ def tlv_parse(cls, wire, ignore_critical: bool = False):
                     object.__setattr__(obj, fname, lst)
                 lst.append(val)
                 field_pos = i                   # stay at i to accept more elements
+
+            elif kind == 'map':
+                # Two-phase parse: consume key, then immediately read value TLV.
+                key_ann, val_ann = _map_annotations(ann)
+                key_meta = _map_key_meta(meta)
+                vl_meta  = _map_val_meta(meta)
+                key_kind = _infer_kind(key_ann, key_meta)
+                vl_kind  = _infer_kind(val_ann, vl_meta)
+
+                dct = getattr(obj, fname)
+                if dct is None:
+                    dct = {}
+                    object.__setattr__(obj, fname, dct)
+                idx = len(dct)
+
+                key = _parse_value(f'{fname}[{idx}#k]', key_kind, key_ann, key_meta,
+                                   mv, offset, length, offset_btl, ignore_critical)
+
+                # advance past key value → now at the value TLV
+                offset += length
+                offset_btl = offset
+                _val_typ, _sz_t2 = parse_tl_num(mv, offset)
+                offset += _sz_t2
+                length, _sz_l2 = parse_tl_num(mv, offset)
+                offset += _sz_l2
+
+                val = _parse_value(f'{fname}[{idx}#v]', vl_kind, val_ann, vl_meta,
+                                   mv, offset, length, offset_btl, ignore_critical)
+                dct[key] = val
+                field_pos = i                   # stay at i to accept more pairs
+
             else:
                 val = _parse_value(fname, kind, ann, meta,
                                    mv, offset, length, offset_btl, ignore_critical)
