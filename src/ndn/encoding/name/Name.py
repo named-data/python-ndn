@@ -19,7 +19,7 @@
 Name module is a collection of functions processing NDN Names.
 """
 from functools import reduce
-from typing import List, Optional, Iterable
+from collections.abc import Iterable
 from . import Component
 from ..tlv_type import BinaryStr, VarBinaryStr, FormalName, NonStrictName, is_binary_str
 from ..tlv_var import write_tl_num, parse_tl_num, get_tl_num_size
@@ -29,7 +29,7 @@ TYPE_NAME = 0x07
 """The TLV type of NDN Name."""
 
 
-def from_str(val: str) -> List[bytearray]:
+def from_str(val: str) -> list[bytearray]:
     r"""
     Construct a Name from a URI string.
 
@@ -156,7 +156,7 @@ def encoded_length(name: FormalName) -> int:
     return length + size_typ + size_len
 
 
-def encode(name: FormalName, buf: Optional[VarBinaryStr] = None, offset: int = 0) -> VarBinaryStr:
+def encode(name: FormalName, buf: VarBinaryStr | None = None, offset: int = 0) -> VarBinaryStr:
     length = reduce(lambda x, y: x + len(y), name, 0)
     size_typ = 1
     size_len = get_tl_num_size(length)
@@ -175,7 +175,7 @@ def encode(name: FormalName, buf: Optional[VarBinaryStr] = None, offset: int = 0
     return buf
 
 
-def decode(buf: BinaryStr, offset: int = 0) -> (List[memoryview], int):
+def decode(buf: BinaryStr, offset: int = 0) -> (list[memoryview], int):
     buf = memoryview(buf)
     origin_offset = offset
 

@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import abc
 import sys
-from typing import List
 
 __all__ = ['Platform']
 
@@ -42,7 +41,7 @@ class Platform(abc.ABC):
         return Platform._instance
 
     @abc.abstractmethod
-    def client_conf_paths(self) -> List[str]:
+    def client_conf_paths(self) -> list[str]:
         pass
 
     @abc.abstractmethod
@@ -54,7 +53,7 @@ class Platform(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def default_pib_paths(self) -> List[str]:
+    def default_pib_paths(self) -> list[str]:
         pass
 
     @abc.abstractmethod
@@ -62,7 +61,7 @@ class Platform(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def default_tpm_paths(self) -> List[str]:
+    def default_tpm_paths(self) -> list[str]:
         pass
 
     @abc.abstractmethod

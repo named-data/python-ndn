@@ -19,7 +19,8 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
-from typing import Iterator, Any
+from typing import Any
+from collections.abc import Iterator
 from ...encoding import FormalName, BinaryStr, NonStrictName, Name
 from ...app_support.security_v2 import self_sign
 from ..signer.sha256_digest_signer import DigestSha256Signer
@@ -450,7 +451,7 @@ class KeychainSqlite3(Keychain):
     @staticmethod
     def initialize(path: str, tpm_scheme: str, tpm_path: str = '') -> bool:
         if os.path.exists(path):
-            logging.getLogger(__name__).fatal(f'PIB database {path} already exists.')
+            logging.getLogger(__name__).fatal('PIB database %s already exists.', path)
             return False
         # Make sure the directory exists
         base_dir = os.path.dirname(path)

@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import sys
 import logging
-from typing import Tuple, Optional
 from ctypes import c_void_p, pointer, c_int
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA, ECC
@@ -83,7 +82,7 @@ class TpmOsxKeychain(Tpm):
         sec = OsxSec()
         with ReleaseGuard() as g:
             # TODO: what about name convension?
-            logging.getLogger(__name__).debug('Get OSX Key %s' % Name.to_str(key_name))
+            logging.getLogger(__name__).debug('Get OSX Key %s', Name.to_str(key_name))
             g.key_label = CFSTR(Name.to_str(key_name))
             g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 6, cf.kCFTypeDictionaryKeyCallBacks, None))
             cf.CFDictionaryAddValue(g.query, sec.kSecClass, sec.kSecClassKey)
@@ -104,7 +103,7 @@ class TpmOsxKeychain(Tpm):
             key_ref = cf.CFRetain(cf.CFDictionaryGetValue(g.dic, sec.kSecValueRef))
         return key_type, key_bits, key_ref
 
-    def get_signer(self, key_name: NonStrictName, key_locator_name: Optional[NonStrictName] = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
         key_type, key_bits, key_ref = self._get_key(key_name)
         if key_locator_name is None:
             key_locator_name = key_name
@@ -120,7 +119,7 @@ class TpmOsxKeychain(Tpm):
     def delete_key(self, key_name: FormalName):
         sec = OsxSec()
         with ReleaseGuard() as g:
-            logging.getLogger(__name__).debug('Delete OSX Key %s' % Name.to_str(key_name))
+            logging.getLogger(__name__).debug('Delete OSX Key %s', Name.to_str(key_name))
             g.key_label = CFSTR(Name.to_str(key_name))
             g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 3, cf.kCFTypeDictionaryKeyCallBacks, None))
             cf.CFDictionaryAddValue(g.query, sec.kSecClass, sec.kSecClassKey)
@@ -138,10 +137,10 @@ class TpmOsxKeychain(Tpm):
         else:
             raise ValueError(f'Unsupported key type {key_type}')
 
-    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
+    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> tuple[FormalName, BinaryStr]:
         sec = OsxSec()
         with ReleaseGuard() as g:
-            logging.getLogger(__name__).debug('Generating OSX Key %s' % key_type)
+            logging.getLogger(__name__).debug('Generating OSX Key %s', key_type)
 
             # Get key type and size
             if key_type == 'rsa':
@@ -182,7 +181,7 @@ class TpmOsxKeychain(Tpm):
             key_name = self.construct_key_name(id_name, pub_key, **kwargs)
             key_name_str = Name.to_str(key_name)
             g.key_label = CFSTR(Name.to_str(key_name_str))
-            logging.getLogger(__name__).debug('Generated OSX Key %s' % key_name_str)
+            logging.getLogger(__name__).debug('Generated OSX Key %s', key_name_str)
 
             # SecItemUpdate: kSecAttrLabel, kSecAttrAccessControl
             g.query = ObjCInstance(cf.CFDictionaryCreateMutable(None, 2, cf.kCFTypeDictionaryKeyCallBacks, None))

@@ -1,4 +1,3 @@
-import typing
 import logging
 import asyncio as aio
 from ndn import appv2

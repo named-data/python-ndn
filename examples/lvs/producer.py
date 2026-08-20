@@ -70,7 +70,7 @@ def main():
     @app.route('/lvs-test/article/xinyu/hello')
     def on_interest(name, param, _app_param):
         print(f'>> I: {Name.to_str(name)}, {param}')
-        content = "Hello,".encode()
+        content = b"Hello,"
         data_name = name + [Component.from_version(timestamp())]
         sign_cert_name = checker.suggest(data_name, app.keychain)
         print(f'        Suggested signing cert: {Name.to_str(sign_cert_name)}')
@@ -82,7 +82,7 @@ def main():
     @app.route('/lvs-test/article/xinyu/world')
     def on_interest(name, param, _app_param):
         print(f'>> I: {Name.to_str(name)}, {param}')
-        content = "world!".encode()
+        content = b"world!"
         data_name = name + [Component.from_version(timestamp())]
         sign_cert_name = checker.suggest(data_name, app.keychain)
         print(f'        Suggested signing cert: {Name.to_str(sign_cert_name)}')

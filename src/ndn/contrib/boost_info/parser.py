@@ -123,7 +123,7 @@ class PropertyTree:
     @classmethod
     def load(cls, path: str) -> PropertyTree:
         ret = PropertyTree()
-        with open(path, 'r') as f:
+        with open(path) as f:
             cls._parse_children(ret.root, f.readlines(), 0)
         return ret
 

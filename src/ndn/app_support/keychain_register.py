@@ -33,7 +33,7 @@ class KcHandler:
         can_be_prefix = pkt_ctx['int_param'].can_be_prefix
         # can_be_prefix = True if using KEY name, False if using CERT name
         if len(int_name) != len(id_name) + (2 if can_be_prefix else 4):
-            logger.warning(f'Invalid key fetching Interest: {enc.Name.to_str(int_name)}')
+            logger.warning('Invalid key fetching Interest: %s', enc.Name.to_str(int_name))
             return
         try:
             key_name = int_name[:len(id_name)+2]
@@ -47,12 +47,12 @@ class KcHandler:
             else:
                 cert = key[int_name]
             if cert is not None:
-                logger.info(f'KeychainRegister replied with: {enc.Name.to_str(cert.name)}')
+                logger.info('KeychainRegister replied with: %s', enc.Name.to_str(cert.name))
                 reply(cert.data)
             else:
-                logger.warning(f'No certificate for key: {enc.Name.to_str(int_name)}')
+                logger.warning('No certificate for key: %s', enc.Name.to_str(int_name))
         except KeyError:
-            logger.warning(f'Fetching not existing key/cert: {enc.Name.to_str(int_name)}')
+            logger.warning('Fetching not existing key/cert: %s', enc.Name.to_str(int_name))
 
     def __init__(self, ident: sec.AbstractIdentity):
         self.ident = ident

@@ -18,7 +18,7 @@
 import abc
 import struct
 from enum import Enum, Flag
-from typing import Optional, Type, List, Iterable
+from collections.abc import Iterable
 from functools import reduce
 from .tlv_type import BinaryStr, VarBinaryStr, is_binary_str
 from .tlv_var import write_tl_num, parse_tl_num, get_tl_num_size
@@ -694,7 +694,7 @@ class TlvModel(metaclass=TlvModelMeta):
     :ivar _encoded_fields: a list of :any:`Field` in order.
     :vartype _encoded_fields: List[Field]
     """
-    _encoded_fields: List[Field]
+    _encoded_fields: list[Field]
 
     def __repr__(self):
         values = ', '.join(f'{field.name}={field.__get__(self, None).__repr__()}' for field in self._encoded_fields)
@@ -738,7 +738,7 @@ class TlvModel(metaclass=TlvModelMeta):
                 result.append((field.name, field.__get__(self, None)))
         return dict_factory(result)
 
-    def encoded_length(self, markers: Optional[dict] = None) -> int:
+    def encoded_length(self, markers: dict | None = None) -> int:
         """
         Get the encoded Length of this TlvModel.
 
@@ -756,7 +756,7 @@ class TlvModel(metaclass=TlvModelMeta):
     def encode(self,
                wire: VarBinaryStr = None,
                offset: int = 0,
-               markers: Optional[dict] = None) -> VarBinaryStr:
+               markers: dict | None = None) -> VarBinaryStr:
         r"""
         Encode the TlvModel.
 
@@ -785,7 +785,7 @@ class TlvModel(metaclass=TlvModelMeta):
         return wire
 
     @classmethod
-    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None, ignore_critical: bool = False):
+    def parse(cls, wire: BinaryStr, markers: dict | None = None, ignore_critical: bool = False):
         """
         Parse a TlvModel from TLV encoded wire.
 
@@ -865,9 +865,9 @@ class ModelField(Field):
     """
     def __init__(self,
                  type_num: int,
-                 model_type: Type[TlvModel],
-                 copy_in_fields: List[ProcedureArgument] = None,
-                 copy_out_fields: List[ProcedureArgument] = None,
+                 model_type: type[TlvModel],
+                 copy_in_fields: list[ProcedureArgument] = None,
+                 copy_out_fields: list[ProcedureArgument] = None,
                  ignore_critical: bool = False):
         # default should be None here to prevent unintended modification
         super().__init__(type_num, None)

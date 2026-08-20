@@ -16,18 +16,19 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from enum import Enum
-from typing import Optional, Callable, Any, Coroutine
+from typing import Any
+from collections.abc import Callable, Coroutine
 from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, SignaturePtrs
 
 
-Route = Callable[[FormalName, InterestParam, Optional[BinaryStr]], None]
+Route = Callable[[FormalName, InterestParam, BinaryStr | None], None]
 r"""An OnInterest callback function for a route."""
 
 Validator = Callable[[FormalName, SignaturePtrs], Coroutine[Any, None, bool]]
 r"""A validator used to validate an Interest or Data packet."""
 
 # For internal use. = (FormalName, MetaInfo, Content, SigPtrs, RawPacket)
-DataTuple = tuple[FormalName, MetaInfo, Optional[BinaryStr], SignaturePtrs, BinaryStr]
+DataTuple = tuple[FormalName, MetaInfo, BinaryStr | None, SignaturePtrs, BinaryStr]
 
 
 class NetworkError(Exception):
@@ -112,11 +113,11 @@ class ValidationFailure(Exception):
     """
     name: FormalName
     meta_info: MetaInfo
-    content: Optional[BinaryStr]
+    content: BinaryStr | None
     sig_ptrs: SignaturePtrs
     result: ValidResult
 
-    def __init__(self, name: FormalName, meta_info: MetaInfo, content: Optional[BinaryStr],
+    def __init__(self, name: FormalName, meta_info: MetaInfo, content: BinaryStr | None,
                  sig_ptrs: SignaturePtrs, result: ValidResult = ValidResult.FAIL):
         self.name = name
         self.meta_info = meta_info

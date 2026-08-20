@@ -43,7 +43,6 @@ include = [{ path = "tests", format = "sdist" }]
 python = "^3.11"
 pycryptodomex = "^3.21.0"
 pygtrie = "^2.5.0"
-aenum = "^3.1.15"
 lark = "^1.2.2"
 aiohttp = "^3.10.9"
 

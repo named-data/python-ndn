@@ -22,7 +22,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import Callable, Iterator
+from collections.abc import Callable, Iterator
 
 from ...encoding import BinaryStr, Component, FormalName, Name, NonStrictName
 from ...security import Keychain

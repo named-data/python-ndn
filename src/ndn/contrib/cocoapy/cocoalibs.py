@@ -3,7 +3,7 @@ from builtins import str
 from ctypes import *
 from ctypes import util
 
-from .runtime import send_message, ObjCInstance
+from .runtime import ObjCInstance
 from .cocoatypes import *
 
 ######################################################################

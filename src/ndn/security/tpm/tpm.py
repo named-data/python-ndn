@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import abc
-from typing import Tuple, Optional
 from Cryptodome.Hash import SHA256
 from Cryptodome.Random import get_random_bytes
 from ...app_support.security_v2 import KEY_COMPONENT
@@ -25,11 +24,11 @@ from ...encoding import Signer, NonStrictName, BinaryStr, FormalName, Component
 
 class Tpm(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def get_signer(self, key_name: NonStrictName, key_locator_name: Optional[NonStrictName] = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
         pass
 
     @abc.abstractmethod
-    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
+    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> tuple[FormalName, BinaryStr]:
         pass
 
     @abc.abstractmethod

@@ -18,7 +18,6 @@
 import asyncio as aio
 import dataclasses as dc
 from hashlib import sha256
-from typing import Optional
 from pygtrie import Trie
 from .encoding import InterestParam, FormalName, BinaryStr
 from .types import InterestNack, Validator, Route, DataTuple
@@ -92,5 +91,5 @@ class InterestTreeNode:
 
 class PrefixTreeNode:
     callback: Route = None
-    validator: Optional[Validator] = None
+    validator: Validator | None = None
     extra_param: dict = None

@@ -16,7 +16,8 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import abc
-from typing import Any, Callable, Coroutine
+from typing import Any
+from collections.abc import Callable, Coroutine
 
 
 class Face(metaclass=abc.ABCMeta):

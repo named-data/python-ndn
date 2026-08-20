@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import dataclasses as dc
 from hashlib import sha256
-from typing import Optional, List, Tuple
 from .name import Name, Component
 from .signer import Signer
 from .tlv_type import VarBinaryStr, BinaryStr, NonStrictName, FormalName
@@ -167,7 +166,7 @@ class InterestPacketValue(TlvModel):
                                           shrink_len=_shrink_len)
     _digest_cover_end = OffsetMarker()
 
-    def encoded_length(self, markers: Optional[dict] = None) -> int:
+    def encoded_length(self, markers: dict | None = None) -> int:
         if markers is None:
             markers = {}
         self._sig_cover_part.set_arg(markers, [])
@@ -187,7 +186,7 @@ class InterestPacketValue(TlvModel):
     def encode(self,
                wire: VarBinaryStr = None,
                offset: int = 0,
-               markers: Optional[dict] = None) -> VarBinaryStr:
+               markers: dict | None = None) -> VarBinaryStr:
         if markers is None:
             markers = {}
         ret = super().encode(wire, offset, markers)
@@ -209,7 +208,7 @@ class InterestPacketValue(TlvModel):
         return ret
 
     @classmethod
-    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None, ignore_critical: bool = False):
+    def parse(cls, wire: BinaryStr, markers: dict | None = None, ignore_critical: bool = False):
         if markers is None:
             markers = {}
         cls._sig_cover_part.set_arg(markers, [])
@@ -233,7 +232,7 @@ class MetaInfo(TlvModel):
 
     def __init__(self,
                  content_type: int = ContentType.BLOB,
-                 freshness_period: Optional[int] = None,
+                 freshness_period: int | None = None,
                  final_block_id: BinaryStr = None):
         self.content_type = content_type
         self.freshness_period = freshness_period
@@ -265,7 +264,7 @@ class DataPacketValue(TlvModel):
                                           value_buffer=_sig_value_buf,
                                           shrink_len=_shrink_len)
 
-    def encoded_length(self, markers: Optional[dict] = None) -> int:
+    def encoded_length(self, markers: dict | None = None) -> int:
         if markers is None:
             markers = {}
         self._sig_cover_part.set_arg(markers, [])
@@ -279,7 +278,7 @@ class DataPacketValue(TlvModel):
     def encode(self,
                wire: VarBinaryStr = None,
                offset: int = 0,
-               markers: Optional[dict] = None) -> VarBinaryStr:
+               markers: dict | None = None) -> VarBinaryStr:
         if markers is None:
             markers = {}
         ret = super().encode(wire, offset, markers)
@@ -287,7 +286,7 @@ class DataPacketValue(TlvModel):
         return ret
 
     @classmethod
-    def parse(cls, wire: BinaryStr, markers: Optional[dict] = None, ignore_critical: bool = False):
+    def parse(cls, wire: BinaryStr, markers: dict | None = None, ignore_critical: bool = False):
         if markers is None:
             markers = {}
         cls._sig_cover_part.set_arg(markers, [])
@@ -325,10 +324,10 @@ class InterestParam:
     """
     can_be_prefix: bool = False
     must_be_fresh: bool = False
-    nonce: Optional[int] = None
-    lifetime: Optional[int] = 4000
-    hop_limit: Optional[int] = None
-    forwarding_hint: List[NonStrictName] = dc.field(default_factory=list)
+    nonce: int | None = None
+    lifetime: int | None = 4000
+    hop_limit: int | None = None
+    forwarding_hint: list[NonStrictName] = dc.field(default_factory=list)
 
     @staticmethod
     def from_dict(kwargs):
@@ -358,21 +357,21 @@ class SignaturePtrs:
     :ivar digest_value_buf: a pointer to ParametersSha256DigestComponent (TL excluded).
     :vartype digest_value_buf: :class:`memoryview`
     """
-    signature_info: Optional[SignatureInfo] = None
-    signature_covered_part: Optional[List[BinaryStr]] = dc.field(default_factory=list)
-    signature_value_buf: Optional[BinaryStr] = None
-    digest_covered_part: Optional[List[BinaryStr]] = dc.field(default_factory=list)
-    digest_value_buf: Optional[BinaryStr] = None
+    signature_info: SignatureInfo | None = None
+    signature_covered_part: list[BinaryStr] | None = dc.field(default_factory=list)
+    signature_value_buf: BinaryStr | None = None
+    digest_covered_part: list[BinaryStr] | None = dc.field(default_factory=list)
+    digest_value_buf: BinaryStr | None = None
 
 
-Interest = Tuple[FormalName, InterestParam, Optional[BinaryStr], SignaturePtrs]
-Data = Tuple[FormalName, MetaInfo, Optional[BinaryStr], SignaturePtrs]
+Interest = tuple[FormalName, InterestParam, BinaryStr | None, SignaturePtrs]
+Data = tuple[FormalName, MetaInfo, BinaryStr | None, SignaturePtrs]
 
 
 def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
-                  app_param: Optional[BinaryStr] = None,
-                  signer: Optional[Signer] = None,
+                  app_param: BinaryStr | None = None,
+                  signer: Signer | None = None,
                   need_final_name: bool = False):
     r"""
     Make an Interest packet.
@@ -418,8 +417,8 @@ def make_interest(name: NonStrictName,
 
 def make_data(name: NonStrictName,
               meta_info: MetaInfo,
-              content: Optional[BinaryStr] = None,
-              signer: Optional[Signer] = None) -> VarBinaryStr:
+              content: BinaryStr | None = None,
+              signer: Signer | None = None) -> VarBinaryStr:
     r"""
     Make a Data packet.
 

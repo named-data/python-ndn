@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import Optional
 from ndn.app import NDNApp
 from ndn.encoding import Name, InterestParam, BinaryStr, FormalName, MetaInfo
 import logging
@@ -31,9 +30,9 @@ app = NDNApp()
 
 
 @app.route('/example/testApp')
-def on_interest(name: FormalName, param: InterestParam, _app_param: Optional[BinaryStr]):
+def on_interest(name: FormalName, param: InterestParam, _app_param: BinaryStr | None):
     print(f'>> I: {Name.to_str(name)}, {param}')
-    content = "Hello, world!".encode()
+    content = b"Hello, world!"
     app.put_data(name, content=content, freshness_period=10000)
     print(f'<< D: {Name.to_str(name)}')
     print(MetaInfo(freshness_period=10000))
