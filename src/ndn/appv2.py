@@ -50,7 +50,7 @@ Continuation function for :any:`IntHandler` to respond to an Interest.
     :return: True for success, False upon error.
 """
 
-IntHandler = typing.Callable[[enc.FormalName, typing.Optional[enc.BinaryStr], ReplyFunc, PktContext], None]
+IntHandler = typing.Callable[[enc.FormalName, enc.BinaryStr | None, ReplyFunc, PktContext], None]
 r"""
 Interest handler function associated with a name prefix.
 
@@ -100,7 +100,7 @@ async def pass_all(_name, _sig, _context):
 @dataclass
 class PrefixTreeNode:
     callback: IntHandler = None
-    validator: typing.Optional[Validator] = None
+    validator: Validator | None = None
 
 
 @dataclass
@@ -111,7 +111,7 @@ class PendingIntEntry:
     must_be_fresh: bool
     validator: Validator
     implicit_sha256: enc.BinaryStr = b''
-    task: typing.Optional[aio.Task] = None
+    task: aio.Task | None = None
 
     async def satisfy(self, data: types.DataTuple):
         name, meta_info, content, sig, raw_packet = data
@@ -124,7 +124,7 @@ class PendingIntEntry:
         if self.validator is not None:
             try:
                 valid = await self.validator(name, sig, pkt_context)
-            except (aio.CancelledError, aio.TimeoutError):
+            except (TimeoutError, aio.CancelledError):
                 valid = ValidResult.TIMEOUT
         else:
             valid = ValidResult.FAIL
@@ -269,7 +269,7 @@ class NDNApp:
                 self.logger.warning('Unable to decode the fragment of LpPacket')
                 return
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('NetworkNack received %s, reason=%s' % (enc.Name.to_str(name), nack_reason))
+                self.logger.debug('NetworkNack received %s, reason=%s', enc.Name.to_str(name), nack_reason)
             self._on_nack(name, nack_reason)
         else:
             if typ == enc.TypeNumber.INTEREST:
@@ -280,10 +280,10 @@ class NDNApp:
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
                     if pit_token:
-                        self.logger.debug(
-                            f'Interest received {enc.Name.to_str(name)} w/ token={bytes(pit_token).hex()}')
+                        self.logger.debug('Interest received %s w/ token=%s',
+                                          enc.Name.to_str(name), bytes(pit_token).hex())
                     else:
-                        self.logger.debug(f'Interest received {enc.Name.to_str(name)}')
+                        self.logger.debug('Interest received %s', enc.Name.to_str(name))
                 await self._on_interest(name, pit_token, param, app_param, sig, raw_packet=data)
             elif typ == enc.TypeNumber.DATA:
                 try:
@@ -292,14 +292,14 @@ class NDNApp:
                     self.logger.warning('Unable to decode received packet')
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug(f'Data received {enc.Name.to_str(name)}')
+                    self.logger.debug('Data received %s', enc.Name.to_str(name))
                 await self._on_data(name, meta_info, content, sig, raw_packet=data)
             else:
                 self.logger.warning('Unable to decode received packet')
 
     @staticmethod
-    def make_data(name: enc.NonStrictName, content: typing.Optional[enc.BinaryStr],
-                  signer: typing.Optional[enc.Signer], **kwargs):
+    def make_data(name: enc.NonStrictName, content: enc.BinaryStr | None,
+                  signer: enc.Signer | None, **kwargs):
         r"""
         Encode a data packet without requiring an NDNApp instance.
         This is simply a wrapper of encoding.make_data.
@@ -325,21 +325,21 @@ class NDNApp:
             meta_info = enc.MetaInfo.from_dict(kwargs)
         return enc.make_data(name, meta_info, content, signer=signer)
 
-    async def _on_interest(self, name: enc.FormalName, pit_token: typing.Optional[enc.BinaryStr],
-                           param: enc.InterestParam, app_param: typing.Optional[enc.BinaryStr], sig: enc.SignaturePtrs,
+    async def _on_interest(self, name: enc.FormalName, pit_token: enc.BinaryStr | None,
+                           param: enc.InterestParam, app_param: enc.BinaryStr | None, sig: enc.SignaturePtrs,
                            raw_packet: enc.BinaryStr):
         trie_step = self._fib.longest_prefix(name)
         if not trie_step:
-            self.logger.warning('No route: %s' % name)
+            self.logger.warning('No route: %s', name)
             return
         node: PrefixTreeNode = trie_step.value
         if node.callback is None:
-            self.logger.warning('No callback: %s' % name)
+            self.logger.warning('No callback: %s', name)
             return
         sig_required = app_param is not None or sig.signature_info is not None
         if sig_required:
             if not await sec.params_sha256_checker(name, sig):
-                self.logger.warning('Drop malformed Interest: %s' % name)
+                self.logger.warning('Drop malformed Interest: %s', name)
                 return
 
         # Use context to handle misc parameters
@@ -358,7 +358,7 @@ class NDNApp:
         def reply(data: enc.BinaryStr) -> bool:
             now = utils.timestamp()
             if now > deadline:
-                self.logger.warning(f'Deadline passed, unable to reply to {enc.Name.to_str(name)}')
+                self.logger.warning('Deadline passed, unable to reply to %s', enc.Name.to_str(name))
                 return False
             if pit_token is None:
                 self._put_raw_packet(data)
@@ -380,7 +380,7 @@ class NDNApp:
             if valid == ValidResult.PASS or valid == ValidResult.ALLOW_BYPASS:
                 node.callback(name, app_param, reply, context)
             else:
-                self.logger.warning('Drop unvalidated Interest: %s' % name)
+                self.logger.warning('Drop unvalidated Interest: %s', name)
                 return
         aio.create_task(submit_interest())
 
@@ -451,7 +451,7 @@ class NDNApp:
         self.face.send(data)
 
     def attach_handler(self, name: enc.NonStrictName, handler: IntHandler,
-                       validator: typing.Optional[Validator] = None):
+                       validator: Validator | None = None):
         """
         Attach an Interest handler at a name prefix.
         Incoming Interests under the specified name prefix will be dispatched to the handler.
@@ -531,7 +531,7 @@ class NDNApp:
                              validator: Validator,
                              no_response: bool = False
                              ) -> typing.Coroutine[any, None,
-                                                   tuple[enc.FormalName, typing.Optional[enc.BinaryStr], PktContext]]:
+                                                   tuple[enc.FormalName, enc.BinaryStr | None, PktContext]]:
         if no_response:
             self.face.send(raw_interest)
             return None
@@ -565,7 +565,7 @@ class NDNApp:
             lifetime = 100
         try:
             data_name, content, pkt_context = await aio.wait_for(future, timeout=lifetime/1000.0)
-        except aio.TimeoutError:
+        except TimeoutError:
             if node.timeout(future):
                 del self._pit[node_name]
             raise types.InterestTimeout()
@@ -575,7 +575,7 @@ class NDNApp:
         return data_name, content, pkt_context
 
     async def _on_data(self, name: enc.FormalName, meta_info: enc.MetaInfo,
-                       content: typing.Optional[enc.BinaryStr], sig: enc.SignaturePtrs,
+                       content: enc.BinaryStr | None, sig: enc.SignaturePtrs,
                        raw_packet: enc.BinaryStr):
         clean_list = []
         for prefix, node in self._pit.prefixes(name):
@@ -594,10 +594,10 @@ class NDNApp:
                 del self._pit[name]
 
     def express(self, name: enc.NonStrictName, validator: Validator,
-                app_param: typing.Optional[enc.BinaryStr] = None,
-                signer: typing.Optional[enc.Signer] = None,
+                app_param: enc.BinaryStr | None = None,
+                signer: enc.Signer | None = None,
                 **kwargs) -> typing.Coroutine[any, None,
-                                              tuple[enc.FormalName, typing.Optional[enc.BinaryStr], PktContext]]:
+                                              tuple[enc.FormalName, enc.BinaryStr | None, PktContext]]:
         r"""
         Express an Interest.
 
@@ -646,7 +646,7 @@ class NDNApp:
         no_response = kwargs.get('no_response', False)
         return self.express_raw_interest(final_name, interest_param, interest, validator, no_response)
 
-    def route(self, name: enc.NonStrictName, validator: typing.Optional[Validator] = None):
+    def route(self, name: enc.NonStrictName, validator: Validator | None = None):
         r"""
         A decorator used to register a permanent route for a specific prefix.
         The decorated function should be an :any:`IntHandler`.

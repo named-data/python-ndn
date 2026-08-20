@@ -105,12 +105,12 @@ class SvsInst:
     def sync_handler(self, name: enc.FormalName, _app_param: enc.BinaryStr | None,
                      _reply: app.ReplyFunc, _context: app.PktContext) -> None:
         if len(name) != len(self.base_prefix) + 2:
-            self.logger.error(f'Received invalid Sync Interest: {enc.Name.to_str(name)}')
+            self.logger.error('Received invalid Sync Interest: %s', enc.Name.to_str(name))
             return
         try:
             remote_sv_pkt = StateVecWrapper.parse(name[-2]).val
         except (enc.DecodeError, IndexError) as e:
-            self.logger.error(f'Unable to decode state vector [{enc.Name.to_str(name)}]: {e}')
+            self.logger.error('Unable to decode state vector [%s]: %s', enc.Name.to_str(name), e)
             return
 
         if remote_sv_pkt is None or not remote_sv_pkt.entries:
@@ -138,11 +138,11 @@ class SvsInst:
                 # Remote is latest
                 need_fetch = True
                 self.local_sv[rsv_id] = rsv_seq
-                self.logger.debug(f'Missing data for: [{enc.Name.to_str(rsv_id)}]: {lsv_seq} < {rsv_seq}')
+                self.logger.debug('Missing data for: [%s]: %s < %s', enc.Name.to_str(rsv_id), lsv_seq, rsv_seq)
             elif lsv_seq > rsv_seq:
                 # Local is latest
                 need_notif = True
-                self.logger.debug(f'Outdated remote on: [{enc.Name.to_str(rsv_id)}]: {rsv_seq} < {lsv_seq}')
+                self.logger.debug('Outdated remote on: [%s]: %s < %s', enc.Name.to_str(rsv_id), rsv_seq, lsv_seq)
 
         if need_notif or self.state == SvsState.SyncSuppression:
             # Set the aggregation timer
@@ -175,7 +175,7 @@ class SvsInst:
                 self.timer_rst_event.clear()
             except aio.CancelledError:
                 break
-            except aio.TimeoutError:
+            except TimeoutError:
                 # The real timer triggered
                 # Note: this part is non-blocking
                 if not self.running:

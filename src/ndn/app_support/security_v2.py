@@ -15,8 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import Tuple
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from ..utils import timestamp
 from ..encoding import Component, Name, ModelField, TlvModel, ContentType, BytesField, \
     SignatureInfo, TypeNumber, RepeatedField, IncludeBase, MetaInfo, VarBinaryStr, \
@@ -84,7 +83,7 @@ def parse_certificate(wire) -> CertificateV2Value:
     return CertificateV2Value.parse(wire)
 
 
-def new_cert(key_name, issuer_id_component, pub_key, signer, start_time, end_time) -> Tuple[FormalName, VarBinaryStr]:
+def new_cert(key_name, issuer_id_component, pub_key, signer, start_time, end_time) -> tuple[FormalName, VarBinaryStr]:
     cert_val = CertificateV2Value()
     cert_name = Name.normalize(key_name) + [issuer_id_component, Component.from_version(timestamp())]
     cert_val.name = cert_name
@@ -111,21 +110,21 @@ def new_cert(key_name, issuer_id_component, pub_key, signer, start_time, end_tim
     return cert_name, buf
 
 
-def self_sign(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
-    end_time = datetime.now(timezone.utc)
+def self_sign(key_name, pub_key, signer) -> tuple[FormalName, VarBinaryStr]:
+    end_time = datetime.now(UTC)
     end_time = end_time.replace(year=end_time.year + 20)
     return new_cert(key_name, SELF_COMPONENT, pub_key, signer,
                     datetime.fromisoformat('1970-01-01T00:00:00'), end_time)
 
 
-def sign_req(key_name, pub_key, signer) -> Tuple[FormalName, VarBinaryStr]:
-    start_time = datetime.now(timezone.utc)
+def sign_req(key_name, pub_key, signer) -> tuple[FormalName, VarBinaryStr]:
+    start_time = datetime.now(UTC)
     end_time = start_time + timedelta(days=10)
     return new_cert(key_name, SIGN_REQ_COMPONENT, pub_key, signer,
-                    datetime.now(timezone.utc), end_time)
+                    datetime.now(UTC), end_time)
 
 
-def derive_cert(key_name, issuer_id, pub_key, signer, start_time, expire_sec) -> Tuple[FormalName, VarBinaryStr]:
+def derive_cert(key_name, issuer_id, pub_key, signer, start_time, expire_sec) -> tuple[FormalName, VarBinaryStr]:
     end_time = start_time + timedelta(seconds=expire_sec)
     if isinstance(issuer_id, str):
         issuer_id = Component.from_str(issuer_id)

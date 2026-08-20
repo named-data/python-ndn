@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import List
 from Cryptodome.Hash import SHA256
 from ...encoding import Signer, SignatureType, VarBinaryStr
 from ...utils import timestamp, gen_nonce_64
@@ -37,7 +36,7 @@ class DigestSha256Signer(Signer):
     def get_signature_value_size(self):
         return 32
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+    def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         h = SHA256.new()
         for blk in contents:
             h.update(blk)

@@ -47,7 +47,7 @@ def execute(args: argparse.Namespace):
         if args.input_file == "-":
             text = sys.stdin.read()
         else:
-            with open(os.path.expandvars(args.input_file), "r") as f:
+            with open(os.path.expandvars(args.input_file)) as f:
                 text = f.read()
     except (ValueError, OSError, IndexError):
         print("Unable to read the input file")

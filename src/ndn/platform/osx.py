@@ -24,7 +24,7 @@ if sys.platform == 'darwin':
     from ..contrib.cocoapy import cf, CFIndex, CFRange, CFAllocatorRef
 
 
-class OsxSec(object):
+class OsxSec:
     __instance = None
 
     def __new__(cls):

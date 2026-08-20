@@ -18,7 +18,6 @@
 import sys
 import ctypes as c
 import logging
-from typing import Tuple, Optional
 from Cryptodome.PublicKey import ECC, RSA
 from Cryptodome.Util.asn1 import DerSequence
 from ndn.encoding import FormalName, BinaryStr
@@ -178,7 +177,7 @@ class TpmCng(Tpm):
 
         return key_type.value, sig_len.value, h_key
 
-    def get_signer(self, key_name: NonStrictName, key_locator_name: Optional[NonStrictName] = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
         name_hash = Name.to_bytes(key_name).hex()
         key_type, sig_len, h_key = self._get_key(name_hash)
         if key_locator_name is None:
@@ -209,10 +208,10 @@ class TpmCng(Tpm):
         else:
             raise ValueError(f'Unsupported key type {key_type}')
 
-    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
+    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> tuple[FormalName, BinaryStr]:
         cng = Cng()
         with ReleaseGuard() as defer:
-            logging.getLogger(__name__).debug('Generating CNG Key %s' % key_type)
+            logging.getLogger(__name__).debug('Generating CNG Key %s', key_type)
             key_name = self.construct_key_name(id_name, b'', key_id_type='random')
             name_hash = Name.to_bytes(key_name).hex()
 

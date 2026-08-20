@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import abc
-from typing import Optional
 from ..encoding import SignaturePtrs, FormalName, InterestParam, BinaryStr
 from ..encoding.signer import Signer
 from ..types import Validator
@@ -95,11 +94,11 @@ class Encryption(Policy, metaclass=abc.ABCMeta):
     :class:`InterestEncryption` or :class:`DataEncryption`.
     """
     @abc.abstractmethod
-    async def decrypt(self, match, content: BinaryStr) -> Optional[BinaryStr]:
+    async def decrypt(self, match, content: BinaryStr) -> BinaryStr | None:
         pass
 
     @abc.abstractmethod
-    async def encrypt(self, match, content: BinaryStr) -> Optional[BinaryStr]:
+    async def encrypt(self, match, content: BinaryStr) -> BinaryStr | None:
         pass
 
 

@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import abc
-from typing import List
 from .tlv_type import VarBinaryStr
 
 
@@ -44,7 +43,7 @@ class Signer(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+    def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         """
         Calculate the SignatureValue and write it into wire.
         The length of wire is exactly what :meth:`get_signature_value_size` returns.

@@ -36,7 +36,7 @@ def execute(args: argparse.Namespace):
     if args.file == '-':
         text = sys.stdin.read()
     else:
-        with open(os.path.expandvars(args.file), 'r') as f:
+        with open(os.path.expandvars(args.file)) as f:
             text = f.read()
 
     try:

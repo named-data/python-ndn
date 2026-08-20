@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import asyncio as aio
-from typing import Dict, Any, Type, Optional
+from typing import Any
 from dataclasses import dataclass
 from ..encoding import is_binary_str, FormalName, NonStrictName, Name, Component, \
     SignaturePtrs, InterestParam, BinaryStr, MetaInfo, parse_data, TypeNumber
@@ -59,9 +59,9 @@ class Node:
     :ivar ~.app: the :any:`NDNApp` this static tree is attached to. Only available at the root.
     :vartype ~.app: Optional[NDNApp]
     """
-    policies: Dict[Type[policy.Policy], policy.Policy]
+    policies: dict[type[policy.Policy], policy.Policy]
     prefix: FormalName
-    app: Optional[NDNApp]
+    app: NDNApp | None
 
     def __init__(self, parent=None):
         self.parent = parent
@@ -193,7 +193,7 @@ class Node:
 
     # ====== Functions operating on policies ======
 
-    def get_policy(self, typ: Type[policy.Policy]):
+    def get_policy(self, typ: type[policy.Policy]):
         """
         Get the policy of specified type that applies to this node.
         It can be attached to this node or a parent of this node.
@@ -208,7 +208,7 @@ class Node:
             cur = cur.parent
         return ret
 
-    def set_policy(self, typ: Type[policy.Policy], value: policy.Policy):
+    def set_policy(self, typ: type[policy.Policy], value: policy.Policy):
         """
         Attach a policy to this node.
 
@@ -283,13 +283,13 @@ class Node:
             raise TypeError(f'The InterestValidator policy is of wrong type. Name={Name.to_str(name)}')
 
     def _on_interest_root(self, name: FormalName, param: InterestParam,
-                          app_param: Optional[BinaryStr], raw_packet: BinaryStr):
+                          app_param: BinaryStr | None, raw_packet: BinaryStr):
         match = self.match(name)
         aio.create_task(match.on_interest(param, app_param, raw_packet))
 
     # ====== Functions on Interest & Data processing (For overriding)  ======
 
-    async def process_int(self, match, param: InterestParam, app_param: Optional[BinaryStr], raw_packet: BinaryStr):
+    async def process_int(self, match, param: InterestParam, app_param: BinaryStr | None, raw_packet: BinaryStr):
         """
         Processing an incoming Interest packet. Specific node type can override this function to have customized
         processing pipeline.
@@ -305,7 +305,7 @@ class Node:
         """
         pass
 
-    async def process_data(self, match, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
+    async def process_data(self, match, meta_info: MetaInfo, content: BinaryStr | None, raw_packet: BinaryStr):
         """
         Processing an incoming Data packet. Specific node type can override this function to have customized
         processing pipeline. By default it returns the content.
@@ -380,8 +380,8 @@ class MatchedNode:
     node: Node
     name: FormalName
     pos: int
-    env: Dict[str, Any]
-    policies: Dict[Type[policy.Policy], policy.Policy]
+    env: dict[str, Any]
+    policies: dict[type[policy.Policy], policy.Policy]
 
     def finer_match(self, new_name: FormalName):
         """
@@ -415,7 +415,7 @@ class MatchedNode:
         policies.update(cur.policies)
         return MatchedNode(root=self.root, node=cur, name=new_name, pos=pos, env=env, policies=policies)
 
-    async def on_interest(self, param: InterestParam, app_param: Optional[BinaryStr], raw_packet: BinaryStr):
+    async def on_interest(self, param: InterestParam, app_param: BinaryStr | None, raw_packet: BinaryStr):
         """
         Called when an Interest packet comes.
         It looks up the cache and returns a Data packet if it exists.
@@ -441,7 +441,7 @@ class MatchedNode:
         # Process Interest
         await self.node.process_int(self, param, app_param, raw_packet)
 
-    async def on_data(self, meta_info: MetaInfo, content: Optional[BinaryStr], raw_packet: BinaryStr):
+    async def on_data(self, meta_info: MetaInfo, content: BinaryStr | None, raw_packet: BinaryStr):
         """
         Called when a Data packet comes.
         It saves the Data packet into the cache, decrypts the content, and calls
@@ -467,7 +467,7 @@ class MatchedNode:
         # Process Data
         return await self.node.process_data(self, meta_info, content, raw_packet)
 
-    async def express(self, app_param: Optional[BinaryStr] = None, **kwargs):
+    async def express(self, app_param: BinaryStr | None = None, **kwargs):
         """
         Try to fetch the data, called by the node's need function.
         It will search the local cache, and examines the local resource.
@@ -553,7 +553,7 @@ class MatchedNode:
         """
         return self.node.provide(self, content, **kwargs)
 
-    async def put_data(self, content: Optional[BinaryStr] = None, send_packet: bool = False, **kwargs):
+    async def put_data(self, content: BinaryStr | None = None, send_packet: bool = False, **kwargs):
         """
         Generate the Data packet out of content.
         This function encrypts the content, encodes and signs the packet, saves it into the cache,

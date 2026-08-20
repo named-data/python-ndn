@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import List
 from ...encoding import Signer, SignatureType, VarBinaryStr
 
 
@@ -27,6 +26,6 @@ class NullSigner(Signer):
     def get_signature_value_size(self):
         return 0
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+    def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         wire[:] = b''
         return 0

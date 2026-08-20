@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import List, Union
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
@@ -26,7 +25,7 @@ class Sha256WithRsaSigner(Signer):
     key_locator_name: NonStrictName
     key_der: bytes
 
-    def __init__(self, key_locator_name: NonStrictName, key_der: Union[str, bytes]):
+    def __init__(self, key_locator_name: NonStrictName, key_der: str | bytes):
         self.key_locator_name = key_locator_name
         self.key_der = key_der
         self.key = RSA.import_key(self.key_der)
@@ -39,7 +38,7 @@ class Sha256WithRsaSigner(Signer):
     def get_signature_value_size(self):
         return self.key.size_in_bytes()
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+    def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         h = SHA256.new()
         for blk in contents:
             h.update(blk)

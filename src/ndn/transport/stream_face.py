@@ -18,7 +18,6 @@
 import abc
 import asyncio as aio
 import io
-from typing import Optional
 
 from ndn.transport.ip_face import IpFace
 
@@ -28,8 +27,8 @@ from .face import Face
 
 
 class StreamFace(Face, metaclass=abc.ABCMeta):
-    reader: Optional[aio.StreamReader] = None
-    writer: Optional[aio.StreamWriter] = None
+    reader: aio.StreamReader | None = None
+    writer: aio.StreamWriter | None = None
 
     def shutdown(self):
         self.running = False

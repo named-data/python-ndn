@@ -18,7 +18,6 @@
 import os
 from base64 import b64decode, b64encode
 from hashlib import sha256
-from typing import Tuple, Optional
 from Cryptodome.PublicKey import RSA, ECC
 from ...encoding import Signer, NonStrictName, Name, BinaryStr, FormalName
 from ..signer.sha256_rsa_signer import Sha256WithRsaSigner
@@ -40,7 +39,7 @@ class TpmFile(Tpm):
     def _base64_newline(src: bytes):
         return b'\n'.join(src[i*64:i*64+64] for i in range((len(src) + 63) // 64))
 
-    def get_signer(self, key_name: NonStrictName, key_locator_name: Optional[NonStrictName] = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
         key_name = Name.to_bytes(key_name)
         if key_locator_name is None:
             key_locator_name = key_name
@@ -77,7 +76,7 @@ class TpmFile(Tpm):
         except FileNotFoundError:
             pass
 
-    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
+    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> tuple[FormalName, BinaryStr]:
         if key_type == 'rsa':
             siz = kwargs.pop('key_size', 2048)
             pri_key = RSA.generate(siz)

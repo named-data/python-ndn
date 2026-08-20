@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import List
 from Cryptodome.Hash import SHA256, HMAC
 from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr
 
@@ -36,7 +35,7 @@ class HmacSha256Signer(Signer):
     def get_signature_value_size(self):
         return 32
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+    def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         h = HMAC.new(self.key_bytes, digestmod=SHA256)
         for blk in contents:
             h.update(blk)

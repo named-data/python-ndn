@@ -29,7 +29,6 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import platform
 import struct
 
@@ -834,7 +833,7 @@ class ObjCClass:
             return cls._registered_classes[name]
 
         # Otherwise create a new Python object and then initialize it.
-        objc_class = super(ObjCClass, cls).__new__(cls)
+        objc_class = super().__new__(cls)
         objc_class.ptr = ptr
         objc_class.name = name
         objc_class.instance_methods = {}   # mapping of name -> instance method
@@ -950,7 +949,7 @@ class ObjCInstance:
             return cls._cached_objects[object_ptr.value]
 
         # Otherwise, create a new ObjCInstance.
-        objc_instance = super(ObjCInstance, cls).__new__(cls)
+        objc_instance = super().__new__(cls)
         objc_instance.ptr = object_ptr
         objc_instance._as_parameter_ = object_ptr
         # Determine class of this object.
