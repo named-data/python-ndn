@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import struct
 from enum import Enum, Flag
-from typing import Optional
 from ..transport.face import Face
 from ..utils import timestamp, gen_nonce_64
 from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField, \
@@ -231,7 +230,7 @@ class CsInfo(TlvModel):
     n_misses = UintField(0x82)
 
 
-def make_command(module, command, face: Optional[Face] = None, **kwargs):
+def make_command(module, command, face: Face | None = None, **kwargs):
     ret = make_command_v2(module, command, face, **kwargs)
 
     # Timestamp and nonce
@@ -257,7 +256,7 @@ def make_command(module, command, face: Optional[Face] = None, **kwargs):
     return ret
 
 
-def make_command_v2(module, command, face: Optional[Face] = None, **kwargs):
+def make_command_v2(module, command, face: Face | None = None, **kwargs):
     # V2 returns the Command Interest name for the NDNv3 signed Interest
     # Note: this behavior is supported by NFD and YaNFD but has not been documented yet (on 06/26/2022):
     # https://redmine.named-data.net/projects/nfd/wiki/ControlCommand

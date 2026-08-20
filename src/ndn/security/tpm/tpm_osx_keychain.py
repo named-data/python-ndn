@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import sys
 import logging
-from typing import Tuple, Optional
 from ctypes import c_void_p, pointer, c_int
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA, ECC
@@ -104,7 +103,7 @@ class TpmOsxKeychain(Tpm):
             key_ref = cf.CFRetain(cf.CFDictionaryGetValue(g.dic, sec.kSecValueRef))
         return key_type, key_bits, key_ref
 
-    def get_signer(self, key_name: NonStrictName, key_locator_name: Optional[NonStrictName] = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
         key_type, key_bits, key_ref = self._get_key(key_name)
         if key_locator_name is None:
             key_locator_name = key_name
@@ -138,7 +137,7 @@ class TpmOsxKeychain(Tpm):
         else:
             raise ValueError(f'Unsupported key type {key_type}')
 
-    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> Tuple[FormalName, BinaryStr]:
+    def generate_key(self, id_name: FormalName, key_type: str = 'rsa', **kwargs) -> tuple[FormalName, BinaryStr]:
         sec = OsxSec()
         with ReleaseGuard() as g:
             logging.getLogger(__name__).debug('Generating OSX Key %s' % key_type)

@@ -175,7 +175,7 @@ class SvsInst:
                 self.timer_rst_event.clear()
             except aio.CancelledError:
                 break
-            except aio.TimeoutError:
+            except TimeoutError:
                 # The real timer triggered
                 # Note: this part is non-blocking
                 if not self.running:

@@ -124,7 +124,7 @@ class NdnDpdkUdpFace(NdnDpdkFace):
             if self.transport is not None:
                 self.transport.close()
 
-    handler: typing.Optional[PacketHandler]
+    handler: PacketHandler | None
 
     def __init__(self, gql_url: str, self_addr: str, self_port: int,
                  dpdk_addr: str, dpdk_port: int):

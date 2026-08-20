@@ -15,7 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import Union, List, Iterable
+from typing import Union
+from collections.abc import Iterable
 
 
 __all__ = ['BinaryStr', 'VarBinaryStr', 'FormalName', 'NonStrictName', 'is_binary_str']
@@ -27,10 +28,10 @@ r"""A binary string is any of :class:`bytes`, :class:`bytearray`, :class:`memory
 VarBinaryStr = Union[bytearray, memoryview]
 r"""A variant binary string is a :class:`bytearray` or a non-readonly :class:`memoryview`."""
 
-FormalName = List[BinaryStr]
+FormalName = list[BinaryStr]
 r"""A FormalName is a list of encoded Components."""
 
-NonStrictName = Union[Iterable[Union[BinaryStr, str]], str, BinaryStr]
+NonStrictName = Union[Iterable[BinaryStr | str], str, BinaryStr]
 r"""
 A NonStrictName is any of below:
 

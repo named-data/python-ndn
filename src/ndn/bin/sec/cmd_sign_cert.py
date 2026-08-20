@@ -19,7 +19,7 @@ import os
 import sys
 import base64
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from ...encoding import Name
 from ...app_support.security_v2 import parse_certificate, new_cert
 from .utils import resolve_keychain, infer_obj_name
@@ -47,7 +47,7 @@ def execute(args: argparse.Namespace):
     if args.file == '-':
         text = sys.stdin.read()
     else:
-        with open(os.path.expandvars(args.file), 'r') as f:
+        with open(os.path.expandvars(args.file)) as f:
             text = f.read()
     try:
         sign_req_data = base64.standard_b64decode(text)
@@ -89,7 +89,7 @@ def execute(args: argparse.Namespace):
         return -3
 
     if not args.not_before:
-        not_before = datetime.now(timezone.utc)
+        not_before = datetime.now(UTC)
     else:
         try:
             not_before = datetime.strptime(args.not_before, '%Y%m%dT%H%M%S')

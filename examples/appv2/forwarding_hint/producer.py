@@ -1,4 +1,3 @@
-import typing
 import logging
 from ndn import appv2
 from ndn import encoding as enc
@@ -15,10 +14,10 @@ keychain = app.default_keychain()
 
 
 @app.route('/repo/command')
-def on_cmd(name: enc.FormalName, _app_param: typing.Optional[enc.BinaryStr],
+def on_cmd(name: enc.FormalName, _app_param: enc.BinaryStr | None,
            reply: appv2.ReplyFunc, context: appv2.PktContext):
     print(f'>> I: {enc.Name.to_str(name)}, {context["int_param"]}')
-    content = "Hello, world!".encode()
+    content = b"Hello, world!"
     reply(app.make_data(name, content=content, signer=keychain.get_signer({}),
                         freshness_period=10000))
     print(f'<< D: {enc.Name.to_str(name)}')
@@ -30,7 +29,7 @@ def on_cmd(name: enc.FormalName, _app_param: typing.Optional[enc.BinaryStr],
 # The following function catches all Interests that are not handled.
 # So we can dispatch by forwarding hints.
 @app.route('/')
-def on_fwd_hint(name: enc.FormalName, app_param: typing.Optional[enc.BinaryStr],
+def on_fwd_hint(name: enc.FormalName, app_param: enc.BinaryStr | None,
                 reply: appv2.ReplyFunc, context: appv2.PktContext):
     fwd_hints = context["int_param"].forwarding_hint
     if fwd_hints:

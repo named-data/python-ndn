@@ -22,7 +22,6 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import lark
-from typing import Union
 from dataclasses import dataclass
 from ...encoding import Component
 
@@ -44,19 +43,19 @@ class Pattern:
 
 @dataclass
 class NamePat:
-    p: list[Union[ComponentValue, RuleId, Pattern]]
+    p: list[ComponentValue | RuleId | Pattern]
 
 
 @dataclass
 class FnCall:
     fn: str
-    args: list[Union[ComponentValue, Pattern]]
+    args: list[ComponentValue | Pattern]
 
 
 @dataclass
 class TagConstraint:
     pat: Pattern
-    options: list[Union[ComponentValue, Pattern, FnCall]]
+    options: list[ComponentValue | Pattern | FnCall]
 
 
 @dataclass

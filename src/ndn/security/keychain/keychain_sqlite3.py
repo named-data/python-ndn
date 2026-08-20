@@ -19,7 +19,8 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
-from typing import Iterator, Any
+from typing import Any
+from collections.abc import Iterator
 from ...encoding import FormalName, BinaryStr, NonStrictName, Name
 from ...app_support.security_v2 import self_sign
 from ..signer.sha256_digest_signer import DigestSha256Signer

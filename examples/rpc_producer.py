@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import Optional
 from ndn.app import NDNApp
 from ndn.encoding import Name, InterestParam, BinaryStr, FormalName, MetaInfo
 import logging
@@ -31,7 +30,7 @@ app = NDNApp()
 
 
 @app.route('/example/rpc')
-def on_interest(name: FormalName, param: InterestParam, app_param: Optional[BinaryStr]):
+def on_interest(name: FormalName, param: InterestParam, app_param: BinaryStr | None):
     app_param = bytes(app_param)
     print(f'>> I: {Name.to_str(name)}, {param}, {app_param}')
     if not app_param:

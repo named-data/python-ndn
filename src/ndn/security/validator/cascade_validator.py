@@ -17,7 +17,8 @@
 # -----------------------------------------------------------------------------
 import abc
 import logging
-from typing import Optional, Coroutine, Any
+from typing import Any
+from collections.abc import Coroutine
 from Cryptodome.PublicKey import ECC, RSA
 from ...encoding import FormalName, BinaryStr, SignatureType, Name, parse_data, SignaturePtrs
 from ...app import NDNApp, Validator, ValidationFailure, InterestTimeout, InterestNack
@@ -26,7 +27,7 @@ from .known_key_validator import verify_rsa, verify_hmac, verify_ecdsa
 
 class PublicKeyStorage(abc.ABC):
     @abc.abstractmethod
-    def load(self, name: FormalName) -> Optional[bytes]:
+    def load(self, name: FormalName) -> bytes | None:
         pass
 
     @abc.abstractmethod
@@ -35,7 +36,7 @@ class PublicKeyStorage(abc.ABC):
 
 
 class EmptyKeyStorage(PublicKeyStorage):
-    def load(self, name: FormalName) -> Optional[bytes]:
+    def load(self, name: FormalName) -> bytes | None:
         return None
 
     def save(self, name: FormalName, key_bits: bytes):
@@ -48,7 +49,7 @@ class MemoryKeyStorage(PublicKeyStorage):
     def __init__(self):
         self._cache = {}
 
-    def load(self, name: FormalName) -> Optional[bytes]:
+    def load(self, name: FormalName) -> bytes | None:
         return self._cache.get(Name.to_bytes(name), None)
 
     def save(self, name: FormalName, key_bits: bytes):
@@ -58,7 +59,7 @@ class MemoryKeyStorage(PublicKeyStorage):
 class CascadeChecker:
     app: NDNApp
     next_level: Validator
-    storage: Optional[PublicKeyStorage]
+    storage: PublicKeyStorage | None
     anchor_key: bytes
     anchor_name: FormalName
 

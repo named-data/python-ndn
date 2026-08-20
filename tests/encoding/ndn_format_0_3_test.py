@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import hashlib
 import pytest
-from typing import List
 from ndn.security import DigestSha256Signer
 from ndn.encoding import Name, Component, InterestParam, MetaInfo, ContentType, SignatureType, \
     make_interest, make_data, parse_interest, parse_data, DecodeError, Signer, VarBinaryStr
@@ -209,7 +208,7 @@ class TestDataMake:
             def get_signature_value_size(self) -> int:
                 return 10
 
-            def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+            def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
                 return 5
 
         name = '/test'

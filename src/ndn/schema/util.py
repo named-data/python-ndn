@@ -15,10 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import Union, List, Tuple
 from ..encoding import Name, Component, BinaryStr
 
-NamePattern = List[Union[BinaryStr, Tuple[int, int, str]]]
+NamePattern = list[BinaryStr | tuple[int, int, str]]
 r"""
 NamePattern is a list containing mixed name components and varaible patterns.
 A variable pattern is a capturing pattern that matches with exactly one name component.

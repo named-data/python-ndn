@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-import typing
 import logging
 from ndn import appv2
 from ndn import encoding as enc
@@ -32,10 +31,10 @@ keychain = app.default_keychain()
 
 
 @app.route('/example/testApp')
-def on_interest(name: enc.FormalName, _app_param: typing.Optional[enc.BinaryStr],
+def on_interest(name: enc.FormalName, _app_param: enc.BinaryStr | None,
                 reply: appv2.ReplyFunc, context: appv2.PktContext):
     print(f'>> I: {enc.Name.to_str(name)}, {context["int_param"]}')
-    content = "Hello, world!".encode()
+    content = b"Hello, world!"
     reply(app.make_data(name, content=content, signer=keychain.get_signer({}),
                         freshness_period=10000))
     print(f'<< D: {enc.Name.to_str(name)}')

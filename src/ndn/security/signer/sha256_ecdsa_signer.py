@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import List, Union
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import ECC
 from Cryptodome.Signature import DSS
@@ -29,7 +28,7 @@ class Sha256WithEcdsaSigner(Signer):
     curve_bit: int
     key_size: int
 
-    def __init__(self, key_locator_name: NonStrictName, key_der: Union[bytes, str]):
+    def __init__(self, key_locator_name: NonStrictName, key_der: bytes | str):
         self.key_locator_name = key_locator_name
         self.key_der = key_der
         self.key = ECC.import_key(self.key_der)
@@ -49,7 +48,7 @@ class Sha256WithEcdsaSigner(Signer):
     def get_signature_value_size(self):
         return self.key_size + 8
 
-    def write_signature_value(self, wire: VarBinaryStr, contents: List[VarBinaryStr]) -> int:
+    def write_signature_value(self, wire: VarBinaryStr, contents: list[VarBinaryStr]) -> int:
         h = SHA256.new()
         for blk in contents:
             h.update(blk)

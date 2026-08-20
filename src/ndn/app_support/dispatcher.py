@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import Optional
 from ..encoding import NonStrictName, Name, BinaryStr, InterestParam, FormalName
 from ..types import Route
 from ..name_tree import NameTrie, PrefixTreeNode
@@ -54,7 +53,7 @@ class Dispatcher:
         name = Name.normalize(name)
         del self._tree[name]
 
-    def dispatch(self, name: FormalName, param: InterestParam, app_param: Optional[BinaryStr]) -> bool:
+    def dispatch(self, name: FormalName, param: InterestParam, app_param: BinaryStr | None) -> bool:
         """
         Dispatch the Interest to registered callbacks using longest match.
 

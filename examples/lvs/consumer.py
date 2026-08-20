@@ -1,8 +1,7 @@
 import os
 import sys
 import logging
-from ndn.utils import timestamp
-from ndn.encoding import Name, Component, InterestParam
+from ndn.encoding import Name
 from ndn.security import TpmFile, KeychainSqlite3
 from ndn.app import NDNApp, InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 from ndn.app_support.light_versec import compile_lvs, Checker, DEFAULT_USER_FNS, lvs_validator

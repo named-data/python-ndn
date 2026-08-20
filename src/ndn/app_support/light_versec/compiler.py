@@ -23,7 +23,7 @@
 from __future__ import annotations
 
 import lark
-from typing import TypeVar, Union, Optional
+from typing import TypeVar
 from dataclasses import dataclass
 from . import parser as psr
 from . import binary as bny
@@ -83,7 +83,7 @@ class Compiler:
     @dataclass
     class RuleChain:
         id: str
-        name: list[Union[psr.ComponentValue, psr.Pattern]]
+        name: list[psr.ComponentValue | psr.Pattern]
         cons_set: list[psr.TagConstraint]
         sign_cons: list[str]
 
@@ -250,7 +250,7 @@ class Compiler:
             else:
                 self.rep_rules[rule.id.id] += cur_chains
 
-    def _generate_node(self, depth: int, context: list[RuleChain], parent: Optional[int],
+    def _generate_node(self, depth: int, context: list[RuleChain], parent: int | None,
                        previous_tags: set[int]) -> int:
         node = bny.Node()
         node.id = len(self.node_pool)

@@ -16,7 +16,8 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import logging
-from typing import Callable, Dict, Any
+from typing import Any
+from collections.abc import Callable
 from Cryptodome.PublicKey import ECC, RSA
 from Cryptodome.Signature import DSS, pkcs1_15
 from Cryptodome.Hash import SHA256
@@ -26,7 +27,7 @@ from .schema_tree import Node
 from . import policy
 
 
-Checker = Callable[[Dict[str, Any], Dict[str, Any]], bool]
+Checker = Callable[[dict[str, Any], dict[str, Any]], bool]
 
 
 class SignedBy(policy.DataValidator, policy.InterestValidator):

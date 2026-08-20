@@ -18,7 +18,6 @@
 import os
 import sys
 import argparse
-from typing import Tuple
 from ...platform import Platform
 from ...security import KeychainSqlite3
 from ...client_conf import default_keychain
@@ -65,7 +64,7 @@ def resolve_keychain(args: argparse.Namespace) -> KeychainSqlite3:
     return default_keychain(f'pib-sqlite3:{base_dir}', f'{tpm}:{tpm_path}')
 
 
-def infer_obj_name(obj_name: FormalName) -> Tuple[int, FormalName, FormalName, FormalName]:
+def infer_obj_name(obj_name: FormalName) -> tuple[int, FormalName, FormalName, FormalName]:
     if len(obj_name) > 2 and obj_name[-2] == KEY_KEYWORD:
         v = 1
         id_name = obj_name[:-2]

@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from typing import Optional
 from .tlv_type import BinaryStr, VarBinaryStr
 from .tlv_var import parse_and_check_tl
 from .tlv_model import TlvModel, UintField, BytesField, ModelField, BoolField, DecodeError
@@ -81,7 +80,7 @@ class LpPacket(TlvModel):
     lp_packet = ModelField(LpTypeNumber.LP_PACKET, LpPacketValue)
 
 
-def parse_lp_packet(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):
+def parse_lp_packet(wire: BinaryStr, with_tl: bool = True) -> (int | None, BinaryStr | None):
     """
     Parse an LpPacket, return NackReason (if exists) and the fragment.
 
@@ -115,7 +114,7 @@ def parse_lp_packet_v2(wire: BinaryStr, with_tl: bool = True) -> LpPacketValue:
     return ret
 
 
-def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (Optional[int], Optional[BinaryStr]):
+def parse_network_nack(wire: BinaryStr, with_tl: bool = True) -> (int | None, BinaryStr | None):
     if with_tl:
         wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
     markers = {}
