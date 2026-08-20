@@ -97,7 +97,7 @@ class NDNApp:
                 self.logger.warning('Unable to decode the fragment of LpPacket')
                 return
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('NetworkNack received %s, reason=%s' % (Name.to_str(name), nack_reason))
+                self.logger.debug('NetworkNack received %s, reason=%s', Name.to_str(name), nack_reason)
             self._on_nack(name, nack_reason)
         else:
             if typ == TypeNumber.INTEREST:
@@ -107,7 +107,7 @@ class NDNApp:
                     self.logger.warning('Unable to decode received packet')
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug('Interest received %s' % Name.to_str(name))
+                    self.logger.debug('Interest received %s', Name.to_str(name))
                 await self._on_interest(name, param, app_param, sig, raw_packet=data)
             elif typ == TypeNumber.DATA:
                 try:
@@ -116,7 +116,7 @@ class NDNApp:
                     self.logger.warning('Unable to decode received packet')
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug('Data received %s' % Name.to_str(name))
+                    self.logger.debug('Data received %s', Name.to_str(name))
                 await self._on_data(name, meta_info, content, sig, raw_packet=data)
             else:
                 self.logger.warning('Unable to decode received packet')
@@ -432,15 +432,15 @@ class NDNApp:
                     lifetime=1000)
                 ret = parse_response(reply)
                 if ret['status_code'] != 200:
-                    self.logger.error(f'Registration for {Name.to_str(name)} failed: '
-                                      f'{ret["status_code"]} {ret["status_text"]}')
+                    self.logger.error('Registration for %s failed: %s %s',
+                                      Name.to_str(name), ret["status_code"], ret["status_text"])
                     return False
                 else:
-                    self.logger.debug(f'Registration for {Name.to_str(name)} succeeded: '
-                                      f'{ret["status_code"]} {ret["status_text"]}')
+                    self.logger.debug('Registration for %s succeeded: %s %s',
+                                      Name.to_str(name), ret["status_code"], ret["status_text"])
                     return True
             except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
-                self.logger.error(f'Registration for {Name.to_str(name)} failed: {e.__class__.__name__}')
+                self.logger.error('Registration for %s failed: %s', Name.to_str(name), e.__class__.__name__)
                 return False
 
     async def unregister(self, name: NonStrictName) -> bool:
@@ -513,15 +513,15 @@ class NDNApp:
                            app_param: BinaryStr | None, sig: SignaturePtrs, raw_packet: BinaryStr):
         trie_step = self._prefix_tree.longest_prefix(name)
         if not trie_step:
-            self.logger.warning('No route: %s' % name)
+            self.logger.warning('No route: %s', name)
             return
         node = trie_step.value
         if node.callback is None:
-            self.logger.warning('No callback: %s' % name)
+            self.logger.warning('No callback: %s', name)
             return
         if app_param is not None or sig.signature_info is not None:
             if not await params_sha256_checker(name, sig):
-                self.logger.warning('Drop malformed Interest: %s' % name)
+                self.logger.warning('Drop malformed Interest: %s', name)
                 return
 
         # In case the validator blocks the pipeline, create a task
@@ -532,7 +532,7 @@ class NDNApp:
             else:
                 valid = True
             if not valid:
-                self.logger.warning('Drop unvalidated Interest: %s' % name)
+                self.logger.warning('Drop unvalidated Interest: %s', name)
                 return
             if node.extra_param:
                 kwargs = {}

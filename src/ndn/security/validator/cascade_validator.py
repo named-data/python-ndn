@@ -93,7 +93,7 @@ class CascadeChecker:
             return False
         # Obtain public key
         cert_name = sig_ptrs.signature_info.key_locator.name
-        self.logger.debug(f'Verifying {Name.to_str(name)} <- {Name.to_str(cert_name)} ...')
+        self.logger.debug('Verifying %s <- %s ...', Name.to_str(name), Name.to_str(cert_name))
         if cert_name == self.anchor_name:
             self.logger.debug('Use trust anchor.')
             key_bits = self.anchor_key

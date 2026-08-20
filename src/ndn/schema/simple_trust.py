@@ -81,27 +81,27 @@ class SignedBy(policy.DataValidator, policy.InterestValidator):
     async def validate(self, match, sig_ptrs: SignaturePtrs) -> bool:
         # Check key name
         if sig_ptrs.signature_info is None or sig_ptrs.signature_info.key_locator is None:
-            self.logger.info(f'{Name.to_str(match.name)} => Not signed')
+            self.logger.info('%s => Not signed', Name.to_str(match.name))
             return False
         key_name = sig_ptrs.signature_info.key_locator.name
         if not key_name:
-            self.logger.info(f'{Name.to_str(match.name)} => Not signed')
+            self.logger.info('%s => Not signed', Name.to_str(match.name))
             return False
         key_match = match.root.match(key_name)
         if key_match.node is not self.key:
-            self.logger.info(f'{Name.to_str(match.name)} => The key name {Name.to_str(key_name)} mismatch')
+            self.logger.info('%s => The key name %s mismatch', Name.to_str(match.name), Name.to_str(key_name))
             return False
         if self.subject_to and not self.subject_to(match.env, key_match.env):
-            self.logger.info(f'{Name.to_str(match.name)} => The key name {Name.to_str(key_name)} mismatch')
+            self.logger.info('%s => The key name %s mismatch', Name.to_str(match.name), Name.to_str(key_name))
             return False
         # Get key_bits
         try:
             key_bits, _ = await key_match.need(must_be_fresh=True, can_be_prefix=True)
         except (NetworkError, InterestNack, InterestTimeout) as e:
-            self.logger.info(f'{Name.to_str(match.name)} => Unable to fetch the key {Name.to_str(key_name)} due to {e}')
+            self.logger.info('%s => Unable to fetch the key %s due to %s', Name.to_str(match.name), Name.to_str(key_name), e)
             return False
         except ValidationFailure:
-            self.logger.info(f'{Name.to_str(match.name)} => The key {Name.to_str(key_name)} cannot be verified')
+            self.logger.info('%s => The key %s cannot be verified', Name.to_str(match.name), Name.to_str(key_name))
             return False
         # Import key
         sig_type = sig_ptrs.signature_info.signature_type
@@ -114,10 +114,10 @@ class SignedBy(policy.DataValidator, policy.InterestValidator):
                 pub_key = ECC.import_key(key_bits)
                 verifier = DSS.new(pub_key, 'fips-186-3', 'der')
             else:
-                self.logger.info(f'{Name.to_str(match.name)} => Unrecognized signature type {sig_type}')
+                self.logger.info('%s => Unrecognized signature type %s', Name.to_str(match.name), sig_type)
                 return False
         except (ValueError, IndexError, TypeError):
-            self.logger.info(f'{Name.to_str(match.name)} => The key {Name.to_str(key_name)} is malformed')
+            self.logger.info('%s => The key %s is malformed', Name.to_str(match.name), Name.to_str(key_name))
             return False
         # Verify signature
         h = SHA256.new()
@@ -126,7 +126,7 @@ class SignedBy(policy.DataValidator, policy.InterestValidator):
         try:
             verifier.verify(h, bytes(sig_ptrs.signature_value_buf))
         except ValueError:
-            self.logger.info(f'{Name.to_str(match.name)} => Unable to verify the signature')
+            self.logger.info('%s => Unable to verify the signature', Name.to_str(match.name))
             return False
-        self.logger.debug(f'{Name.to_str(match.name)} => Verification passed')
+        self.logger.debug('%s => Verification passed', Name.to_str(match.name))
         return True

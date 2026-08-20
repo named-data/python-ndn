@@ -269,7 +269,7 @@ class NDNApp:
                 self.logger.warning('Unable to decode the fragment of LpPacket')
                 return
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('NetworkNack received %s, reason=%s' % (enc.Name.to_str(name), nack_reason))
+                self.logger.debug('NetworkNack received %s, reason=%s', enc.Name.to_str(name), nack_reason)
             self._on_nack(name, nack_reason)
         else:
             if typ == enc.TypeNumber.INTEREST:
@@ -280,10 +280,10 @@ class NDNApp:
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
                     if pit_token:
-                        self.logger.debug(
-                            f'Interest received {enc.Name.to_str(name)} w/ token={bytes(pit_token).hex()}')
+                        self.logger.debug('Interest received %s w/ token=%s',
+                                          enc.Name.to_str(name), bytes(pit_token).hex())
                     else:
-                        self.logger.debug(f'Interest received {enc.Name.to_str(name)}')
+                        self.logger.debug('Interest received %s', enc.Name.to_str(name))
                 await self._on_interest(name, pit_token, param, app_param, sig, raw_packet=data)
             elif typ == enc.TypeNumber.DATA:
                 try:
@@ -292,7 +292,7 @@ class NDNApp:
                     self.logger.warning('Unable to decode received packet')
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug(f'Data received {enc.Name.to_str(name)}')
+                    self.logger.debug('Data received %s', enc.Name.to_str(name))
                 await self._on_data(name, meta_info, content, sig, raw_packet=data)
             else:
                 self.logger.warning('Unable to decode received packet')
@@ -330,16 +330,16 @@ class NDNApp:
                            raw_packet: enc.BinaryStr):
         trie_step = self._fib.longest_prefix(name)
         if not trie_step:
-            self.logger.warning('No route: %s' % name)
+            self.logger.warning('No route: %s', name)
             return
         node: PrefixTreeNode = trie_step.value
         if node.callback is None:
-            self.logger.warning('No callback: %s' % name)
+            self.logger.warning('No callback: %s', name)
             return
         sig_required = app_param is not None or sig.signature_info is not None
         if sig_required:
             if not await sec.params_sha256_checker(name, sig):
-                self.logger.warning('Drop malformed Interest: %s' % name)
+                self.logger.warning('Drop malformed Interest: %s', name)
                 return
 
         # Use context to handle misc parameters
@@ -358,7 +358,7 @@ class NDNApp:
         def reply(data: enc.BinaryStr) -> bool:
             now = utils.timestamp()
             if now > deadline:
-                self.logger.warning(f'Deadline passed, unable to reply to {enc.Name.to_str(name)}')
+                self.logger.warning('Deadline passed, unable to reply to %s', enc.Name.to_str(name))
                 return False
             if pit_token is None:
                 self._put_raw_packet(data)
@@ -380,7 +380,7 @@ class NDNApp:
             if valid == ValidResult.PASS or valid == ValidResult.ALLOW_BYPASS:
                 node.callback(name, app_param, reply, context)
             else:
-                self.logger.warning('Drop unvalidated Interest: %s' % name)
+                self.logger.warning('Drop unvalidated Interest: %s', name)
                 return
         aio.create_task(submit_interest())
 
