@@ -18,7 +18,7 @@
 import argparse
 from base64 import standard_b64encode
 from ...encoding import Name, SignatureType
-from ...app_support.security_v2 import parse_certificate
+from ...app_support.security_v2_2 import parse_certificate
 from .utils import resolve_keychain
 
 

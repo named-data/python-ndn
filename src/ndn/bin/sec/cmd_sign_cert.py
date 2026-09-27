@@ -21,7 +21,7 @@ import base64
 import argparse
 from datetime import datetime, timedelta, UTC
 from ...encoding import Name
-from ...app_support.security_v2 import parse_certificate, new_cert
+from ...app_support.security_v2_2 import parse_certificate, new_cert
 from .utils import resolve_keychain, infer_obj_name
 
 

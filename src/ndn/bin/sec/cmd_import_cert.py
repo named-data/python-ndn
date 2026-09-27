@@ -20,7 +20,7 @@ import os
 import sys
 import argparse
 from ...encoding import Name
-from ...app_support.security_v2 import parse_certificate
+from ...app_support.security_v2_2 import parse_certificate
 from .utils import resolve_keychain
 
 

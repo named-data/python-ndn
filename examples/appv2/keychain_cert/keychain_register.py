@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import logging
-from ndn import appv2
+from ndn import appv2_2
 from ndn.app_support.keychain_register import attach_keychain_register
 
 
@@ -26,7 +26,7 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
                     style='{')
 
 
-app = appv2.NDNApp()
+app = appv2_2.NDNApp()
 keychain = app.default_keychain()
 attach_keychain_register(keychain, app)
 

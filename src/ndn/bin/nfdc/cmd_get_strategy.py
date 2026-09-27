@@ -16,9 +16,10 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...appv2 import NDNApp
+from ...appv2_2 import NDNApp
 from ...encoding import Name
-from ...app_support.nfd_mgmt import StrategyChoiceMsg
+from ...encoding.tlv_model_v2 import tlv_parse
+from ...app_support.nfd_mgmt_2 import StrategyChoiceMsg
 from .utils import express_interest
 
 
@@ -36,7 +37,7 @@ def execute(args: argparse.Namespace):
     async def list_strategy():
         try:
             data = await express_interest(app, "/localhost/nfd/strategy-choice/list")
-            msg = StrategyChoiceMsg.parse(data)
+            msg = tlv_parse(StrategyChoiceMsg, data)
             for s in msg.strategy_choices:
                 s_prefix = Name.to_str(s.name)
                 if prefix and s_prefix != prefix:

@@ -18,7 +18,7 @@
 import argparse
 import base64
 from ...encoding import Name
-from ...app_support.security_v2 import sign_req
+from ...app_support.security_v2_2 import sign_req
 from .utils import resolve_keychain, infer_obj_name
 
 

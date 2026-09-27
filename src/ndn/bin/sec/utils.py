@@ -21,7 +21,7 @@ import argparse
 from ...platform import Platform
 from ...security import KeychainSqlite3
 from ...client_conf import default_keychain
-from ...app_support.security_v2 import KEY_COMPONENT
+from ...app_support.security_v2_2 import KEY_COMPONENT
 from ...encoding import Name, FormalName
 
 

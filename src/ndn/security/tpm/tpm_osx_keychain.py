@@ -94,9 +94,9 @@ class TpmOsxKeychain(Tpm):
             g.dic = c_void_p()
             ret = sec.security.SecItemCopyMatching(g.query, pointer(g.dic))
             if ret == sec.errSecItemNotFound:
-                raise KeyError(f"Unable to find key {key_name}")
+                raise KeyError(f"Unable to find key {Name.to_str(key_name)}")
             elif ret != sec.errSecSuccess:
-                raise RuntimeError(f"Error happened when searching specific key {key_name}")
+                raise RuntimeError(f"Error happened when searching specific key {Name.to_str(key_name)}")
 
             key_type = cfstring_to_string(cf.CFDictionaryGetValue(g.dic, sec.kSecAttrKeyType))
             key_bits = cfnumber_to_number(cf.CFDictionaryGetValue(g.dic, sec.kSecAttrKeySizeInBits))

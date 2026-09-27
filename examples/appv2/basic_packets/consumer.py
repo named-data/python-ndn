@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import logging
-from ndn import utils, appv2, types
+from ndn import utils, appv2_2, types
 from ndn import encoding as enc
 
 
@@ -26,7 +26,7 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
                     style='{')
 
 
-app = appv2.NDNApp()
+app = appv2_2.NDNApp()
 
 
 async def main():
@@ -36,7 +36,7 @@ async def main():
         print(f'Sending Interest {enc.Name.to_str(name)}, {enc.InterestParam(must_be_fresh=True, lifetime=6000)}')
         # TODO: Write a better validator
         data_name, content, pkt_context = await app.express(
-            name, validator=appv2.pass_all,
+            name, validator=appv2_2.pass_all,
             must_be_fresh=True, can_be_prefix=False, lifetime=6000)
 
         print(f'Received Data Name: {enc.Name.to_str(data_name)}')

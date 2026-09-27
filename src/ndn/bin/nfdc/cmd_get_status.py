@@ -17,8 +17,9 @@
 # -----------------------------------------------------------------------------
 import argparse
 import datetime
-from ...appv2 import NDNApp
-from ...app_support.nfd_mgmt import GeneralStatus
+from ...appv2_2 import NDNApp
+from ...encoding.tlv_model_v2 import tlv_parse
+from ...app_support.nfd_mgmt_2 import GeneralStatus
 from .utils import express_interest
 
 
@@ -34,7 +35,7 @@ def execute(_args: argparse.Namespace):
         try:
             data = await express_interest(app, "/localhost/nfd/status/general")
 
-            msg = GeneralStatus.parse(data)
+            msg = tlv_parse(GeneralStatus, data)
 
             print('General status:')
             print(f'{"version":>25}\t{msg.nfd_version}')
