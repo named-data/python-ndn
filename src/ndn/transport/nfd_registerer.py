@@ -21,7 +21,7 @@ from .. import encoding as enc
 from .. import security as sec
 from .. import types
 from .. import utils
-from ..app_support import nfd_mgmt
+from ..app_support import nfd_mgmt, nfd_mgmt_2
 from .prefix_registerer import PrefixRegisterer
 
 
@@ -32,6 +32,7 @@ async def pass_all(_name, _sig, _context):
 class NfdRegister(PrefixRegisterer):
     _prefix_register_semaphore: aio.Semaphore = None
     _last_command_timestamp: int = 0
+    mgmt = nfd_mgmt
 
     def __init__(self):
         super().__init__()
@@ -48,11 +49,11 @@ class NfdRegister(PrefixRegisterer):
                 await aio.sleep(0.001)
             try:
                 _, reply, _ = await self.app.express(
-                    name=nfd_mgmt.make_command_v2('rib', 'register', self.app.face, name=name),
+                    name=self.mgmt.make_command_v2('rib', 'register', self.app.face, name=name),
                     app_param=b'', signer=sec.DigestSha256Signer(for_interest=True),
                     validator=pass_all,
                     lifetime=1000)
-                ret = nfd_mgmt.parse_response(reply)
+                ret = self.mgmt.parse_response(reply)
                 if ret['status_code'] != 200:
                     logging.getLogger(__name__).error('Registration for %s failed: %s %s',
                                                       enc.Name.to_str(name), ret["status_code"], ret["status_text"])
@@ -77,9 +78,13 @@ class NfdRegister(PrefixRegisterer):
                 await aio.sleep(0.001)
             try:
                 await self.app.express(
-                    nfd_mgmt.make_command_v2('rib', 'unregister', self.app.face, name=name),
+                    self.mgmt.make_command_v2('rib', 'unregister', self.app.face, name=name),
                     app_param=b'', signer=sec.DigestSha256Signer(for_interest=True),
                     validator=pass_all, lifetime=1000)
                 return True
             except (types.InterestNack, types.InterestTimeout, types.InterestCanceled, types.ValidationFailure):
                 return False
+
+
+class NfdRegister2(NfdRegister):
+    mgmt = nfd_mgmt_2

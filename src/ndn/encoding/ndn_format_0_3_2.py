@@ -14,7 +14,7 @@ from .tlv_var import get_tl_num_size, parse_and_check_tl, write_tl_num
 
 __all__ = [
     'TypeNumber', 'ContentType', 'SignatureType', 'KeyLocator',
-    'SignatureInfo',
+    'SignatureInfo', 'write_signature_info',
     'Links', 'MetaInfo', 'InterestParam', 'SignaturePtrs', 'make_interest',
     'make_data', 'parse_interest', 'parse_data', 'Interest', 'Data',
 ]
@@ -91,6 +91,20 @@ class SignatureInfo:
         default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_TIME})
     signature_seq_num: Optional[int] = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_SEQ_NUM})
+
+
+def write_signature_info(signer: Signer, signature_info: SignatureInfo) -> None:
+    """
+    Let *signer* fill *signature_info*.
+
+    Signers still assign the v1 ``KeyLocator`` model, which the dataclass
+    encoder cannot serialize, so it is converted to :class:`KeyLocator`.
+    """
+    signer.write_signature_info(signature_info)
+    key_locator = signature_info.key_locator
+    if key_locator is not None and not isinstance(key_locator, KeyLocator):
+        signature_info.key_locator = KeyLocator(
+            name=key_locator.name, key_digest=key_locator.key_digest)
 
 
 @dc.dataclass
@@ -255,7 +269,7 @@ def make_interest(name: NonStrictName,
             names=list(interest_param.forwarding_hint))
     if signer is not None:
         value.signature_info = SignatureInfo()
-        signer.write_signature_info(value.signature_info)
+        write_signature_info(signer, value.signature_info)
         if value.application_parameters is None:
             value.application_parameters = b''
 
@@ -280,7 +294,7 @@ def make_data(name: NonStrictName,
     value = DataPacketValue(name=name, meta_info=meta_info, content=content)
     if signer is not None:
         value.signature_info = SignatureInfo()
-        signer.write_signature_info(value.signature_info)
+        write_signature_info(signer, value.signature_info)
     encoded_value = tlv_encode(value, markers={'##signer': signer})
     return _wrap_tlv(TypeNumber.DATA, encoded_value)
 

@@ -98,6 +98,7 @@ Signature machinery markers (set by tlv_encode / tlv_parse internally):
 import dataclasses
 import struct
 import typing
+import weakref
 from enum import Enum, Flag
 from hashlib import sha256
 from types import UnionType
@@ -220,6 +221,69 @@ def _map_val_meta(metadata: dict) -> dict:
     if 'ignore_critical' in metadata:
         m['ignore_critical'] = metadata['ignore_critical']
     return m
+
+
+# ---------------------------------------------------------------------------
+# Per-class schema cache
+# ---------------------------------------------------------------------------
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _FieldSpec:
+    """Everything the encoder/parser needs about one field, resolved once."""
+    name: str
+    kind: str
+    metadata: typing.Mapping
+    annotation: typing.Any
+    tlv_type: typing.Optional[int]
+    enum_cls: typing.Optional[type] = None
+    elem: typing.Optional['_FieldSpec'] = None
+    key: typing.Optional['_FieldSpec'] = None
+    val: typing.Optional['_FieldSpec'] = None
+
+
+def _make_spec(name: str, annotation, metadata) -> _FieldSpec:
+    kind = _infer_kind(annotation, metadata)
+    annotation = _unwrap_optional(annotation)
+    enum_cls = elem = key = val = None
+    if kind == 'uint' and isinstance(annotation, type) and issubclass(annotation, (Enum, Flag)):
+        enum_cls = annotation
+    elif kind == 'repeated':
+        elem = _make_spec(name, _element_annotation(annotation), metadata)
+    elif kind == 'map':
+        key_ann, val_ann = _map_annotations(annotation)
+        key = _make_spec(name, key_ann, _map_key_meta(metadata))
+        val = _make_spec(name, val_ann, _map_val_meta(metadata))
+    return _FieldSpec(name, kind, metadata, annotation, metadata.get('tlv_type'),
+                      enum_cls, elem, key, val)
+
+
+_SCHEMA_CACHE: 'weakref.WeakKeyDictionary[type, tuple[_FieldSpec, ...]]' = weakref.WeakKeyDictionary()
+
+
+def _get_schema(cls) -> tuple[_FieldSpec, ...]:
+    """
+    Return the TLV field specs of dataclass *cls* in declaration order.
+
+    Built on first use rather than at class definition so that forward
+    references to classes defined later in the same module can be resolved.
+    Fields with neither ``tlv_type`` nor ``field_type`` metadata are skipped.
+    """
+    try:
+        return _SCHEMA_CACHE[cls]
+    except KeyError:
+        pass
+    hints = typing.get_type_hints(cls)
+    specs = []
+    for f in dataclasses.fields(cls):
+        if 'tlv_type' not in f.metadata and 'field_type' not in f.metadata:
+            continue
+        spec = _make_spec(f.name, hints[f.name], f.metadata)
+        if spec.kind not in _ZERO_WIRE_KINDS and spec.tlv_type is None:
+            continue
+        specs.append(spec)
+    schema = tuple(specs)
+    _SCHEMA_CACHE[cls] = schema
+    return schema
 
 
 # ---------------------------------------------------------------------------
@@ -400,8 +464,7 @@ def _uint_value_len(val: int, fname: str, fixed_len) -> int:
     return n
 
 
-def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict,
-                           markers: dict) -> int:
+def _encoded_length_field(fname: str, val, spec: _FieldSpec, markers: dict) -> int:
     """
     Compute the encoded byte count of one TLV field (T + L + V).
 
@@ -410,6 +473,7 @@ def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict
     subclasses.  Returns 0 when the field is absent (*val* is ``None``/falsy
     for bool).
     """
+    kind = spec.kind
     # Zero-wire kinds: handled before looking up tlv_type.
     if kind == 'offset_marker':
         return 0
@@ -418,16 +482,16 @@ def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict
         signer = markers.get('##signer')
         if signer is None:
             return 0
-        type_num = metadata['tlv_type']
+        type_num = spec.tlv_type
         sig_size = signer.get_signature_value_size()
         markers[f'{fname}##sig_size'] = sig_size
         markers.setdefault('##sig_covered_part', [])
         return get_tl_num_size(type_num) + get_tl_num_size(sig_size) + sig_size
 
     if kind == 'interest_name':
-        return _encoded_length_interest_name(fname, val, metadata, markers)
+        return _encoded_length_interest_name(fname, val, spec.metadata, markers)
 
-    type_num = metadata['tlv_type']
+    type_num = spec.tlv_type
 
     # BoolField: present if truthy, absent otherwise
     if kind == 'bool':
@@ -441,7 +505,7 @@ def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict
             val = val.value
         if not isinstance(val, int) or val < 0:
             raise TypeError(f'{fname}={val!r} is not a non-negative integer')
-        fixed_len = metadata.get('fixed_len')
+        fixed_len = spec.metadata.get('fixed_len')
         vlen = _uint_value_len(val, fname, fixed_len)
         markers[f'{fname}##encoded_length'] = vlen
         # L for uint is always 1 byte because vlen ∈ {1,2,4,8} < 253
@@ -489,28 +553,20 @@ def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict
     if kind == 'repeated':
         if not val:
             return 0
-        elem_ann = _element_annotation(annotation)
-        elem_kind = _infer_kind(elem_ann, metadata)
+        elem = spec.elem
         total = 0
         for i, ele in enumerate(val):
-            total += _encoded_length_field(
-                f'{fname}[{i}]', ele, elem_kind, elem_ann, metadata, markers)
+            total += _encoded_length_field(f'{fname}[{i}]', ele, elem, markers)
         return total
 
     if kind == 'map':
         if not val:
             return 0
-        key_ann, val_ann = _map_annotations(annotation)
-        key_meta = _map_key_meta(metadata)
-        vl_meta  = _map_val_meta(metadata)
-        key_kind = _infer_kind(key_ann, key_meta)
-        vl_kind  = _infer_kind(val_ann, vl_meta)
+        key_spec, val_spec = spec.key, spec.val
         total = 0
         for i, (k, v) in enumerate(val.items()):
-            total += _encoded_length_field(
-                f'{fname}[{i}#k]', k, key_kind, key_ann, key_meta, markers)
-            total += _encoded_length_field(
-                f'{fname}[{i}#v]', v, vl_kind,  val_ann, vl_meta,  markers)
+            total += _encoded_length_field(f'{fname}[{i}#k]', k, key_spec, markers)
+            total += _encoded_length_field(f'{fname}[{i}#v]', v, val_spec, markers)
         return total
 
     raise TypeError(f'Unknown field kind {kind!r} for {fname!r}')
@@ -518,16 +574,9 @@ def _encoded_length_field(fname: str, val, kind: str, annotation, metadata: dict
 
 def _encoded_length_model(obj, markers: dict) -> int:
     """Compute the total encoded length for all TLV fields of a dataclass object."""
-    cls = type(obj)
-    hints = typing.get_type_hints(cls)
     total = 0
-    for f in dataclasses.fields(cls):
-        ann = hints[f.name]
-        kind = _infer_kind(ann, f.metadata)
-        if kind not in _ZERO_WIRE_KINDS and 'tlv_type' not in f.metadata:
-            continue
-        total += _encoded_length_field(
-            f.name, getattr(obj, f.name), kind, ann, f.metadata, markers)
+    for spec in _get_schema(type(obj)):
+        total += _encoded_length_field(spec.name, getattr(obj, spec.name), spec, markers)
     markers['##encoded_length'] = total
     return total
 
@@ -536,7 +585,7 @@ def _encoded_length_model(obj, markers: dict) -> int:
 # Encoding — pass 2: write bytes
 # ---------------------------------------------------------------------------
 
-def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
+def _encode_into_field(fname: str, val, spec: _FieldSpec,
                        markers: dict, wire: VarBinaryStr, offset: int) -> int:
     """
     Write one TLV field into *wire* at *offset*.
@@ -545,6 +594,8 @@ def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
     Returns the number of bytes written.  Must be called after the matching
     :func:`_encoded_length_field` call so that ``markers`` is populated.
     """
+    kind = spec.kind
+    metadata = spec.metadata
     # Zero-wire kinds: handled before looking up tlv_type.
     if kind == 'offset_marker':
         markers[fname] = offset
@@ -554,7 +605,7 @@ def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
         signer = markers.get('##signer')
         if signer is None:
             return 0
-        type_num = metadata['tlv_type']
+        type_num = spec.tlv_type
         sig_size = markers[f'{fname}##sig_size']
         # Collect the covered region: from cover_start up to current offset.
         cover_start_field = metadata.get('cover_start')
@@ -576,7 +627,7 @@ def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
     if kind == 'interest_name':
         return _encode_into_interest_name(fname, val, metadata, markers, wire, offset)
 
-    type_num = metadata['tlv_type']
+    type_num = spec.tlv_type
 
     if kind == 'bool':
         if val:
@@ -634,31 +685,23 @@ def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
     if kind == 'repeated':
         if not val:
             return 0
-        elem_ann = _element_annotation(annotation)
-        elem_kind = _infer_kind(elem_ann, metadata)
+        elem = spec.elem
         total = 0
         for i, ele in enumerate(val):
             total += _encode_into_field(
-                f'{fname}[{i}]', ele, elem_kind, elem_ann, metadata, markers,
-                wire, offset + total)
+                f'{fname}[{i}]', ele, elem, markers, wire, offset + total)
         return total
 
     if kind == 'map':
         if not val:
             return 0
-        key_ann, val_ann = _map_annotations(annotation)
-        key_meta = _map_key_meta(metadata)
-        vl_meta  = _map_val_meta(metadata)
-        key_kind = _infer_kind(key_ann, key_meta)
-        vl_kind  = _infer_kind(val_ann, vl_meta)
+        key_spec, val_spec = spec.key, spec.val
         total = 0
         for i, (k, v) in enumerate(val.items()):
             total += _encode_into_field(
-                f'{fname}[{i}#k]', k, key_kind, key_ann, key_meta, markers,
-                wire, offset + total)
+                f'{fname}[{i}#k]', k, key_spec, markers, wire, offset + total)
             total += _encode_into_field(
-                f'{fname}[{i}#v]', v, vl_kind,  val_ann, vl_meta,  markers,
-                wire, offset + total)
+                f'{fname}[{i}#v]', v, val_spec, markers, wire, offset + total)
         return total
 
     raise TypeError(f'Unknown field kind {kind!r} for {fname!r}')
@@ -666,15 +709,9 @@ def _encode_into_field(fname: str, val, kind: str, annotation, metadata: dict,
 
 def _encode_into_model(obj, markers: dict, wire: VarBinaryStr, offset: int) -> None:
     """Write all TLV fields of a dataclass object into *wire* starting at *offset*."""
-    cls = type(obj)
-    hints = typing.get_type_hints(cls)
-    for f in dataclasses.fields(cls):
-        ann = hints[f.name]
-        kind = _infer_kind(ann, f.metadata)
-        if kind not in _ZERO_WIRE_KINDS and 'tlv_type' not in f.metadata:
-            continue
+    for spec in _get_schema(type(obj)):
         offset += _encode_into_field(
-            f.name, getattr(obj, f.name), kind, ann, f.metadata, markers, wire, offset)
+            spec.name, getattr(obj, spec.name), spec, markers, wire, offset)
 
 
 # ---------------------------------------------------------------------------
@@ -742,16 +779,14 @@ def _make_default_instance(cls):
     return obj
 
 
-def _parse_value(fname: str, kind: str, annotation, metadata: dict,
+def _parse_value(fname: str, spec: _FieldSpec,
                  wire, offset: int, length: int, offset_btl: int,
                  ignore_critical: bool):
     """
     Parse a single TLV *value* (V only, not T or L) from *wire*.
 
     :param fname: field name (for error messages).
-    :param kind: field kind string.
-    :param annotation: resolved Python type annotation.
-    :param metadata: dataclass field metadata dict.
+    :param spec: resolved field spec.
     :param wire: memoryview of the full wire buffer.
     :param offset: byte offset of V within *wire*.
     :param length: byte length of V.
@@ -760,6 +795,7 @@ def _parse_value(fname: str, kind: str, annotation, metadata: dict,
     :param ignore_critical: forwarded to nested ``tlv_parse`` calls.
     :return: the parsed Python value.
     """
+    kind = spec.kind
     if kind == 'bool':
         return True
 
@@ -776,12 +812,9 @@ def _parse_value(fname: str, kind: str, annotation, metadata: dict,
             raise ValueError(
                 f'{fname}: uint value length must be 1, 2, 4, or 8; got {length}')
         # Auto-convert to the annotated Enum/Flag type if applicable
-        inner = _unwrap_optional(annotation)
-        if (isinstance(inner, type)
-                and issubclass(inner, (Enum, Flag))
-                and inner is not int):
+        if spec.enum_cls is not None:
             try:
-                return inner(raw)
+                return spec.enum_cls(raw)
             except ValueError:
                 pass
         return raw
@@ -796,9 +829,8 @@ def _parse_value(fname: str, kind: str, annotation, metadata: dict,
         return Name.decode(wire, offset_btl)[0]
 
     if kind == 'model':
-        inner_cls = _unwrap_optional(annotation)
-        ignore = metadata.get('ignore_critical', ignore_critical)
-        return tlv_parse(inner_cls, wire[offset:offset + length], ignore)
+        ignore = spec.metadata.get('ignore_critical', ignore_critical)
+        return tlv_parse(spec.annotation, wire[offset:offset + length], ignore)
 
     raise TypeError(f'Unknown kind {kind!r} for {fname!r}')
 
@@ -836,14 +868,7 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
     else:
         mv = memoryview(wire if isinstance(wire, (bytes, bytearray)) else bytes(wire))
 
-    hints = typing.get_type_hints(cls)
-    ordered = []
-    for f in dataclasses.fields(cls):
-        ann = hints[f.name]
-        kind = _infer_kind(ann, f.metadata)
-        if kind not in _ZERO_WIRE_KINDS and 'tlv_type' not in f.metadata:
-            continue
-        ordered.append((f.name, f.metadata, kind, ann))
+    ordered = _get_schema(cls)
 
     obj = _make_default_instance(cls)
     offset = 0
@@ -858,23 +883,22 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
 
         found = False
         for i in range(field_pos, len(ordered)):
-            fname, meta, kind, ann = ordered[i]
+            spec = ordered[i]
+            kind = spec.kind
             if kind == 'offset_marker':
                 continue                        # never matches a wire TLV type
 
-            if meta['tlv_type'] != typ:
+            if spec.tlv_type != typ:
                 continue
 
+            fname = spec.name
             # Advance any offset_markers between field_pos and i.
             for j in range(field_pos, i):
-                jname, _, jkind, _ = ordered[j]
-                if jkind == 'offset_marker':
-                    markers[jname] = offset_btl
+                if ordered[j].kind == 'offset_marker':
+                    markers[ordered[j].name] = offset_btl
 
             if kind == 'repeated':
-                elem_ann = _element_annotation(ann)
-                elem_kind = _infer_kind(elem_ann, meta)
-                val = _parse_value(fname, elem_kind, elem_ann, meta,
+                val = _parse_value(fname, spec.elem,
                                    mv, offset, length, offset_btl, ignore_critical)
                 lst = getattr(obj, fname)
                 if lst is None:
@@ -885,19 +909,13 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
 
             elif kind == 'map':
                 # Two-phase parse: consume key, then immediately read value TLV.
-                key_ann, val_ann = _map_annotations(ann)
-                key_meta = _map_key_meta(meta)
-                vl_meta  = _map_val_meta(meta)
-                key_kind = _infer_kind(key_ann, key_meta)
-                vl_kind  = _infer_kind(val_ann, vl_meta)
-
                 dct = getattr(obj, fname)
                 if dct is None:
                     dct = {}
                     object.__setattr__(obj, fname, dct)
                 idx = len(dct)
 
-                key = _parse_value(f'{fname}[{idx}#k]', key_kind, key_ann, key_meta,
+                key = _parse_value(f'{fname}[{idx}#k]', spec.key,
                                    mv, offset, length, offset_btl, ignore_critical)
 
                 # advance past key value → now at the value TLV
@@ -908,7 +926,7 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
                 length, _sz_l2 = parse_tl_num(mv, offset)
                 offset += _sz_l2
 
-                val = _parse_value(f'{fname}[{idx}#v]', vl_kind, val_ann, vl_meta,
+                val = _parse_value(f'{fname}[{idx}#v]', spec.val,
                                    mv, offset, length, offset_btl, ignore_critical)
                 dct[key] = val
                 field_pos = i                   # stay at i to accept more pairs
@@ -917,7 +935,7 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
                 # Extract sig buffer; append covered region to ##sig_covered_part.
                 sig_buf = mv[offset:offset + length]
                 markers['##sig_value_buf'] = sig_buf
-                cover_start_field = meta.get('cover_start')
+                cover_start_field = spec.metadata.get('cover_start')
                 if cover_start_field is not None:
                     cover_start = markers.get(cover_start_field)
                     if cover_start is not None:
@@ -939,7 +957,7 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
                 field_pos = i + 1
 
             else:
-                val = _parse_value(fname, kind, ann, meta,
+                val = _parse_value(fname, spec,
                                    mv, offset, length, offset_btl, ignore_critical)
                 object.__setattr__(obj, fname, val)
                 field_pos = i + 1

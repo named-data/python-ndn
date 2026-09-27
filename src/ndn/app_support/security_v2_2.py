@@ -31,10 +31,10 @@ from ..encoding.tlv_model_v2 import tlv_encode, tlv_parse
 from ..encoding.ndn_format_0_3_2 import (
     ContentType,
     DataPacketValue,
-    KeyLocator,
     MetaInfo,
     SignatureInfo,
     TypeNumber,
+    write_signature_info,
 )
 
 
@@ -144,14 +144,7 @@ def new_cert(key_name, issuer_id_component, pub_key, signer,
             not_after=not_after,
         ),
     )
-    signer.write_signature_info(signature_info)
-    if (signature_info.key_locator is not None
-            and not isinstance(signature_info.key_locator, KeyLocator)):
-        old_key_locator = signature_info.key_locator
-        signature_info.key_locator = KeyLocator(
-            name=old_key_locator.name,
-            key_digest=old_key_locator.key_digest,
-        )
+    write_signature_info(signer, signature_info)
     cert_val = CertificateV2Value(
         name=cert_name,
         content=pub_key,

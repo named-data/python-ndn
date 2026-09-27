@@ -1,6 +1,7 @@
 import hashlib
 
 from ndn.encoding import Name
+from ndn.encoding import ndn_format_0_3 as v1
 from ndn.encoding.ndn_format_0_3_2 import (
     ContentType,
     InterestParam,
@@ -11,7 +12,7 @@ from ndn.encoding.ndn_format_0_3_2 import (
     parse_data,
     parse_interest,
 )
-from ndn.security import DigestSha256Signer
+from ndn.security import DigestSha256Signer, HmacSha256Signer
 
 
 def test_default_interest_wire_format():
@@ -71,3 +72,15 @@ def test_data_wire_format_and_coverage():
     assert content is None
     signature = hashlib.sha256(b''.join(sig.signature_covered_part)).digest()
     assert signature == sig.signature_value_buf
+
+
+def test_key_locator_signer_matches_v1():
+    signer = HmacSha256Signer('/local/KEY/1', b'secret')
+    data = make_data('/local/data', MetaInfo(), b'content', signer=signer)
+    assert data == v1.make_data('/local/data', v1.MetaInfo(), b'content', signer=signer)
+    _, _, _, sig = parse_data(data)
+    assert sig.signature_info.key_locator.name == Name.from_str('/local/KEY/1')
+
+    interest = make_interest('/local/int', InterestParam(nonce=1), b'\x01', signer)
+    assert interest == v1.make_interest(
+        '/local/int', v1.InterestParam(nonce=1), b'\x01', signer)

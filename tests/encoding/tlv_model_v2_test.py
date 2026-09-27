@@ -1233,3 +1233,74 @@ class TestSignatureMachinery:
         m = {}
         tlv_set_arg(m, 'key', 'value')
         assert tlv_get_arg(m, 'key') == 'value'
+
+
+# ---------------------------------------------------------------------------
+# Schema cache
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _ForwardOuter:
+    inner: '_ForwardInner' = field(default=None, metadata={'tlv_type': 0x10})
+
+
+@dataclass
+class _ForwardInner:
+    val: int = field(default=None, metadata={'tlv_type': 0x01})
+
+
+class TestSchemaCache:
+    def test_type_hints_resolved_once_per_class(self, monkeypatch):
+        import typing
+        from ndn.encoding import tlv_model_v2
+
+        @dataclass
+        class Inner:
+            v: int = field(default=None, metadata={'tlv_type': 0x01})
+
+        @dataclass
+        class Outer:
+            items: list[Inner] = field(default_factory=list, metadata={'tlv_type': 0x10})
+            m: dict[str, bytes] = field(default_factory=dict, metadata={'tlv_type': 0x21, 'val_tlv_type': 0x23})
+
+        calls = []
+        real = typing.get_type_hints
+        monkeypatch.setattr(tlv_model_v2.typing, 'get_type_hints',
+                            lambda cls, *a, **k: calls.append(cls) or real(cls, *a, **k))
+        obj = Outer(items=[Inner(v=1), Inner(v=2)], m={'k': b'v'})
+        for _ in range(3):
+            assert tlv_parse(Outer, tlv_encode(obj)).items[1].v == 2
+        assert sorted(c.__name__ for c in calls) == ['Inner', 'Outer']
+
+    def test_forward_reference_resolved_lazily(self):
+        wire = tlv_encode(_ForwardOuter(inner=_ForwardInner(val=5)))
+        assert wire == b'\x10\x03\x01\x01\x05'
+        assert tlv_parse(_ForwardOuter, wire).inner.val == 5
+
+    def test_local_class_not_kept_alive(self):
+        import gc
+        import weakref
+
+        def make():
+            @dataclass
+            class Local:
+                x: int = field(default=None, metadata={'tlv_type': 0x01})
+            tlv_parse(Local, tlv_encode(Local(x=1)))
+            return weakref.ref(Local)
+
+        ref = make()
+        gc.collect()
+        assert ref() is None
+
+    def test_non_tlv_field_with_unsupported_annotation_ignored(self):
+        class Opaque:
+            pass
+
+        @dataclass
+        class M:
+            cache: Opaque = None
+            x: int = field(default=None, metadata={'tlv_type': 0x01})
+
+        wire = tlv_encode(M(cache=Opaque(), x=3))
+        assert wire == b'\x01\x01\x03'
+        assert tlv_parse(M, wire).x == 3

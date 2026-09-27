@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterator
 
 from ...encoding import BinaryStr, Component, FormalName, Name, NonStrictName
 from ...security import Keychain
-from ..security_v2 import parse_certificate
+from ..security_v2_2 import parse_certificate
 from . import binary as bny
 from .compiler import top_order
 
