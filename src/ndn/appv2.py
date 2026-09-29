@@ -364,6 +364,7 @@ class NDNApp:
                 self._put_raw_packet(data)
             else:
                 self._put_raw_packet_with_pit_token(data, pit_token)
+            return True
 
         # In case the validator blocks the pipeline, create a task
         async def submit_interest():
@@ -437,8 +438,10 @@ class NDNApp:
         pt.pit_token = pit_token
         pt_wire = pt.encode()
         frag_l = len(data)
-        lp_l = len(pt_wire) + enc.get_tl_num_size(ndnlp.LpTypeNumber.FRAGMENT) + enc.get_tl_num_size(frag_l)
-        wire_l = enc.get_tl_num_size(ndnlp.LpTypeNumber.LP_PACKET) + enc.get_tl_num_size(lp_l) + lp_l
+        frag_header_l = (enc.get_tl_num_size(ndnlp.LpTypeNumber.FRAGMENT) + enc.get_tl_num_size(frag_l))
+        lp_l = len(pt_wire) + frag_header_l + frag_l
+        wire_l = (enc.get_tl_num_size(ndnlp.LpTypeNumber.LP_PACKET)
+                  + enc.get_tl_num_size(lp_l) + len(pt_wire) + frag_header_l)
         wire = bytearray(wire_l)
         pos = 0
         pos += enc.write_tl_num(ndnlp.LpTypeNumber.LP_PACKET, wire, pos)

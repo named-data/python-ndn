@@ -450,6 +450,8 @@ def _finalize_encode(markers: dict, mv: memoryview, model_end: int) -> int:
 
 def _uint_value_len(val: int, fname: str, fixed_len) -> int:
     if fixed_len is not None:
+        if fixed_len not in (1, 2, 4, 8):
+            raise ValueError("uint fixed_len must be 1, 2, 4, or 8")
         n = fixed_len
     elif val <= 0xFF:
         n = 1
@@ -544,6 +546,8 @@ def _encoded_length_field(fname: str, val, spec: _FieldSpec, markers: dict) -> i
         return total_with_tl
 
     if kind == 'model':
+        if not isinstance(val, spec.annotation):
+            raise TypeError(f'{fname}={val!r} is not of type {spec.annotation!r}')
         inner_markers: dict = {}
         length = _encoded_length_model(val, inner_markers)
         markers[f'{fname}##inner_markers'] = inner_markers
@@ -880,6 +884,8 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
         offset += sz_t
         length, sz_l = parse_tl_num(mv, offset)
         offset += sz_l
+        if length > len(mv) - offset:
+            raise IndexError('TLV length exceeds the input buffer')
 
         found = False
         for i in range(field_pos, len(ordered)):
@@ -925,6 +931,11 @@ def tlv_parse(cls, wire, ignore_critical: bool = False, markers: dict = None):
                 offset += _sz_t2
                 length, _sz_l2 = parse_tl_num(mv, offset)
                 offset += _sz_l2
+                if _val_typ != spec.val.tlv_type:
+                    raise DecodeError(
+                        f'{fname}: expected map value type {spec.val.tlv_type:#x}, got {_val_typ:#x}')
+                if length > len(mv) - offset:
+                    raise IndexError('map value length exceeds the input buffer')
 
                 val = _parse_value(f'{fname}[{idx}#v]', spec.val,
                                    mv, offset, length, offset_btl, ignore_critical)
