@@ -15,214 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from enum import Enum, Flag
-from ndn.encoding import TlvModel, NameField, UintField, BytesField, BoolField, Component, \
-    RepeatedField, ModelField, Name, IncludeBase, MapField
-
-
-class TestEncodeDecode:
-    def test_basic(self):
-        class Model(TlvModel):
-            name = NameField()
-            int_val = UintField(0x03)
-            str_val = BytesField(0x02)
-            bool_val = BoolField(0x01)
-
-        model = Model()
-        model.name = ['test', Component.from_str('name')]
-        model.int_val = 0
-        assert model.encode() == b'\x07\x0c\x08\x04test\x08\x04name\x03\x01\x00'
-
-        model = Model.parse(b'\x07\x0c\x08\x04test\x08\x04name\x03\x01\x00')
-        assert model.name == Name.from_str('/test/name')
-        assert model.int_val == 0
-        assert not model.bool_val
-
-        model.name = 'test/name'
-        model.str_val = b'str'
-        model.bool_val = True
-        assert model.encode() == b'\x07\x0c\x08\x04test\x08\x04name\x03\x01\x00\x02\x03str\x01\x00'
-
-        model = Model.parse(b'\x07\x0c\x08\x04test\x08\x04name\x03\x01\x00\x02\x03str\x01\x00')
-        assert model.str_val == b'str'
-        assert model.bool_val
-
-    def test_repeat(self):
-        class WordArray(TlvModel):
-            words = RepeatedField(UintField(0x01, fixed_len=2))
-
-        array = WordArray()
-        array.words = [i for i in range(3)]
-        assert array.encode() == b'\x01\x02\x00\x00\x01\x02\x00\x01\x01\x02\x00\x02'
-
-        array = WordArray.parse(b'\x01\x02\x00\x00\x01\x02\x00\x01\x01\x02\x00\x02')
-        assert array.words == [0, 1, 2]
-
-    def test_map(self):
-        class ArgList(TlvModel):
-            params = MapField(BytesField(0x85, is_string=True), BytesField(0x87))
-
-        arg_list = ArgList()
-        arg_list.params = {
-            'key1': b'val1',
-            'key2': b'val2'
-        }
-        # The following line is OK because Python 3.9+ dicts are ordered
-        assert arg_list.encode() == b'\x85\x04key1\x87\x04val1\x85\x04key2\x87\x04val2'
-        arg_list = ArgList.parse(b'\x85\x04key1\x87\x04val1\x85\x04key2\x87\x04val2')
-        assert len(arg_list.params) == 2
-        assert bytes(arg_list.params['key1']) == b'val1'
-        assert bytes(arg_list.params['key2']) == b'val2'
-
-    def test_nested(self):
-        class Inner(TlvModel):
-            val = UintField(0x01)
-
-        class Outer(TlvModel):
-            val = ModelField(0x02, Inner)
-
-        obj = Outer()
-        obj.val = Inner()
-        obj.val.val = 255
-        assert obj.encode() == b'\x02\x03\x01\x01\xFF'
-
-        obj = Outer.parse(b'\x02\x03\x01\x01\xFF')
-        assert obj.val.val == 255
-
-    def test_derivation(self):
-        class Base(TlvModel):
-            m2 = UintField(0x02)
-
-        class Derived(Base):
-            m1 = UintField(0x01)
-            _base = IncludeBase(Base)
-            m3 = UintField(0x03)
-
-        obj = Derived()
-        obj.m1, obj.m2, obj.m3 = range(1, 4)
-        assert obj.encode() == b'\x01\x01\x01\x02\x01\x02\x03\x01\x03'
-
-        obj = Derived.parse(b'\x01\x01\x01\x02\x01\x02\x03\x01\x03')
-        assert obj.m1 == 1
-        assert obj.m2 == 2
-        assert obj.m3 == 3
-
-    def test_override(self):
-        class A1(TlvModel):
-            m1 = UintField(0x01)
-
-        class A2(A1):
-            _a1 = IncludeBase(A1)
-            m2 = UintField(0x02)
-
-        class B1(TlvModel):
-            a = ModelField(0x03, A1)
-
-        class B2(B1):
-            IncludeBase(B1)
-            a = ModelField(0x03, A2)
-
-        obj = B2()
-        obj.a = A2()
-        obj.a.m1 = 1
-        obj.a.m2 = 2
-        assert obj.encode() == b'\x03\x06\x01\x01\x01\x02\x01\x02'
-
-        obj = B2.parse(b'\x03\x06\x01\x01\x01\x02\x01\x02')
-        assert obj.a.m1 == 1
-        assert obj.a.m2 == 2
-
-    def test_diamond(self):
-        class A(TlvModel):
-            m1 = UintField(0x01)
-
-        class B1(A):
-            _base = IncludeBase(A)
-            m1 = UintField(0x02)
-            m4 = UintField(0x04)
-
-        class B2(A):
-            _base = IncludeBase(A)
-            m1 = UintField(0x03)
-            m5 = UintField(0x05)
-
-        class D(B1, B2):
-            _b2 = IncludeBase(B2)
-            _b1 = IncludeBase(B1)
-
-        obj = D()
-        obj.m1, obj.m2, obj.m4, obj.m5 = 1, 2, 4, 5
-        assert obj.encode() == b'\x02\x01\x01\x05\x01\x05\x04\x01\x04'
-
-        obj = D.parse(b'\x02\x01\x01\x05\x01\x05\x04\x01\x04')
-        assert obj.m1 == 1
-        assert obj.m4 == 4
-        assert obj.m5 == 5
-
-
-class TestAsDict:
-    def test_asdict(self):
-        class EnumVal(Enum):
-            E1 = 1
-            E2 = 2
-
-        class FlagVal(Flag):
-            F1 = 1
-            F2 = 2
-
-        class WordArray(TlvModel):
-            words = RepeatedField(UintField(0x04, fixed_len=2))
-
-        class Model(TlvModel):
-            name = NameField()
-            int_val = UintField(0x03)
-            bytes_val = BytesField(0x02)
-            bool_val = BoolField(0x01)
-            array = ModelField(0x05, WordArray)
-            flag_val = UintField(0x06, val_base_type=FlagVal)
-            enum_arr = RepeatedField(UintField(0x07, val_base_type=EnumVal))
-            str_val = BytesField(0x08, is_string=True)
-            str_arr = RepeatedField(BytesField(0x09, is_string=True))
-
-        obj = Model()
-        obj.name = '/test/name'
-        obj.int_val = 0
-        obj.bytes_val = b'\x00'
-        obj.array = WordArray()
-        obj.array.words = [1, 2, 3]
-        obj.flag_val = FlagVal.F1 | FlagVal.F2
-        obj.enum_arr = [EnumVal.E1, EnumVal.E2]
-        obj.str_val = 'वरुण'
-        obj.str_arr = ['あいう', 'utf-8']
-        assert obj.asdict() == {'name': '/test/name',
-                                'int_val': 0,
-                                'bytes_val': b'\x00',
-                                'bool_val': None,
-                                'array': {'words': [1, 2, 3]},
-                                'flag_val': FlagVal.F1 | FlagVal.F2,
-                                'enum_arr': [EnumVal.E1, EnumVal.E2],
-                                'str_val': 'वरुण',
-                                'str_arr': ['あいう', 'utf-8']}
-
-
-# -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
-#
-# This file is part of python-ndn.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# -----------------------------------------------------------------------------
-"""Tests for the dataclass-based TLV v2 API (tlv_encode / tlv_parse)."""
+"""Tests for the dataclass-based TLV API."""
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
 from hashlib import sha256
@@ -231,9 +24,7 @@ import pytest
 
 from ndn.encoding import (
     tlv_encode, tlv_parse, NDNName, DecodeError, tlv_get_arg, tlv_set_arg,
-    # v1 equivalents used for binary-compatibility checks
-    TlvModel, UintField, BoolField, BytesField, NameField, ModelField,
-    RepeatedField, Name, Signer,
+    Name, Signer,
 )
 
 
@@ -263,11 +54,11 @@ class _RepeatedModel:
 
 
 # ---------------------------------------------------------------------------
-# TestUintField
+# Unsigned integer tests
 # ---------------------------------------------------------------------------
 
-class TestUintField:
-    """UintField: variable-width and fixed-width non-negative integers."""
+class TestUint:
+    """Variable-width and fixed-width non-negative integers."""
 
     def test_min_width_1_byte(self):
         @dataclass
@@ -352,7 +143,7 @@ class TestUintField:
         assert tlv_parse(M, wire).x == 42
 
 
-class TestUintFieldEnum:
+class TestUintEnum:
     """IntEnum and IntFlag auto-conversion on parse."""
 
     def test_intenum_roundtrip(self):
@@ -401,11 +192,11 @@ class TestUintFieldEnum:
 
 
 # ---------------------------------------------------------------------------
-# TestBoolField
+# Boolean tests
 # ---------------------------------------------------------------------------
 
-class TestBoolField:
-    """BoolField: 0-length TLV present when truthy, absent otherwise."""
+class TestBool:
+    """Zero-length TLV present when truthy, absent otherwise."""
 
     def test_present(self):
         @dataclass
@@ -446,11 +237,11 @@ class TestBoolField:
 
 
 # ---------------------------------------------------------------------------
-# TestBytesField
+# Byte-string tests
 # ---------------------------------------------------------------------------
 
-class TestBytesField:
-    """BytesField: raw bytes and UTF-8 strings."""
+class TestBytes:
+    """Raw bytes and UTF-8 strings."""
 
     def test_bytes_roundtrip(self):
         @dataclass
@@ -526,10 +317,10 @@ class TestBytesField:
 
 
 # ---------------------------------------------------------------------------
-# TestNameField
+# Name tests
 # ---------------------------------------------------------------------------
 
-class TestNameField:
+class TestName:
     """NDNName: NDN Name TLV via string, FormalName list, or binary."""
 
     def test_from_string(self):
@@ -586,11 +377,11 @@ class TestNameField:
 
 
 # ---------------------------------------------------------------------------
-# TestModelField
+# Nested model tests
 # ---------------------------------------------------------------------------
 
-class TestModelField:
-    """ModelField: nested dataclass, recursively encoded."""
+class TestNestedModel:
+    """Nested dataclass, recursively encoded."""
 
     def test_basic_nested(self):
         wire = tlv_encode(_Outer(inner=_Inner(val=255)))
@@ -644,11 +435,11 @@ class TestModelField:
 
 
 # ---------------------------------------------------------------------------
-# TestRepeatedField
+# Repeated value tests
 # ---------------------------------------------------------------------------
 
-class TestRepeatedField:
-    """RepeatedField: multiple TLVs of the same type, no outer wrapper."""
+class TestRepeated:
+    """Multiple TLVs of the same type, without an outer wrapper."""
 
     def test_uint_elements(self):
         wire = tlv_encode(_RepeatedUint(words=[0, 1, 2]))
@@ -784,7 +575,7 @@ class TestOrdering:
 # ---------------------------------------------------------------------------
 
 class TestInheritance:
-    """Dataclass inheritance: parent fields come first (no IncludeBase needed)."""
+    """Dataclass inheritance places parent fields first."""
 
     def test_parent_fields_encoded_first(self):
         @dataclass
@@ -919,137 +710,48 @@ class TestDefaultHandling:
 
 
 # ---------------------------------------------------------------------------
-# TestBinaryCompatibility
+# Golden wire compatibility
 # ---------------------------------------------------------------------------
 
-class TestBinaryCompatibility:
-    """Byte-for-byte compatibility with the v1 TlvModel metaclass API."""
-
-    def test_uint_compat(self):
-        class V1(TlvModel):
-            sig_type = UintField(0x1b, fixed_len=1)
-            nonce    = UintField(0x26)
-
+class TestGoldenWireCompatibility:
+    def test_scalar_wire_formats(self):
         @dataclass
-        class V2:
-            sig_type: int = field(default=None,
-                                   metadata={'tlv_type': 0x1b, 'fixed_len': 1})
-            nonce:    int = field(default=None, metadata={'tlv_type': 0x26})
+        class Scalars:
+            sig_type: int = field(default=None, metadata={'tlv_type': 0x1b, 'fixed_len': 1})
+            nonce: int = field(default=None, metadata={'tlv_type': 0x26})
+            flag: bool = field(default=None, metadata={'tlv_type': 0x28})
+            raw: bytes = field(default=None, metadata={'tlv_type': 0x2a})
 
-        v1 = V1(); v1.sig_type = 3; v1.nonce = 42
-        assert bytes(v1.encode()) == bytes(tlv_encode(V2(sig_type=3, nonce=42)))
+        wire = bytes(tlv_encode(Scalars(sig_type=3, nonce=42, flag=True, raw=b'hi')))
+        assert wire == bytes.fromhex('1b010326012a28002a026869')
 
-    def test_bool_compat(self):
-        class V1(TlvModel):
-            flag  = BoolField(0x12)
-            count = UintField(0x0a)
-
+    def test_name_and_nested_wire_formats(self):
         @dataclass
-        class V2:
-            flag:  bool = field(default=None, metadata={'tlv_type': 0x12})
-            count: int  = field(default=None, metadata={'tlv_type': 0x0a})
-
-        for flag_val in (True, False, None):
-            v1 = V1(); v1.flag = flag_val; v1.count = 5
-            v2 = V2(flag=flag_val, count=5)
-            assert bytes(v1.encode()) == bytes(tlv_encode(v2))
-
-    def test_bytes_compat(self):
-        class V1(TlvModel):
-            raw   = BytesField(0x15)
-            label = BytesField(0x16, is_string=True)
-
-        @dataclass
-        class V2:
-            raw:   bytes = field(default=None, metadata={'tlv_type': 0x15})
-            label: str   = field(default=None, metadata={'tlv_type': 0x16})
-
-        v1 = V1(); v1.raw = b'\x01\x02\x03'; v1.label = 'hi'
-        v2 = V2(raw=b'\x01\x02\x03', label='hi')
-        assert bytes(v1.encode()) == bytes(tlv_encode(v2))
-
-    def test_name_compat(self):
-        class V1(TlvModel):
-            name = NameField()
-
-        @dataclass
-        class V2:
-            name: NDNName = field(default=None, metadata={'tlv_type': 0x07})
-
-        v1 = V1(); v1.name = '/foo/bar'
-        v2 = V2(name='/foo/bar')
-        assert bytes(v1.encode()) == bytes(tlv_encode(v2))
-
-    def test_model_compat(self):
-        class V1Inner(TlvModel):
-            val = UintField(0x01)
-
-        class V1Outer(TlvModel):
-            inner = ModelField(0x10, V1Inner)
-
-        @dataclass
-        class V2Inner:
+        class Inner:
             val: int = field(default=None, metadata={'tlv_type': 0x01})
 
         @dataclass
-        class V2Outer:
-            inner: V2Inner = field(default=None, metadata={'tlv_type': 0x10})
+        class Outer:
+            name: NDNName = field(default=None, metadata={'tlv_type': 0x07})
+            inner: Inner = field(default=None, metadata={'tlv_type': 0x10})
 
-        v1 = V1Outer(); v1.inner = V1Inner(); v1.inner.val = 99
-        v2 = V2Outer(inner=V2Inner(val=99))
-        assert bytes(v1.encode()) == bytes(tlv_encode(v2))
+        wire = bytes(tlv_encode(Outer(name='/foo/bar', inner=Inner(val=99))))
+        assert wire == bytes.fromhex('070a0803666f6f08036261721003010163')
+        parsed = tlv_parse(Outer, wire)
+        assert Name.to_str(parsed.name) == '/foo/bar'
+        assert parsed.inner.val == 99
 
-    def test_repeated_uint_compat(self):
-        class V1(TlvModel):
-            words = RepeatedField(UintField(0x01, fixed_len=2))
+    def test_repeated_wire_formats(self):
+        uint_wire = bytes(tlv_encode(_RepeatedUint(words=[0, 1, 2])))
+        assert uint_wire == bytes.fromhex('010200000102000101020002')
 
-        v1 = V1(); v1.words = [0, 1, 2]
-        v2 = _RepeatedUint(words=[0, 1, 2])
-        assert bytes(v1.encode()) == bytes(tlv_encode(v2))
-
-    def test_repeated_model_compat(self):
-        class V1Inner(TlvModel):
-            val = UintField(0x01)
-
-        class V1Rep(TlvModel):
-            items = RepeatedField(ModelField(0x10, V1Inner))
-
-        v1 = V1Rep()
-        r1 = V1Inner(); r1.val = 10
-        r2 = V1Inner(); r2.val = 20
-        v1.items = [r1, r2]
-
-        v2 = _RepeatedModel(items=[_Inner(val=10), _Inner(val=20)])
-        assert bytes(v1.encode()) == bytes(tlv_encode(v2))
-
-    def test_parse_interop(self):
-        """Wire produced by v1 can be parsed by v2 and vice-versa."""
-        class V1(TlvModel):
-            name  = NameField()
-            count = UintField(0x0a)
-
-        @dataclass
-        class V2:
-            name:  NDNName = field(default=None, metadata={'tlv_type': 0x07})
-            count: int     = field(default=None, metadata={'tlv_type': 0x0a})
-
-        v1 = V1(); v1.name = '/test'; v1.count = 7
-        wire_from_v1 = bytes(v1.encode())
-
-        p = tlv_parse(V2, wire_from_v1)
-        assert Name.to_str(p.name) == '/test'
-        assert p.count == 7
-
-        v2 = V2(name='/test', count=7)
-        wire_from_v2 = bytes(tlv_encode(v2))
-
-        p2 = V1.parse(wire_from_v2)
-        assert Name.to_str(p2.name) == '/test'
-        assert p2.count == 7
+        model_wire = bytes(tlv_encode(
+            _RepeatedModel(items=[_Inner(val=10), _Inner(val=20)])))
+        assert model_wire == bytes.fromhex('100301010a1003010114')
 
 
 # ---------------------------------------------------------------------------
-# MapField tests
+# Map tests
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -1109,35 +811,15 @@ class TestMapField:
         assert p.entries['x'].value == 7
         assert p.entries['y'].value == 99
 
-    def test_v1_compat_wire(self):
-        """v2 map encoding must be byte-for-byte identical to v1 MapField."""
-        from ndn.encoding import MapField, BytesField
+    def test_golden_wire(self):
+        obj = _StrBytesMap(entries={'alpha': b'\x01\x02', 'beta': b'\x03'})
+        wire = bytes(tlv_encode(obj))
+        assert wire == bytes.fromhex('2105616c70686123020102210462657461230103')
 
-        class V1Map(TlvModel):
-            entries = MapField(BytesField(0x21, is_string=True), BytesField(0x23))
-
-        v1 = V1Map()
-        v1.entries['alpha'] = b'\x01\x02'
-        v1.entries['beta']  = b'\x03'
-        v1_wire = bytes(v1.encode())
-
-        v2 = _StrBytesMap(entries={'alpha': b'\x01\x02', 'beta': b'\x03'})
-        v2_wire = bytes(tlv_encode(v2))
-
-        assert v1_wire == v2_wire
-
-    def test_v1_produced_wire_parsed_by_v2(self):
-        from ndn.encoding import MapField, BytesField
-
-        class V1Map(TlvModel):
-            entries = MapField(BytesField(0x21, is_string=True), BytesField(0x23))
-
-        v1 = V1Map()
-        v1.entries['hello'] = b'\xde\xad'
-        wire = bytes(v1.encode())
-
-        p = tlv_parse(_StrBytesMap, wire)
-        assert bytes(p.entries['hello']) == b'\xde\xad'
+    def test_golden_wire_is_parsed(self):
+        wire = bytes.fromhex('210568656c6c6f2302dead')
+        parsed = tlv_parse(_StrBytesMap, wire)
+        assert bytes(parsed.entries['hello']) == b'\xde\xad'
 
     def test_bytes_values_are_memoryview_zero_copy(self):
         obj = _StrBytesMap(entries={'k': b'\xca\xfe'})
@@ -1316,10 +998,9 @@ class TestSignatureMachinery:
 
         enc_markers = {'##signer': signer}
         wire = tlv_encode(obj, markers=enc_markers)
-        enc_covered = enc_markers['##sig_covered_part']
 
         parse_markers = {}
-        p = tlv_parse(_DataValue, wire, markers=parse_markers)
+        tlv_parse(_DataValue, wire, markers=parse_markers)
         parse_covered = parse_markers.get('##sig_covered_part', [])
         sig_buf = parse_markers['##sig_value_buf']
 

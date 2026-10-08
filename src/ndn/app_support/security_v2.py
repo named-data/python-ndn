@@ -111,7 +111,7 @@ class CertificateV2Value(DataPacketValue):
 class SafeBag:
     certificate_v2: Optional[bytes] = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.DATA})
-    # We do not use ModelField due to 2 reasons:
+    # Keep the certificate as encoded bytes instead of a nested dataclass:
     # 1. The encoded length of CertificateV2 is unknown.
     # 2. Generally we already have an encoded certificate when exporting a
     #    SafeBag.
