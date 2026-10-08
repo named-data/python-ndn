@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
+# Copyright (C) 2019-2022 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -15,12 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-import sys
 import logging
-import ndn.utils
-from ndn.app import NDNApp
-from ndn.types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
-from ndn.encoding import Name, Component, InterestParam
+from ndn import utils, app, types
+from ndn import encoding as enc
 
 
 logging.basicConfig(format='[{asctime}]{levelname}:{message}',
@@ -29,30 +26,29 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
                     style='{')
 
 
-app = NDNApp()
+app = app.NDNApp()
 
 
 async def main():
     try:
-        app_param = ' '.join(x for x in sys.argv[1:])
-        timestamp = ndn.utils.timestamp()
-        name = Name.from_str('/example/rpc') + [Component.from_timestamp(timestamp)]
-        print(f'Sending Interest {Name.to_str(name)}, '
-              f'{InterestParam(must_be_fresh=True, lifetime=6000)}, '
-              f'{app_param}')
-        data_name, meta_info, content = await app.express_interest(
-            name, app_param.encode(), must_be_fresh=True, can_be_prefix=False, lifetime=6000)
+        timestamp = utils.timestamp()
+        name = enc.Name.from_str('/example/testApp/randomData') + [enc.Component.from_timestamp(timestamp)]
+        print(f'Sending Interest {enc.Name.to_str(name)}, {enc.InterestParam(must_be_fresh=True, lifetime=6000)}')
+        # TODO: Write a better validator
+        data_name, content, pkt_context = await app.express(
+            name, validator=app.pass_all,
+            must_be_fresh=True, can_be_prefix=False, lifetime=6000)
 
-        print(f'Received Data Name: {Name.to_str(data_name)}')
-        print(meta_info)
+        print(f'Received Data Name: {enc.Name.to_str(data_name)}')
+        print(pkt_context['meta_info'])
         print(bytes(content) if content else None)
-    except InterestNack as e:
+    except types.InterestNack as e:
         print(f'Nacked with reason={e.reason}')
-    except InterestTimeout:
+    except types.InterestTimeout:
         print(f'Timeout')
-    except InterestCanceled:
+    except types.InterestCanceled:
         print(f'Canceled')
-    except ValidationFailure:
+    except types.ValidationFailure:
         print(f'Data failed to validate')
     finally:
         app.shutdown()

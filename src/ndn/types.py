@@ -16,16 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 from enum import Enum
-from typing import Any
-from collections.abc import Callable, Coroutine
-from .encoding import FormalName, MetaInfo, BinaryStr, InterestParam, SignaturePtrs
-
-
-Route = Callable[[FormalName, InterestParam, BinaryStr | None], None]
-r"""An OnInterest callback function for a route."""
-
-Validator = Callable[[FormalName, SignaturePtrs], Coroutine[Any, None, bool]]
-r"""A validator used to validate an Interest or Data packet."""
+from .encoding import FormalName, MetaInfo, BinaryStr, SignaturePtrs
 
 # For internal use. = (FormalName, MetaInfo, Content, SigPtrs, RawPacket)
 DataTuple = tuple[FormalName, MetaInfo, BinaryStr | None, SignaturePtrs, BinaryStr]
@@ -77,7 +68,7 @@ class ValidResult(Enum):
     """
     Validation result returned by a validator.
     Most of them are designed for the union checker, which chains multiple checkers in order.
-    For NDNApp (v2), only PASS and ALLOW_BYPASS are considered as True.
+    For NDNApp, only PASS and ALLOW_BYPASS are considered successful.
     """
 
     FAIL = -2
@@ -105,7 +96,7 @@ class ValidationFailure(Exception):
     :ivar meta_info: the MetaInfo.
     :vartype meta_info: :any:`MetaInfo`
     :ivar content: the Content of Data.
-    :vartype content: Optional[:any:`BinaryStr`]
+    :vartype content: :any:`BinaryStr` | None
     :ivar sig_ptrs: the signature pointers of Data
     :vartype sig_ptrs: :any:`SignaturePtrs`
     :ivar result: the reason of failure.

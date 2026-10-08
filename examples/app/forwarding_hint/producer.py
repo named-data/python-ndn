@@ -1,5 +1,5 @@
 import logging
-from ndn import appv2
+from ndn import app
 from ndn import encoding as enc
 
 
@@ -9,13 +9,13 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
                     style='{')
 
 
-app = appv2.NDNApp()
+app = app.NDNApp()
 keychain = app.default_keychain()
 
 
 @app.route('/repo/command')
 def on_cmd(name: enc.FormalName, _app_param: enc.BinaryStr | None,
-           reply: appv2.ReplyFunc, context: appv2.PktContext):
+           reply: app.ReplyFunc, context: app.PktContext):
     print(f'>> I: {enc.Name.to_str(name)}, {context["int_param"]}')
     content = b"Hello, world!"
     reply(app.make_data(name, content=content, signer=keychain.get_signer({}),
@@ -30,7 +30,7 @@ def on_cmd(name: enc.FormalName, _app_param: enc.BinaryStr | None,
 # So we can dispatch by forwarding hints.
 @app.route('/')
 def on_fwd_hint(name: enc.FormalName, app_param: enc.BinaryStr | None,
-                reply: appv2.ReplyFunc, context: appv2.PktContext):
+                reply: app.ReplyFunc, context: app.PktContext):
     fwd_hints = context["int_param"].forwarding_hint
     if fwd_hints:
         fh_name = fwd_hints[0]

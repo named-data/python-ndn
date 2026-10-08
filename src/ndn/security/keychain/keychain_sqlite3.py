@@ -686,7 +686,7 @@ class KeychainSqlite3(Keychain):
         :Keyword Arguments:
 
             + **key_size** (:class:`int`) - key size in bit.
-            + **key_id** (Union[:any:`BinaryStr`, :class:`str`]) - a one-Component ID of the Key.
+            + **key_id** (:any:`BinaryStr` | :class:`str`) - a one-Component ID of the Key.
             + **key_id_type** (:class:`str`) - the method to generate the ID if *key_id* is not specified.
               Can be ``random`` or ``sha256``.
 

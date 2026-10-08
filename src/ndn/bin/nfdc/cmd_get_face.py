@@ -16,10 +16,11 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...appv2 import NDNApp
+from ...app import NDNApp
 from ...encoding import Name, Component
+from ...encoding.tlv_model import tlv_encode, tlv_parse
 from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response
-from .utils import express_interest
+from .utils import express_command
 
 
 def add_parser(subparsers):
@@ -34,8 +35,8 @@ def execute(args: argparse.Namespace):
 
     async def list_face():
         try:
-            data = await express_interest(app, "/localhost/nfd/faces/list")
-            msg = FaceStatusMsg.parse(data)
+            data = await express_command(app, "/localhost/nfd/faces/list")
+            msg = tlv_parse(FaceStatusMsg, data)
             # TODO: Should calculate the length instead of using a fixed number
             print(f'{"FaceID":7}{"RemoteURI":<30}\t{"LocalURI":<30}')
             print(f'{"------":7}{"---------":<30}\t{"--------":<30}')
@@ -46,14 +47,14 @@ def execute(args: argparse.Namespace):
 
     async def inspect_face(face_id, face_uri):
         async def exec_query():
-            data = await express_interest(app, data_name)
+            data = await express_command(app, data_name)
             if not data:
                 return False
             elif data[0] == 0x65:
                 msg = parse_response(data)
                 print('Query failed with response', msg['status_code'], msg['status_text'])
             else:
-                msg = FaceStatusMsg.parse(data)
+                msg = tlv_parse(FaceStatusMsg, data)
                 for f in msg.face_status:
                     print()
                     print(f'{"Face ID":>12}\t{f.face_id}')
@@ -78,16 +79,16 @@ def execute(args: argparse.Namespace):
         filt.face_query_filter = FaceQueryFilterValue()
         if face_id is not None:
             filt.face_query_filter.face_id = face_id
-            data_name = Name.from_str(name) + [Component.from_bytes(filt.encode())]
+            data_name = Name.from_str(name) + [Component.from_bytes(tlv_encode(filt))]
             if not await exec_query():
                 print('No face is found')
         else:
             filt.face_query_filter.uri = face_uri
-            data_name = Name.from_str(name) + [Component.from_bytes(filt.encode())]
+            data_name = Name.from_str(name) + [Component.from_bytes(tlv_encode(filt))]
             if not await exec_query():
                 filt.face_query_filter.uri = None
                 filt.face_query_filter.local_uri = face_uri
-                data_name = Name.from_str(name) + [Component.from_bytes(filt.encode())]
+                data_name = Name.from_str(name) + [Component.from_bytes(tlv_encode(filt))]
                 if not await exec_query():
                     print('No face is found')
         app.shutdown()

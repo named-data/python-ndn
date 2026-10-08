@@ -20,7 +20,7 @@ from Cryptodome.Hash import SHA256, HMAC
 from Cryptodome.PublicKey import ECC, RSA
 from Cryptodome.Signature import DSS, pkcs1_15, eddsa
 from ...encoding import FormalName, BinaryStr, NonStrictName, SignaturePtrs, Name, SignatureType
-from ...types import Validator
+from ...types import ValidResult
 from ...app_support.security_v2 import parse_certificate
 
 
@@ -66,22 +66,22 @@ class KnownChecker(abc.ABC):
         pass
 
     @classmethod
-    def from_key(cls, key_name: NonStrictName, pub_key_bits: BinaryStr) -> Validator:
+    def from_key(cls, key_name: NonStrictName, pub_key_bits: BinaryStr):
         key_name = Name.normalize(key_name)
 
-        async def validator(_name: FormalName, sig_ptrs: SignaturePtrs) -> bool:
+        async def validator(_name: FormalName, sig_ptrs: SignaturePtrs, _context=None) -> ValidResult:
             if not sig_ptrs.signature_info or not sig_ptrs.signature_info.key_locator:
-                return False
+                return ValidResult.FAIL
             if not sig_ptrs.signature_info.key_locator.name:
-                return False
+                return ValidResult.FAIL
             if not Name.is_prefix(key_name, sig_ptrs.signature_info.key_locator.name):
-                return False
-            return cls._verify(pub_key_bits, sig_ptrs)
+                return ValidResult.FAIL
+            return ValidResult.PASS if cls._verify(pub_key_bits, sig_ptrs) else ValidResult.FAIL
 
         return validator
 
     @classmethod
-    def from_cert(cls, certificate: BinaryStr) -> Validator:
+    def from_cert(cls, certificate: BinaryStr):
         cert = parse_certificate(certificate)
         key_name = cert.name[:-2]
         key_bits = cert.content

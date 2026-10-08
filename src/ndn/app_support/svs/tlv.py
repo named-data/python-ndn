@@ -15,34 +15,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import dataclasses as dc
 from ... import encoding as enc
 
 
 __all__ = ['StateVecEntry', 'StateVec', 'StateVecWrapper', 'MappingEntry', 'MappingData', 'MappingDataWrapper']
 
 
-class StateVecEntry(enc.TlvModel):
-    node_id = enc.NameField()
-    seq_no = enc.UintField(0xcc)
+@dc.dataclass
+class StateVecEntry:
+    node_id: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
+    seq_no: int | None = dc.field(default=None, metadata={'tlv_type': 0xcc})
 
 
-class StateVec(enc.TlvModel):
-    entries = enc.RepeatedField(enc.ModelField(0xca, StateVecEntry))
+@dc.dataclass
+class StateVec:
+    entries: list[StateVecEntry] = dc.field(default_factory=list, metadata={'tlv_type': 0xca})
 
 
-class StateVecWrapper(enc.TlvModel):
-    val = enc.ModelField(0xc9, StateVec)
+@dc.dataclass
+class StateVecWrapper:
+    val: StateVec | None = dc.field(default=None, metadata={'tlv_type': 0xc9})
 
 
-class MappingEntry(enc.TlvModel):
-    seq_no = enc.UintField(0xcc)
-    app_name = enc.NameField()
+@dc.dataclass
+class MappingEntry:
+    seq_no: int | None = dc.field(default=None, metadata={'tlv_type': 0xcc})
+    app_name: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
 
 
-class MappingData(enc.TlvModel):
-    node_id = enc.NameField()
-    entries = enc.ModelField(0xce, MappingEntry)
+@dc.dataclass
+class MappingData:
+    node_id: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
+    entries: MappingEntry | None = dc.field(default=None, metadata={'tlv_type': 0xce})
 
 
-class MappingDataWrapper(enc.TlvModel):
-    val = enc.ModelField(0xcd, MappingEntry)
+@dc.dataclass
+class MappingDataWrapper:
+    val: MappingEntry | None = dc.field(default=None, metadata={'tlv_type': 0xcd})

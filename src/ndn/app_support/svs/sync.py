@@ -22,7 +22,7 @@ import time
 import asyncio as aio
 from enum import Enum
 from ... import encoding as enc
-from ... import appv2 as app
+from ... import app
 from .tlv import StateVec, StateVecWrapper, StateVecEntry
 
 
@@ -108,7 +108,7 @@ class SvsInst:
             self.logger.error('Received invalid Sync Interest: %s', enc.Name.to_str(name))
             return
         try:
-            remote_sv_pkt = StateVecWrapper.parse(name[-2]).val
+            remote_sv_pkt = enc.tlv_parse(StateVecWrapper, name[-2]).val
         except (enc.DecodeError, IndexError) as e:
             self.logger.error('Unable to decode state vector [%s]: %s', enc.Name.to_str(name), e)
             return
@@ -203,7 +203,7 @@ class SvsInst:
             cur.node_id = enc.Name.from_bytes(lsv_id)
             cur.seq_no = lsv_seq
             sv_pkt.val.entries.append(cur)
-        sync_name = self.base_prefix + [sv_pkt.encode()]
+        sync_name = self.base_prefix + [enc.tlv_encode(sv_pkt)]
         self.ndn_app.express(sync_name, app.pass_all, signer=self.int_signer, no_response=True)
 
     def new_data(self):
