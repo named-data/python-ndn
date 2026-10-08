@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Next (breaking)
++++++++++++++++
+* Replace the descriptor-based TLV model with dataclass models and ``tlv_encode``/``tlv_parse``.
+* Make the PIT-token-aware application API canonical at ``ndn.app`` and remove ``ndn.appv2``.
+* Remove the legacy application API, Name Tree Schema, dispatcher, segment fetcher, and cascade validator.
+
 0.4-1 (2023-08-21)
 ++++++++++++++++++
 * Update dependencies: drop cryptography.

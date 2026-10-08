@@ -2,79 +2,73 @@ Basic Applications
 ==================
 
 Connect to NFD
-~~~~~~~~~~~~~~
-
-NDNApp connects to an NFD node and provides interface to express and process Interests.
-The following code initializes an NDNApp instance with default configuration.
+--------------
 
 .. code-block:: python3
 
     from ndn.app import NDNApp
-    app = NDNApp()
-    app.run_forever()
 
-If there is a main function for the application, use the ``after_start`` argument.
-
-.. code-block:: python3
-
-    from ndn.app import NDNApp
     app = NDNApp()
 
     async def main():
-        # Do something
-        app.shutdown()  # Close the connection and shutdown
+        # Application startup work goes here.
+        app.shutdown()
 
     app.run_forever(after_start=main())
 
 Consumer
-~~~~~~~~
+--------
 
-A consumer can use ``express_interest`` to express an Interest.
-If a Data is received and validated, it returns the Name, MetaInfo and Content of Data.
-Otherwise, an exception is thrown.
+A consumer calls :meth:`NDNApp.express` with a validator. The returned context
+contains ``meta_info``, ``sig_ptrs``, and ``raw_packet``.
 
 .. code-block:: python3
 
+    from ndn.app import NDNApp, pass_all
     from ndn.encoding import Name
+    from ndn.types import InterestNack, InterestTimeout, ValidationFailure
+
+    app = NDNApp()
 
     async def main():
         try:
-            data_name, meta_info, content = await app.express_interest(
-                # Interest Name
+            data_name, content, context = await app.express(
                 '/example/testApp/randomData',
+                validator=pass_all,
                 must_be_fresh=True,
-                can_be_prefix=False,
-                # Interest lifetime in ms
-                lifetime=6000)
-            # Print out Data Name, MetaInfo and its conetnt.
-            print(f'Received Data Name: {Name.to_str(data_name)}')
-            print(meta_info)
+                lifetime=6000,
+            )
+            print(Name.to_str(data_name))
+            print(context['meta_info'])
             print(bytes(content) if content else None)
-        except InterestNack as e:
-            # A NACK is received
-            print(f'Nacked with reason={e.reason}')
+        except InterestNack as exc:
+            print(f'Nacked with reason={exc.reason}')
         except InterestTimeout:
-            # Interest times out
-            print(f'Timeout')
-        except InterestCanceled:
-            # Connection to NFD is broken
-            print(f'Canceled')
+            print('Timeout')
         except ValidationFailure:
-            # Validation failure
-            print(f'Data failed to validate')
+            print('Data failed to validate')
         finally:
             app.shutdown()
 
 Producer
-~~~~~~~~
+--------
 
-A producer can call ``route`` to register a permanent route.
-Route registration can be done before application is started.
-NDNApp will automatically announce that route to the NFD node.
+Interest handlers are synchronous callbacks. Use the supplied ``reply``
+function to preserve the incoming PIT token.
 
 .. code-block:: python3
 
-    @app.route('/example/testApp')
-    def on_interest(name, interest_param, application_param):
-        app.put_data(name, content=b'content', freshness_period=10000)
+    from ndn.app import NDNApp
+    from ndn.security import DigestSha256Signer
 
+    app = NDNApp()
+
+    @app.route('/example/testApp')
+    def on_interest(name, app_param, reply, context):
+        packet = app.make_data(
+            name,
+            content=b'content',
+            signer=DigestSha256Signer(),
+            freshness_period=10000,
+        )
+        reply(packet)
