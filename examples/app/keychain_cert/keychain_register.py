@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
+# Copyright (C) 2019-2022 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -15,9 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from ndn.app import NDNApp
-from ndn.encoding import Name, InterestParam, BinaryStr, FormalName, MetaInfo
 import logging
+from ndn import app
+from ndn.app_support.keychain_register import attach_keychain_register
 
 
 logging.basicConfig(format='[{asctime}]{levelname}:{message}',
@@ -26,23 +26,9 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
                     style='{')
 
 
-app = NDNApp()
-
-
-@app.route('/example/rpc')
-def on_interest(name: FormalName, param: InterestParam, app_param: BinaryStr | None):
-    app_param = bytes(app_param)
-    print(f'>> I: {Name.to_str(name)}, {param}, {app_param}')
-    if not app_param:
-        print("<< No application parameter, dropped")
-        return
-    s = sum(int(x) for x in app_param.split())
-    content = str(s).encode()
-    app.put_data(name, content=content, freshness_period=500)
-    print(f'<< D: {Name.to_str(name)}')
-    print(MetaInfo(freshness_period=500))
-    print(f'Content: {content}')
-    print('')
+app = app.NDNApp()
+keychain = app.default_keychain()
+attach_keychain_register(keychain, app)
 
 
 if __name__ == '__main__':

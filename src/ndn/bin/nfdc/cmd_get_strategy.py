@@ -20,7 +20,7 @@ from ...app import NDNApp
 from ...encoding import Name
 from ...encoding.tlv_model import tlv_parse
 from ...app_support.nfd_mgmt import StrategyChoiceMsg
-from .utils import express_interest
+from .utils import express_command
 
 
 def add_parser(subparsers):
@@ -36,7 +36,7 @@ def execute(args: argparse.Namespace):
 
     async def list_strategy():
         try:
-            data = await express_interest(app, "/localhost/nfd/strategy-choice/list")
+            data = await express_command(app, "/localhost/nfd/strategy-choice/list")
             msg = tlv_parse(StrategyChoiceMsg, data)
             for s in msg.strategy_choices:
                 s_prefix = Name.to_str(s.name)

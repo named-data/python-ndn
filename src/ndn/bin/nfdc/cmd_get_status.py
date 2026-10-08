@@ -20,7 +20,7 @@ import datetime
 from ...app import NDNApp
 from ...encoding.tlv_model import tlv_parse
 from ...app_support.nfd_mgmt import GeneralStatus
-from .utils import express_interest
+from .utils import express_command
 
 
 def add_parser(subparsers):
@@ -33,7 +33,7 @@ def execute(_args: argparse.Namespace):
 
     async def after_start():
         try:
-            data = await express_interest(app, "/localhost/nfd/status/general")
+            data = await express_command(app, "/localhost/nfd/status/general")
 
             msg = tlv_parse(GeneralStatus, data)
 

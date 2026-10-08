@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import sys
 import logging
-from ndn import appv2, types
+from ndn import app, types
 from ndn import encoding as enc
 from ndn.app_support import security_v2 as secv2
 
@@ -32,7 +32,7 @@ if len(sys.argv) < 2:
     logging.fatal('Please input a KEY or CERT name')
     exit(0)
 
-app = appv2.NDNApp()
+app = app.NDNApp()
 
 
 async def main():
@@ -43,7 +43,7 @@ async def main():
               f'{enc.InterestParam(must_be_fresh=True, can_be_prefix=can_be_prefix, lifetime=6000)}')
         # TODO: Write a better validator
         data_name, content, pkt_context = await app.express(
-            name, validator=appv2.pass_all,
+            name, validator=app.pass_all,
             must_be_fresh=True, can_be_prefix=can_be_prefix, lifetime=6000)
 
         print(f'Received Data Name: {enc.Name.to_str(data_name)}')

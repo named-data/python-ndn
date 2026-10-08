@@ -1,6 +1,6 @@
 import logging
 import asyncio as aio
-from ndn import appv2
+from ndn import app
 from ndn import encoding as enc
 from ndn import types
 from ndn import security as sec
@@ -25,7 +25,7 @@ def on_missing_data(_svs_inst: svs.SvsInst):
     fetch_signal.set()
 
 
-app = appv2.NDNApp()
+app = app.NDNApp()
 keychain = app.default_keychain()
 text_node_id = f'node-{random.randbytes(4).hex()}'
 name_node_id = enc.Name.from_str(text_node_id)
@@ -34,7 +34,7 @@ svs_inst = svs.SvsInst(
     group_prefix, name_node_id,
     on_missing_data,
     sec.DigestSha256Signer(),
-    appv2.pass_all,
+    app.pass_all,
     sync_interval=10,
 )
 packet_cache = {}
@@ -64,7 +64,7 @@ async def fetch_missing_data():
                 for i in range(fetched_seq+1, seq+1):
                     pkt_name = node_name + [enc.Component.from_sequence_num(i)]
                     try:
-                        _, data, _ = await app.express(pkt_name, appv2.pass_all)
+                        _, data, _ = await app.express(pkt_name, app.pass_all)
                         logging.info(f'Fetched {enc.Name.to_str(pkt_name)}: {bytes(data).decode()}')
                     except types.InterestNack as e:
                         logging.info(f'[{enc.Name.to_str(pkt_name)}] Nacked with reason={e.reason}')

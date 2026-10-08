@@ -20,7 +20,7 @@ from Cryptodome.Hash import SHA256, HMAC
 from Cryptodome.PublicKey import ECC, RSA
 from Cryptodome.Signature import DSS, pkcs1_15, eddsa
 from ...encoding import FormalName, BinaryStr, NonStrictName, SignaturePtrs, Name, SignatureType
-from ...types import Validator, ValidResult
+from ...types import ValidResult
 from ...app_support.security_v2 import parse_certificate
 
 
@@ -66,7 +66,7 @@ class KnownChecker(abc.ABC):
         pass
 
     @classmethod
-    def from_key(cls, key_name: NonStrictName, pub_key_bits: BinaryStr) -> Validator:
+    def from_key(cls, key_name: NonStrictName, pub_key_bits: BinaryStr):
         key_name = Name.normalize(key_name)
 
         async def validator(_name: FormalName, sig_ptrs: SignaturePtrs, _context=None) -> ValidResult:
@@ -81,7 +81,7 @@ class KnownChecker(abc.ABC):
         return validator
 
     @classmethod
-    def from_cert(cls, certificate: BinaryStr) -> Validator:
+    def from_cert(cls, certificate: BinaryStr):
         cert = parse_certificate(certificate)
         key_name = cert.name[:-2]
         key_bits = cert.content

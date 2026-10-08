@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import logging
-from ndn import utils, appv2, types
+from ndn import utils, app, types
 from ndn import encoding as enc
 
 
@@ -26,7 +26,7 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
                     style='{')
 
 
-app = appv2.NDNApp()
+app = app.NDNApp()
 
 
 async def express_int(name, fw_hint):
@@ -34,13 +34,13 @@ async def express_int(name, fw_hint):
         if fw_hint is None:
             print(f'Sending Interest {enc.Name.to_str(name)}, {enc.InterestParam(must_be_fresh=True, lifetime=6000)}')
             data_name, content, pkt_context = await app.express(
-                name, validator=appv2.pass_all,
+                name, validator=app.pass_all,
                 must_be_fresh=True, can_be_prefix=False, lifetime=6000)
         else:
             print(f'Sending Interest {enc.Name.to_str(name)}, '
                   f'{enc.InterestParam(must_be_fresh=True, lifetime=6000, forwarding_hint=[fw_hint])}')
             data_name, content, pkt_context = await app.express(
-                name, validator=appv2.pass_all,
+                name, validator=app.pass_all,
                 must_be_fresh=True, can_be_prefix=False, lifetime=6000, forwarding_hint=[fw_hint])
 
         print(f'Received Data Name: {enc.Name.to_str(data_name)}')

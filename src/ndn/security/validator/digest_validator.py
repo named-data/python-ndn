@@ -18,7 +18,7 @@
 import logging
 from hashlib import sha256
 from ...encoding import FormalName, SignatureType, Name, SignaturePtrs
-from ...types import Validator, ValidResult
+from ...types import ValidResult
 
 
 async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs, _context=None) -> ValidResult:
@@ -52,15 +52,3 @@ async def params_sha256_checker(name: FormalName, sig: SignaturePtrs) -> bool:
         ret = sha256_algo.digest() == sig_value
     logging.getLogger(__name__).debug('Interest params-sha256 check %s -> %s', Name.to_str(name), ret)
     return ret
-
-
-def union_checker(*args) -> Validator:
-    async def wrapper(name: FormalName, sig: SignaturePtrs, context) -> ValidResult:
-        for checker in args:
-            result = await checker(name, sig, context)
-            if result in (ValidResult.FAIL, ValidResult.TIMEOUT):
-                return result
-            if result is ValidResult.ALLOW_BYPASS:
-                return result
-        return ValidResult.PASS
-    return wrapper

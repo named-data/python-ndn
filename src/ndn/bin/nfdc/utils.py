@@ -20,7 +20,7 @@ from ...security import DigestSha256Signer
 from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 
 
-async def express_interest(app: NDNApp, name):
+async def express_command(app: NDNApp, name):
     try:
         _, data, context = await app.express(
             name, validator=pass_all, app_param=b'', signer=DigestSha256Signer(True),

@@ -20,7 +20,7 @@ from ...app import NDNApp
 from ...encoding import Name
 from ...encoding.tlv_model import tlv_parse
 from ...app_support.nfd_mgmt import FibStatus, RibStatus
-from .utils import express_interest
+from .utils import express_command
 
 
 def add_parser(subparsers):
@@ -36,9 +36,9 @@ def execute(args: argparse.Namespace):
 
     async def list_route():
         try:
-            fib_data = await express_interest(app, "/localhost/nfd/fib/list")
+            fib_data = await express_command(app, "/localhost/nfd/fib/list")
             fib_msg = tlv_parse(FibStatus, fib_data)
-            rib_data = await express_interest(app, "/localhost/nfd/rib/list")
+            rib_data = await express_command(app, "/localhost/nfd/rib/list")
             rib_msg = tlv_parse(RibStatus, rib_data)
             # TODO: Should calculate the length instead of using a fixed number
             print('Forwarding Table (FIB)')

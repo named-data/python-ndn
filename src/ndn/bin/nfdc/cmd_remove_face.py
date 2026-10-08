@@ -21,7 +21,7 @@ from ...encoding import Name, Component
 from ...encoding.tlv_model import tlv_encode, tlv_parse
 from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response, \
     make_command_v2
-from .utils import express_interest
+from .utils import express_command
 
 
 def add_parser(subparsers):
@@ -38,7 +38,7 @@ def execute(args: argparse.Namespace):
     async def remove_face(fid):
         print(f'Removing face {fid} ...', end='')
         cmd = make_command_v2('faces', 'destroy', face_id=fid)
-        res = await express_interest(app, cmd)
+        res = await express_command(app, cmd)
         msg = parse_response(res)
         print(f'\t{msg["status_code"]} {msg["status_text"]}')
 
@@ -50,7 +50,7 @@ def execute(args: argparse.Namespace):
 
     async def run_with_uri(uri):
         async def try_remove():
-            data = await express_interest(app, data_name)
+            data = await express_command(app, data_name)
             if not data:
                 return False
             elif data[0] == 0x65:
