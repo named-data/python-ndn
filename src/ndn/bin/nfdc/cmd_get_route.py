@@ -18,6 +18,7 @@
 import argparse
 from ...appv2 import NDNApp
 from ...encoding import Name
+from ...encoding.tlv_model import tlv_parse
 from ...app_support.nfd_mgmt import FibStatus, RibStatus
 from .utils import express_interest
 
@@ -36,9 +37,9 @@ def execute(args: argparse.Namespace):
     async def list_route():
         try:
             fib_data = await express_interest(app, "/localhost/nfd/fib/list")
-            fib_msg = FibStatus.parse(fib_data)
+            fib_msg = tlv_parse(FibStatus, fib_data)
             rib_data = await express_interest(app, "/localhost/nfd/rib/list")
-            rib_msg = RibStatus.parse(rib_data)
+            rib_msg = tlv_parse(RibStatus, rib_data)
             # TODO: Should calculate the length instead of using a fixed number
             print('Forwarding Table (FIB)')
             for ent in fib_msg.entries:

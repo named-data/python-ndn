@@ -38,7 +38,7 @@ def execute(args: argparse.Namespace):
         uri = uri + ":6363"
 
     async def create_face():
-        cmd = make_command_v2('faces', 'create', uri=uri.encode())
+        cmd = make_command_v2('faces', 'create', uri=uri)
         res = await express_interest(app, cmd)
         msg = parse_response(res)
         print(f'{msg["status_code"]} {msg["status_text"]}')

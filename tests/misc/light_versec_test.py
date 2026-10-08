@@ -35,6 +35,15 @@ class TestLvsBasic:
         assert checker.validate_user_fns()
 
     @staticmethod
+    def test_binary_round_trip():
+        model = compile_lvs('#rule: "a"/b/"c"')
+        wire = bytes(model.encode())
+        restored = type(model).parse(wire)
+
+        assert bytes(restored.encode()) == wire
+        assert Checker(restored, {}).validate_user_fns()
+
+    @staticmethod
     def test_temp_identifiers():
         lvs = r'''
         #_: "a"/b/"c"

@@ -15,13 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+"""NFD management protocol models using the dataclass TLV API."""
+import dataclasses as dc
 import struct
+from typing import Optional
 from enum import Enum, Flag
+
 from ..transport.face import Face
 from ..utils import timestamp, gen_nonce_64
-from ..encoding import Component, Name, ModelField, TlvModel, NameField, UintField, BytesField, \
-    SignatureInfo, get_tl_num_size, TypeNumber, write_tl_num, parse_and_check_tl, \
-    RepeatedField
+from ..encoding import Component, Name, get_tl_num_size, write_tl_num, parse_and_check_tl
+from ..encoding.tlv_model import NDNName, tlv_encode, tlv_parse
+from ..encoding.ndn_format_0_3 import SignatureInfo, TypeNumber, write_signature_info
 from ..security import DigestSha256Signer
 
 
@@ -62,172 +66,214 @@ class FaceEventKind(Enum):
     DOWN = 4
 
 
-class Strategy(TlvModel):
-    name = NameField()
+__all__ = [
+    'FaceScope', 'FacePersistency', 'FaceLinkType', 'FaceFlags', 'RouteFlags', 'FaceEventKind',
+    'Strategy', 'ControlParametersValue', 'ControlParameters', 'ControlResponse',
+    'FaceEventNotificationValue', 'FaceEventNotification', 'GeneralStatus', 'FaceStatus',
+    'FaceStatusMsg', 'FaceQueryFilterValue', 'FaceQueryFilter', 'Route', 'RibEntry', 'RibStatus',
+    'NextHopRecord', 'FibEntry', 'FibStatus', 'StrategyChoice', 'StrategyChoiceMsg', 'CsInfo',
+    'make_command', 'make_command_v2', 'parse_response',
+]
 
 
-class ControlParametersValue(TlvModel):
-    name = NameField()
-    face_id = UintField(0x69)
-    uri = BytesField(0x72, is_string=True)
-    local_uri = BytesField(0x81, is_string=True)
-    origin = UintField(0x6f)
-    cost = UintField(0x6a)
-    capacity = UintField(0x83)
-    count = UintField(0x84)
-    base_congestion_mark_interval = UintField(0x87)
-    default_congestion_threshold = UintField(0x88)
-    mtu = UintField(0x89)
-    flags = UintField(0x6c)
-    mask = UintField(0x70)
-    strategy = ModelField(0x6b, Strategy)
-    expiration_period = UintField(0x6d)
-    face_persistency = UintField(0x85, val_base_type=FacePersistency)
+def _tlv(type_num: int):
+    return dc.field(default=None, metadata={'tlv_type': type_num})
 
 
-class ControlParameters(TlvModel):
-    cp = ModelField(0x68, ControlParametersValue)
+def _name():
+    return _tlv(TypeNumber.NAME)
 
 
-class ControlResponse(TlvModel):
-    status_code = UintField(0x66)
-    status_text = BytesField(0x67, is_string=True)
-    body = ModelField(0x68, ControlParametersValue)
+def _repeated(type_num: int):
+    return dc.field(default_factory=list, metadata={'tlv_type': type_num})
 
 
-class FaceEventNotificationValue(TlvModel):
-    face_event_kind = UintField(0xc1, val_base_type=FaceEventKind)
-    face_id = UintField(0x69)
-    uri = BytesField(0x72, is_string=True)
-    local_uri = BytesField(0x81, is_string=True)
-    face_scope = UintField(0x84, val_base_type=FaceScope)
-    face_persistency = UintField(0x85, val_base_type=FacePersistency)
-    link_type = UintField(0x86, val_base_type=FaceLinkType)
-    flags = UintField(0x6c, val_base_type=FaceFlags)
+@dc.dataclass
+class Strategy:
+    name: NDNName = _name()
 
 
-class FaceEventNotification(TlvModel):
-    event = ModelField(0xc0, FaceEventNotificationValue)
+@dc.dataclass
+class ControlParametersValue:
+    name: NDNName = _name()
+    face_id: Optional[int] = _tlv(0x69)
+    uri: Optional[str] = _tlv(0x72)
+    local_uri: Optional[str] = _tlv(0x81)
+    origin: Optional[int] = _tlv(0x6f)
+    cost: Optional[int] = _tlv(0x6a)
+    capacity: Optional[int] = _tlv(0x83)
+    count: Optional[int] = _tlv(0x84)
+    base_congestion_mark_interval: Optional[int] = _tlv(0x87)
+    default_congestion_threshold: Optional[int] = _tlv(0x88)
+    mtu: Optional[int] = _tlv(0x89)
+    flags: Optional[int] = _tlv(0x6c)
+    mask: Optional[int] = _tlv(0x70)
+    strategy: Optional[Strategy] = _tlv(0x6b)
+    expiration_period: Optional[int] = _tlv(0x6d)
+    face_persistency: Optional[FacePersistency] = _tlv(0x85)
 
 
-class GeneralStatus(TlvModel):
-    nfd_version = BytesField(0x80, is_string=True)
-    start_timestamp = UintField(0x81)
-    current_timestamp = UintField(0x82)
-    n_name_tree_entries = UintField(0x83)
-    n_fib_entries = UintField(0x84)
-    n_pit_entries = UintField(0x85)
-    n_measurement_entries = UintField(0x86)
-    n_cs_entries = UintField(0x87)
-    n_in_interests = UintField(0x90)
-    n_in_data = UintField(0x91)
-    n_in_nacks = UintField(0x97)
-    n_out_interests = UintField(0x92)
-    n_out_data = UintField(0x93)
-    n_out_nacks = UintField(0x98)
-    n_satisfied_interests = UintField(0x99)
-    n_unsatisfied_interests = UintField(0x9a)
+@dc.dataclass
+class ControlParameters:
+    cp: Optional[ControlParametersValue] = _tlv(0x68)
+
+
+@dc.dataclass
+class ControlResponse:
+    status_code: Optional[int] = _tlv(0x66)
+    status_text: Optional[str] = _tlv(0x67)
+    body: Optional[ControlParametersValue] = _tlv(0x68)
+
+
+@dc.dataclass
+class FaceEventNotificationValue:
+    face_event_kind: Optional[FaceEventKind] = _tlv(0xc1)
+    face_id: Optional[int] = _tlv(0x69)
+    uri: Optional[str] = _tlv(0x72)
+    local_uri: Optional[str] = _tlv(0x81)
+    face_scope: Optional[FaceScope] = _tlv(0x84)
+    face_persistency: Optional[FacePersistency] = _tlv(0x85)
+    link_type: Optional[FaceLinkType] = _tlv(0x86)
+    flags: Optional[FaceFlags] = _tlv(0x6c)
+
+
+@dc.dataclass
+class FaceEventNotification:
+    event: Optional[FaceEventNotificationValue] = _tlv(0xc0)
+
+
+@dc.dataclass
+class GeneralStatus:
+    nfd_version: Optional[str] = _tlv(0x80)
+    start_timestamp: Optional[int] = _tlv(0x81)
+    current_timestamp: Optional[int] = _tlv(0x82)
+    n_name_tree_entries: Optional[int] = _tlv(0x83)
+    n_fib_entries: Optional[int] = _tlv(0x84)
+    n_pit_entries: Optional[int] = _tlv(0x85)
+    n_measurement_entries: Optional[int] = _tlv(0x86)
+    n_cs_entries: Optional[int] = _tlv(0x87)
+    n_in_interests: Optional[int] = _tlv(0x90)
+    n_in_data: Optional[int] = _tlv(0x91)
+    n_in_nacks: Optional[int] = _tlv(0x97)
+    n_out_interests: Optional[int] = _tlv(0x92)
+    n_out_data: Optional[int] = _tlv(0x93)
+    n_out_nacks: Optional[int] = _tlv(0x98)
+    n_satisfied_interests: Optional[int] = _tlv(0x99)
+    n_unsatisfied_interests: Optional[int] = _tlv(0x9a)
     # The following comes from DNMP's extension to NFD mgmt protocol:
     # https://github.com/pollere/DNMP-v2/blob/c4359ae1af03824ec1ee8cd27a7d52c9151fa813/formats/forwarder-status.proto
     # It does not show up in the standard protocol:
     # https://redmine.named-data.net/projects/nfd/wiki/ForwarderStatus
-    n_fragmentation_errors = UintField(0xc8)
-    n_out_over_mtu = UintField(0xc9)
-    n_in_lp_invalid = UintField(0xca)
-    n_reassembly_timeouts = UintField(0xcb)
-    n_in_net_invalid = UintField(0xcc)
-    n_acknowledged = UintField(0xcd)
-    n_retransmitted = UintField(0xce)
-    n_retx_exhausted = UintField(0xcf)
-    n_congestion_marked = UintField(0xd0)
+    n_fragmentation_errors: Optional[int] = _tlv(0xc8)
+    n_out_over_mtu: Optional[int] = _tlv(0xc9)
+    n_in_lp_invalid: Optional[int] = _tlv(0xca)
+    n_reassembly_timeouts: Optional[int] = _tlv(0xcb)
+    n_in_net_invalid: Optional[int] = _tlv(0xcc)
+    n_acknowledged: Optional[int] = _tlv(0xcd)
+    n_retransmitted: Optional[int] = _tlv(0xce)
+    n_retx_exhausted: Optional[int] = _tlv(0xcf)
+    n_congestion_marked: Optional[int] = _tlv(0xd0)
 
 
-class FaceStatus(TlvModel):
-    face_id = UintField(0x69)
-    uri = BytesField(0x72, is_string=True)
-    local_uri = BytesField(0x81, is_string=True)
-    expiration_period = UintField(0x6d)
-    face_scope = UintField(0x84, val_base_type=FaceScope)
-    face_persistency = UintField(0x85, val_base_type=FacePersistency)
-    link_type = UintField(0x86, val_base_type=FaceLinkType)
-    base_congestion_mark_interval = UintField(0x87)
-    default_congestion_threshold = UintField(0x88)
-    mtu = UintField(0x89)
-    n_in_interests = UintField(0x90)
-    n_in_data = UintField(0x91)
-    n_in_nacks = UintField(0x97)
-    n_out_interests = UintField(0x92)
-    n_out_data = UintField(0x93)
-    n_out_nacks = UintField(0x98)
-    n_in_bytes = UintField(0x94)
-    n_out_bytes = UintField(0x95)
-    flags = UintField(0x6c, val_base_type=FaceFlags)
+@dc.dataclass
+class FaceStatus:
+    face_id: Optional[int] = _tlv(0x69)
+    uri: Optional[str] = _tlv(0x72)
+    local_uri: Optional[str] = _tlv(0x81)
+    expiration_period: Optional[int] = _tlv(0x6d)
+    face_scope: Optional[FaceScope] = _tlv(0x84)
+    face_persistency: Optional[FacePersistency] = _tlv(0x85)
+    link_type: Optional[FaceLinkType] = _tlv(0x86)
+    base_congestion_mark_interval: Optional[int] = _tlv(0x87)
+    default_congestion_threshold: Optional[int] = _tlv(0x88)
+    mtu: Optional[int] = _tlv(0x89)
+    n_in_interests: Optional[int] = _tlv(0x90)
+    n_in_data: Optional[int] = _tlv(0x91)
+    n_in_nacks: Optional[int] = _tlv(0x97)
+    n_out_interests: Optional[int] = _tlv(0x92)
+    n_out_data: Optional[int] = _tlv(0x93)
+    n_out_nacks: Optional[int] = _tlv(0x98)
+    n_in_bytes: Optional[int] = _tlv(0x94)
+    n_out_bytes: Optional[int] = _tlv(0x95)
+    flags: Optional[FaceFlags] = _tlv(0x6c)
 
 
-class FaceStatusMsg(TlvModel):
-    face_status = RepeatedField(ModelField(0x80, FaceStatus))
+@dc.dataclass
+class FaceStatusMsg:
+    face_status: list[FaceStatus] = _repeated(0x80)
 
 
-class FaceQueryFilterValue(TlvModel):
-    face_id = UintField(0x69)
-    uri_scheme = BytesField(0x83, is_string=True)
-    uri = BytesField(0x72, is_string=True)
-    local_uri = BytesField(0x81, is_string=True)
-    face_scope = UintField(0x84, val_base_type=FaceScope)
-    face_persistency = UintField(0x85, val_base_type=FacePersistency)
-    link_type = UintField(0x86, val_base_type=FaceLinkType)
+@dc.dataclass
+class FaceQueryFilterValue:
+    face_id: Optional[int] = _tlv(0x69)
+    uri_scheme: Optional[str] = _tlv(0x83)
+    uri: Optional[str] = _tlv(0x72)
+    local_uri: Optional[str] = _tlv(0x81)
+    face_scope: Optional[FaceScope] = _tlv(0x84)
+    face_persistency: Optional[FacePersistency] = _tlv(0x85)
+    link_type: Optional[FaceLinkType] = _tlv(0x86)
 
 
-class FaceQueryFilter(TlvModel):
-    face_query_filter = ModelField(0x96, FaceQueryFilterValue)
+@dc.dataclass
+class FaceQueryFilter:
+    face_query_filter: Optional[FaceQueryFilterValue] = _tlv(0x96)
 
 
-class Route(TlvModel):
-    face_id = UintField(0x69)
-    origin = UintField(0x6f)
-    cost = UintField(0x6a)
-    flags = UintField(0x6c, val_base_type=RouteFlags)
-    expiration_period = UintField(0x6d)
+@dc.dataclass
+class Route:
+    face_id: Optional[int] = _tlv(0x69)
+    origin: Optional[int] = _tlv(0x6f)
+    cost: Optional[int] = _tlv(0x6a)
+    flags: Optional[RouteFlags] = _tlv(0x6c)
+    expiration_period: Optional[int] = _tlv(0x6d)
 
 
-class RibEntry(TlvModel):
-    name = NameField()
-    routes = RepeatedField(ModelField(0x81, Route))
+@dc.dataclass
+class RibEntry:
+    name: NDNName = _name()
+    routes: list[Route] = _repeated(0x81)
 
 
-class RibStatus(TlvModel):
-    entries = RepeatedField(ModelField(0x80, RibEntry))
+@dc.dataclass
+class RibStatus:
+    entries: list[RibEntry] = _repeated(0x80)
 
 
-class NextHopRecord(TlvModel):
-    face_id = UintField(0x69)
-    cost = UintField(0x6a)
+@dc.dataclass
+class NextHopRecord:
+    face_id: Optional[int] = _tlv(0x69)
+    cost: Optional[int] = _tlv(0x6a)
 
 
-class FibEntry(TlvModel):
-    name = NameField()
-    next_hop_records = RepeatedField(ModelField(0x81, NextHopRecord))
+@dc.dataclass
+class FibEntry:
+    name: NDNName = _name()
+    next_hop_records: list[NextHopRecord] = _repeated(0x81)
 
 
-class FibStatus(TlvModel):
-    entries = RepeatedField(ModelField(0x80, FibEntry))
+@dc.dataclass
+class FibStatus:
+    entries: list[FibEntry] = _repeated(0x80)
 
 
-class StrategyChoice(TlvModel):
-    name = NameField()
-    strategy = ModelField(0x6b, Strategy)
+@dc.dataclass
+class StrategyChoice:
+    name: NDNName = _name()
+    strategy: Optional[Strategy] = _tlv(0x6b)
 
 
-class StrategyChoiceMsg(TlvModel):
-    strategy_choices = RepeatedField(ModelField(0x80, StrategyChoice))
+@dc.dataclass
+class StrategyChoiceMsg:
+    strategy_choices: list[StrategyChoice] = _repeated(0x80)
 
 
-class CsInfo(TlvModel):
-    capacity = UintField(0x83)
-    flags = UintField(0x6c)
-    n_cs_entries = UintField(0x87)
-    n_hits = UintField(0x81)
-    n_misses = UintField(0x82)
+@dc.dataclass
+class CsInfo:
+    capacity: Optional[int] = _tlv(0x83)
+    flags: Optional[int] = _tlv(0x6c)
+    n_cs_entries: Optional[int] = _tlv(0x87)
+    n_hits: Optional[int] = _tlv(0x81)
+    n_misses: Optional[int] = _tlv(0x82)
 
 
 def make_command(module, command, face: Face | None = None, **kwargs):
@@ -240,8 +286,8 @@ def make_command(module, command, face: Face | None = None, **kwargs):
     # SignatureInfo
     signer = DigestSha256Signer()
     sig_info = SignatureInfo()
-    signer.write_signature_info(sig_info)
-    buf = sig_info.encode()
+    write_signature_info(signer, sig_info)
+    buf = tlv_encode(sig_info)
     ret.append(Component.from_bytes(bytes([TypeNumber.SIGNATURE_INFO, len(buf)]) + buf))
 
     # SignatureValue
@@ -268,28 +314,26 @@ def make_command_v2(module, command, face: Face | None = None, **kwargs):
     else:
         ret = Name.from_str(f"/localhop/nfd/{module}/{command}")
     # Command parameters
-    cp = ControlParameters()
-    cp.cp = ControlParametersValue()
+    cp = ControlParameters(cp=ControlParametersValue())
     for k, v in kwargs.items():
         if k == 'strategy':
-            cp.cp.strategy = Strategy()
-            cp.cp.strategy.name = v
+            cp.cp.strategy = Strategy(name=v)
         else:
             setattr(cp.cp, k, v)
-    ret.append(Component.from_bytes(cp.encode()))
+    ret.append(Component.from_bytes(tlv_encode(cp)))
     return ret
 
 
 def parse_response(buf):
     buf = parse_and_check_tl(memoryview(buf), 0x65)
-    cr = ControlResponse.parse(buf)
+    cr = tlv_parse(ControlResponse, buf)
     ret = {}
     ret['status_code'] = cr.status_code
     ret['status_text'] = cr.status_text
     params = cr.body
-    for k in ControlParametersValue._encoded_fields:
-        val = getattr(params, k.name)
+    for f in dc.fields(ControlParametersValue):
+        val = getattr(params, f.name) if params is not None else None
         if isinstance(val, memoryview):
             val = bytes(val)
-        ret[k.name] = val
+        ret[f.name] = val
     return ret

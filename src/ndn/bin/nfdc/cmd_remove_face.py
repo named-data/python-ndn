@@ -18,6 +18,7 @@
 import argparse
 from ...appv2 import NDNApp
 from ...encoding import Name, Component
+from ...encoding.tlv_model import tlv_encode, tlv_parse
 from ...app_support.nfd_mgmt import FaceStatusMsg, FaceQueryFilter, FaceQueryFilterValue, parse_response, \
     make_command_v2
 from .utils import express_interest
@@ -56,7 +57,7 @@ def execute(args: argparse.Namespace):
                 msg = parse_response(data)
                 print('Query failed with response', msg['status_code'], msg['status_text'])
             else:
-                msg = FaceStatusMsg.parse(data)
+                msg = tlv_parse(FaceStatusMsg, data)
                 for f in msg.face_status:
                     await remove_face(f.face_id)
             return True
@@ -66,11 +67,11 @@ def execute(args: argparse.Namespace):
             filt = FaceQueryFilter()
             filt.face_query_filter = FaceQueryFilterValue()
             filt.face_query_filter.uri = uri
-            data_name = Name.from_str(name) + [Component.from_bytes(filt.encode())]
+            data_name = Name.from_str(name) + [Component.from_bytes(tlv_encode(filt))]
             if not await try_remove():
                 filt.face_query_filter.uri = None
                 filt.face_query_filter.local_uri = uri
-                data_name = Name.from_str(name) + [Component.from_bytes(filt.encode())]
+                data_name = Name.from_str(name) + [Component.from_bytes(tlv_encode(filt))]
                 if not await try_remove():
                     print('No face is found')
         finally:
