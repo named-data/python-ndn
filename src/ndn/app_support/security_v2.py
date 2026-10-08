@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import dataclasses as dc
 from datetime import datetime, timedelta, UTC
-from typing import Optional
 
 from ..utils import timestamp
 from ..encoding import (
@@ -58,10 +57,10 @@ class SecurityV2TypeNumber:
 
 @dc.dataclass
 class DescriptionEntry:
-    description_key: Optional[bytes] = dc.field(
+    description_key: bytes | None = dc.field(
         default=None, metadata={
             'tlv_type': SecurityV2TypeNumber.DESCRIPTION_KEY})
-    description_value: Optional[bytes] = dc.field(
+    description_value: bytes | None = dc.field(
         default=None, metadata={
             'tlv_type': SecurityV2TypeNumber.DESCRIPTION_VALUE})
 
@@ -75,32 +74,32 @@ class AdditionalDescription:
 
 @dc.dataclass
 class CertificateV2Extension:
-    additional_description: Optional[AdditionalDescription] = dc.field(
+    additional_description: AdditionalDescription | None = dc.field(
         default=None, metadata={
             'tlv_type': SecurityV2TypeNumber.ADDITIONAL_DESCRIPTION})
 
 
 @dc.dataclass
 class ValidityPeriod:
-    not_before: Optional[bytes] = dc.field(
+    not_before: bytes | None = dc.field(
         default=None, metadata={'tlv_type': SecurityV2TypeNumber.NOT_BEFORE})
-    not_after: Optional[bytes] = dc.field(
+    not_after: bytes | None = dc.field(
         default=None, metadata={'tlv_type': SecurityV2TypeNumber.NOT_AFTER})
 
 
 @dc.dataclass
 class CertificateV2SignatureInfo(SignatureInfo):
-    validity_period: Optional[ValidityPeriod] = dc.field(
+    validity_period: ValidityPeriod | None = dc.field(
         default=None, metadata={
             'tlv_type': SecurityV2TypeNumber.VALIDITY_PERIOD})
-    additional_description: Optional[AdditionalDescription] = dc.field(
+    additional_description: AdditionalDescription | None = dc.field(
         default=None, metadata={
             'tlv_type': SecurityV2TypeNumber.ADDITIONAL_DESCRIPTION})
 
 
 @dc.dataclass
 class CertificateV2Value(DataPacketValue):
-    signature_info: Optional[CertificateV2SignatureInfo] = dc.field(
+    signature_info: CertificateV2SignatureInfo | None = dc.field(
         default=None, metadata={
             'tlv_type': TypeNumber.SIGNATURE_INFO,
             'ignore_critical': True,
@@ -109,13 +108,13 @@ class CertificateV2Value(DataPacketValue):
 
 @dc.dataclass
 class SafeBag:
-    certificate_v2: Optional[bytes] = dc.field(
+    certificate_v2: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.DATA})
     # Keep the certificate as encoded bytes instead of a nested dataclass:
     # 1. The encoded length of CertificateV2 is unknown.
     # 2. Generally we already have an encoded certificate when exporting a
     #    SafeBag.
-    encrypted_key_bag: Optional[bytes] = dc.field(
+    encrypted_key_bag: bytes | None = dc.field(
         default=None, metadata={
             'tlv_type': SecurityV2TypeNumber.ENCRYPTED_KEY_BAG})
 

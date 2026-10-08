@@ -16,7 +16,6 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import dataclasses as dc
-from typing import Optional
 from ... import encoding as enc
 
 
@@ -26,7 +25,7 @@ __all__ = ['StateVecEntry', 'StateVec', 'StateVecWrapper', 'MappingEntry', 'Mapp
 @dc.dataclass
 class StateVecEntry:
     node_id: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
-    seq_no: Optional[int] = dc.field(default=None, metadata={'tlv_type': 0xcc})
+    seq_no: int | None = dc.field(default=None, metadata={'tlv_type': 0xcc})
 
 
 @dc.dataclass
@@ -36,21 +35,21 @@ class StateVec:
 
 @dc.dataclass
 class StateVecWrapper:
-    val: Optional[StateVec] = dc.field(default=None, metadata={'tlv_type': 0xc9})
+    val: StateVec | None = dc.field(default=None, metadata={'tlv_type': 0xc9})
 
 
 @dc.dataclass
 class MappingEntry:
-    seq_no: Optional[int] = dc.field(default=None, metadata={'tlv_type': 0xcc})
+    seq_no: int | None = dc.field(default=None, metadata={'tlv_type': 0xcc})
     app_name: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
 
 
 @dc.dataclass
 class MappingData:
     node_id: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
-    entries: Optional[MappingEntry] = dc.field(default=None, metadata={'tlv_type': 0xce})
+    entries: MappingEntry | None = dc.field(default=None, metadata={'tlv_type': 0xce})
 
 
 @dc.dataclass
 class MappingDataWrapper:
-    val: Optional[MappingEntry] = dc.field(default=None, metadata={'tlv_type': 0xcd})
+    val: MappingEntry | None = dc.field(default=None, metadata={'tlv_type': 0xcd})

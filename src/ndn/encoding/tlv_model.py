@@ -16,6 +16,8 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 """Dataclass-based TLV encoding and decoding."""
+from __future__ import annotations
+
 import dataclasses
 import struct
 import typing
@@ -54,7 +56,7 @@ class NDNName:
 
         name: NDNName = field(default=None, metadata={'tlv_type': 0x07})
         # repeated Names:
-        names: List[NDNName] = field(default_factory=list,
+        names: list[NDNName] = field(default_factory=list,
                                      metadata={'tlv_type': 0x07})
 
     The runtime value is :any:`FormalName`, a list of encoded components.
@@ -66,7 +68,7 @@ class NDNName:
 # ---------------------------------------------------------------------------
 
 def _unwrap_optional(annotation):
-    """Return T for Optional[T] = Union[T, None]; otherwise return unchanged."""
+    """Return T for T | None; otherwise return the annotation unchanged."""
     if typing.get_origin(annotation) in (typing.Union, UnionType):
         args = [a for a in typing.get_args(annotation) if a is not type(None)]
         if len(args) == 1:
@@ -117,14 +119,14 @@ def _infer_kind(annotation, metadata: dict) -> str:
 
 
 def _element_annotation(annotation):
-    """Extract T from List[T]; falls back to bytes."""
+    """Extract T from list[T]; fall back to bytes."""
     annotation = _unwrap_optional(annotation)
     args = typing.get_args(annotation)
     return args[0] if args else bytes
 
 
 def _map_annotations(annotation):
-    """Extract (K, V) from Dict[K, V]; falls back to (str, bytes)."""
+    """Extract (K, V) from dict[K, V]; fall back to (str, bytes)."""
     annotation = _unwrap_optional(annotation)
     args = typing.get_args(annotation)
     if len(args) == 2:
@@ -156,11 +158,11 @@ class _FieldSpec:
     kind: str
     metadata: typing.Mapping
     annotation: typing.Any
-    tlv_type: typing.Optional[int]
-    enum_cls: typing.Optional[type] = None
-    elem: typing.Optional['_FieldSpec'] = None
-    key: typing.Optional['_FieldSpec'] = None
-    val: typing.Optional['_FieldSpec'] = None
+    tlv_type: int | None
+    enum_cls: type | None = None
+    elem: _FieldSpec | None = None
+    key: _FieldSpec | None = None
+    val: _FieldSpec | None = None
 
 
 def _make_spec(name: str, annotation, metadata) -> _FieldSpec:
@@ -179,7 +181,7 @@ def _make_spec(name: str, annotation, metadata) -> _FieldSpec:
                       enum_cls, elem, key, val)
 
 
-_SCHEMA_CACHE: 'weakref.WeakKeyDictionary[type, tuple[_FieldSpec, ...]]' = weakref.WeakKeyDictionary()
+_SCHEMA_CACHE: weakref.WeakKeyDictionary[type, tuple[_FieldSpec, ...]] = weakref.WeakKeyDictionary()
 
 
 def _get_schema(cls) -> tuple[_FieldSpec, ...]:

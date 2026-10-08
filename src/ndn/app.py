@@ -60,12 +60,12 @@ Interest handler function associated with a name prefix.
 The function should use the provided ``reply`` callback to reply with Data, which can handle PIT
 token properly.
 
-..  function:: (name: FormalName, app_param: Optional[BinaryStr], reply: ReplyFunc, context: PktContext) -> None
+..  function:: (name: FormalName, app_param: BinaryStr | None, reply: ReplyFunc, context: PktContext) -> None
 
     :param name: Interest name.
     :type name: :any:`FormalName`
     :param app_param: Interest ApplicationParameters value, or None if absent.
-    :type app_param: Optional[:any:`BinaryStr`]
+    :type app_param: :any:`BinaryStr` | None
     :param reply: continuation function to respond with Data.
     :type reply: :any:`ReplyFunc`
     :param context: packet handler context.
@@ -319,9 +319,9 @@ class NDNApp:
         :param name: the Name.
         :type name: :any:`NonStrictName`
         :param content: the Content.
-        :type content: Optional[:any:`BinaryStr`]
+        :type content: :any:`BinaryStr` | None
         :param signer: the Signer used to sign the packet.
-        :type signer: Optional[:any:`Signer`]
+        :type signer: :any:`Signer` | None
         :param kwargs: arguments for :any:`MetaInfo`.
         :return: TLV encoded Data packet.
         """
@@ -477,7 +477,7 @@ class NDNApp:
             Otherwise, signed Interests are passed to the validator.
             Those failing the validation are dropped silently.
             Those passing the validation are passed to the handler function.
-        :type validator: Optional[:any:`Validator`]
+        :type validator: :any:`Validator` | None
         """
         name = enc.Name.normalize(name)
         node = self._fib.setdefault(name, PrefixTreeNode())
@@ -617,12 +617,12 @@ class NDNApp:
         :param app_param: Interest ApplicationParameters value. If this is not None, a signed
                           Interest is sent. NDNApp does not support sending parameterized
                           Interests that are not signed.
-        :type app_param: Optional[:any:`BinaryStr`]
+        :type app_param: :any:`BinaryStr` | None
         :param signer: Signer for Interest signing. This is required if `app_param` is specified.
-        :type signer: Optional[:any:`Signer`]
+        :type signer: :any:`Signer` | None
         :param kwargs: arguments for :any:`InterestParam`.
         :return: A tuple of (Name, Content, PacketContext) after ``await``.
-        :rtype: Coroutine[Any, None, Tuple[:any:`FormalName`, Optional[:any:`BinaryStr`], :any:`PktContext`]]
+        :rtype: Coroutine[Any, None, tuple[:any:`FormalName`, :any:`BinaryStr` | None, :any:`PktContext`]]
 
         The following exceptions may be raised by ``express``:
 
@@ -664,7 +664,7 @@ class NDNApp:
         :param name: name prefix.
         :type name: :any:`NonStrictName`
         :param validator: validator for signed Interests. See :any:`attach_handler` for details.
-        :type validator: Optional[:any:`Validator`]
+        :type validator: :any:`Validator` | None
 
         :examples:
             .. code-block:: python3

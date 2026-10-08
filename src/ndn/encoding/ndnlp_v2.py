@@ -4,7 +4,6 @@
 # -----------------------------------------------------------------------------
 """NDNLPv2 models using the dataclass TLV API."""
 import dataclasses as dc
-from typing import Optional
 
 from .tlv_model import DecodeError
 from .tlv_model import tlv_encode, tlv_parse
@@ -48,57 +47,57 @@ class NackReason:
 
 @dc.dataclass
 class NetworkNack:
-    nack_reason: Optional[int] = dc.field(
+    nack_reason: int | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.NACK_REASON})
 
 
 @dc.dataclass
 class CachePolicy:
-    cache_policy_type: Optional[int] = dc.field(
+    cache_policy_type: int | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.CACHE_POLICY_TYPE})
 
 
 @dc.dataclass
 class LpPacketValue:
-    frag_index: Optional[int] = dc.field(
+    frag_index: int | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.FRAG_INDEX})
-    frag_count: Optional[int] = dc.field(
+    frag_count: int | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.FRAG_COUNT})
-    pit_token: Optional[bytes] = dc.field(
+    pit_token: bytes | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.PIT_TOKEN})
-    nack: Optional[NetworkNack] = dc.field(
+    nack: NetworkNack | None = dc.field(
         default=None, metadata={
             'tlv_type': LpTypeNumber.NACK, 'ignore_critical': False})
-    incoming_face_id: Optional[int] = dc.field(
+    incoming_face_id: int | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.INCOMING_FACE_ID})
-    next_hop_face_id: Optional[int] = dc.field(
+    next_hop_face_id: int | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.NEXT_HOP_FACE_ID})
-    cache_policy: Optional[CachePolicy] = dc.field(
+    cache_policy: CachePolicy | None = dc.field(
         default=None, metadata={
             'tlv_type': LpTypeNumber.CACHE_POLICY, 'ignore_critical': False})
-    congestion_mark: Optional[int] = dc.field(
+    congestion_mark: int | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.CONGESTION_MARK})
-    tx_sequence: Optional[bytes] = dc.field(
+    tx_sequence: bytes | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.TX_SEQUENCE})
-    ack: Optional[bytes] = dc.field(
+    ack: bytes | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.ACK})
     non_discovery: bool = dc.field(
         default=False, metadata={'tlv_type': LpTypeNumber.NON_DISCOVERY})
-    prefix_announcement: Optional[bytes] = dc.field(
+    prefix_announcement: bytes | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.PREFIX_ANNOUNCEMENT})
-    fragment: Optional[bytes] = dc.field(
+    fragment: bytes | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.FRAGMENT})
 
 
 @dc.dataclass
 class LpPacket:
-    lp_packet: Optional[LpPacketValue] = dc.field(
+    lp_packet: LpPacketValue | None = dc.field(
         default=None, metadata={'tlv_type': LpTypeNumber.LP_PACKET})
 
 
 def parse_lp_packet(wire: BinaryStr,
                     with_tl: bool = True
-                    ) -> tuple[Optional[int], Optional[BinaryStr]]:
+                    ) -> tuple[int | None, BinaryStr | None]:
     ret = parse_lp_packet_v2(wire, with_tl)
     reason = ret.nack.nack_reason if ret.nack is not None else None
     return reason, ret.fragment
@@ -115,7 +114,7 @@ def parse_lp_packet_v2(wire: BinaryStr, with_tl: bool = True) -> LpPacketValue:
 
 def parse_network_nack(
         wire: BinaryStr,
-        with_tl: bool = True) -> tuple[Optional[int], Optional[BinaryStr]]:
+        with_tl: bool = True) -> tuple[int | None, BinaryStr | None]:
     if with_tl:
         wire = parse_and_check_tl(wire, LpTypeNumber.LP_PACKET)
     ret = tlv_parse(LpPacketValue, wire, ignore_critical=True)

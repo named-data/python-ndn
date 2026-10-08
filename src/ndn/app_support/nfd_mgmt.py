@@ -18,7 +18,6 @@
 """NFD management protocol models using the dataclass TLV API."""
 import dataclasses as dc
 import struct
-from typing import Optional
 from enum import Enum, Flag
 
 from ..transport.face import Face
@@ -96,106 +95,106 @@ class Strategy:
 @dc.dataclass
 class ControlParametersValue:
     name: NDNName = _name()
-    face_id: Optional[int] = _tlv(0x69)
-    uri: Optional[str] = _tlv(0x72)
-    local_uri: Optional[str] = _tlv(0x81)
-    origin: Optional[int] = _tlv(0x6f)
-    cost: Optional[int] = _tlv(0x6a)
-    capacity: Optional[int] = _tlv(0x83)
-    count: Optional[int] = _tlv(0x84)
-    base_congestion_mark_interval: Optional[int] = _tlv(0x87)
-    default_congestion_threshold: Optional[int] = _tlv(0x88)
-    mtu: Optional[int] = _tlv(0x89)
-    flags: Optional[int] = _tlv(0x6c)
-    mask: Optional[int] = _tlv(0x70)
-    strategy: Optional[Strategy] = _tlv(0x6b)
-    expiration_period: Optional[int] = _tlv(0x6d)
-    face_persistency: Optional[FacePersistency] = _tlv(0x85)
+    face_id: int | None = _tlv(0x69)
+    uri: str | None = _tlv(0x72)
+    local_uri: str | None = _tlv(0x81)
+    origin: int | None = _tlv(0x6f)
+    cost: int | None = _tlv(0x6a)
+    capacity: int | None = _tlv(0x83)
+    count: int | None = _tlv(0x84)
+    base_congestion_mark_interval: int | None = _tlv(0x87)
+    default_congestion_threshold: int | None = _tlv(0x88)
+    mtu: int | None = _tlv(0x89)
+    flags: int | None = _tlv(0x6c)
+    mask: int | None = _tlv(0x70)
+    strategy: Strategy | None = _tlv(0x6b)
+    expiration_period: int | None = _tlv(0x6d)
+    face_persistency: FacePersistency | None = _tlv(0x85)
 
 
 @dc.dataclass
 class ControlParameters:
-    cp: Optional[ControlParametersValue] = _tlv(0x68)
+    cp: ControlParametersValue | None = _tlv(0x68)
 
 
 @dc.dataclass
 class ControlResponse:
-    status_code: Optional[int] = _tlv(0x66)
-    status_text: Optional[str] = _tlv(0x67)
-    body: Optional[ControlParametersValue] = _tlv(0x68)
+    status_code: int | None = _tlv(0x66)
+    status_text: str | None = _tlv(0x67)
+    body: ControlParametersValue | None = _tlv(0x68)
 
 
 @dc.dataclass
 class FaceEventNotificationValue:
-    face_event_kind: Optional[FaceEventKind] = _tlv(0xc1)
-    face_id: Optional[int] = _tlv(0x69)
-    uri: Optional[str] = _tlv(0x72)
-    local_uri: Optional[str] = _tlv(0x81)
-    face_scope: Optional[FaceScope] = _tlv(0x84)
-    face_persistency: Optional[FacePersistency] = _tlv(0x85)
-    link_type: Optional[FaceLinkType] = _tlv(0x86)
-    flags: Optional[FaceFlags] = _tlv(0x6c)
+    face_event_kind: FaceEventKind | None = _tlv(0xc1)
+    face_id: int | None = _tlv(0x69)
+    uri: str | None = _tlv(0x72)
+    local_uri: str | None = _tlv(0x81)
+    face_scope: FaceScope | None = _tlv(0x84)
+    face_persistency: FacePersistency | None = _tlv(0x85)
+    link_type: FaceLinkType | None = _tlv(0x86)
+    flags: FaceFlags | None = _tlv(0x6c)
 
 
 @dc.dataclass
 class FaceEventNotification:
-    event: Optional[FaceEventNotificationValue] = _tlv(0xc0)
+    event: FaceEventNotificationValue | None = _tlv(0xc0)
 
 
 @dc.dataclass
 class GeneralStatus:
-    nfd_version: Optional[str] = _tlv(0x80)
-    start_timestamp: Optional[int] = _tlv(0x81)
-    current_timestamp: Optional[int] = _tlv(0x82)
-    n_name_tree_entries: Optional[int] = _tlv(0x83)
-    n_fib_entries: Optional[int] = _tlv(0x84)
-    n_pit_entries: Optional[int] = _tlv(0x85)
-    n_measurement_entries: Optional[int] = _tlv(0x86)
-    n_cs_entries: Optional[int] = _tlv(0x87)
-    n_in_interests: Optional[int] = _tlv(0x90)
-    n_in_data: Optional[int] = _tlv(0x91)
-    n_in_nacks: Optional[int] = _tlv(0x97)
-    n_out_interests: Optional[int] = _tlv(0x92)
-    n_out_data: Optional[int] = _tlv(0x93)
-    n_out_nacks: Optional[int] = _tlv(0x98)
-    n_satisfied_interests: Optional[int] = _tlv(0x99)
-    n_unsatisfied_interests: Optional[int] = _tlv(0x9a)
+    nfd_version: str | None = _tlv(0x80)
+    start_timestamp: int | None = _tlv(0x81)
+    current_timestamp: int | None = _tlv(0x82)
+    n_name_tree_entries: int | None = _tlv(0x83)
+    n_fib_entries: int | None = _tlv(0x84)
+    n_pit_entries: int | None = _tlv(0x85)
+    n_measurement_entries: int | None = _tlv(0x86)
+    n_cs_entries: int | None = _tlv(0x87)
+    n_in_interests: int | None = _tlv(0x90)
+    n_in_data: int | None = _tlv(0x91)
+    n_in_nacks: int | None = _tlv(0x97)
+    n_out_interests: int | None = _tlv(0x92)
+    n_out_data: int | None = _tlv(0x93)
+    n_out_nacks: int | None = _tlv(0x98)
+    n_satisfied_interests: int | None = _tlv(0x99)
+    n_unsatisfied_interests: int | None = _tlv(0x9a)
     # The following comes from DNMP's extension to NFD mgmt protocol:
     # https://github.com/pollere/DNMP-v2/blob/c4359ae1af03824ec1ee8cd27a7d52c9151fa813/formats/forwarder-status.proto
     # It does not show up in the standard protocol:
     # https://redmine.named-data.net/projects/nfd/wiki/ForwarderStatus
-    n_fragmentation_errors: Optional[int] = _tlv(0xc8)
-    n_out_over_mtu: Optional[int] = _tlv(0xc9)
-    n_in_lp_invalid: Optional[int] = _tlv(0xca)
-    n_reassembly_timeouts: Optional[int] = _tlv(0xcb)
-    n_in_net_invalid: Optional[int] = _tlv(0xcc)
-    n_acknowledged: Optional[int] = _tlv(0xcd)
-    n_retransmitted: Optional[int] = _tlv(0xce)
-    n_retx_exhausted: Optional[int] = _tlv(0xcf)
-    n_congestion_marked: Optional[int] = _tlv(0xd0)
+    n_fragmentation_errors: int | None = _tlv(0xc8)
+    n_out_over_mtu: int | None = _tlv(0xc9)
+    n_in_lp_invalid: int | None = _tlv(0xca)
+    n_reassembly_timeouts: int | None = _tlv(0xcb)
+    n_in_net_invalid: int | None = _tlv(0xcc)
+    n_acknowledged: int | None = _tlv(0xcd)
+    n_retransmitted: int | None = _tlv(0xce)
+    n_retx_exhausted: int | None = _tlv(0xcf)
+    n_congestion_marked: int | None = _tlv(0xd0)
 
 
 @dc.dataclass
 class FaceStatus:
-    face_id: Optional[int] = _tlv(0x69)
-    uri: Optional[str] = _tlv(0x72)
-    local_uri: Optional[str] = _tlv(0x81)
-    expiration_period: Optional[int] = _tlv(0x6d)
-    face_scope: Optional[FaceScope] = _tlv(0x84)
-    face_persistency: Optional[FacePersistency] = _tlv(0x85)
-    link_type: Optional[FaceLinkType] = _tlv(0x86)
-    base_congestion_mark_interval: Optional[int] = _tlv(0x87)
-    default_congestion_threshold: Optional[int] = _tlv(0x88)
-    mtu: Optional[int] = _tlv(0x89)
-    n_in_interests: Optional[int] = _tlv(0x90)
-    n_in_data: Optional[int] = _tlv(0x91)
-    n_in_nacks: Optional[int] = _tlv(0x97)
-    n_out_interests: Optional[int] = _tlv(0x92)
-    n_out_data: Optional[int] = _tlv(0x93)
-    n_out_nacks: Optional[int] = _tlv(0x98)
-    n_in_bytes: Optional[int] = _tlv(0x94)
-    n_out_bytes: Optional[int] = _tlv(0x95)
-    flags: Optional[FaceFlags] = _tlv(0x6c)
+    face_id: int | None = _tlv(0x69)
+    uri: str | None = _tlv(0x72)
+    local_uri: str | None = _tlv(0x81)
+    expiration_period: int | None = _tlv(0x6d)
+    face_scope: FaceScope | None = _tlv(0x84)
+    face_persistency: FacePersistency | None = _tlv(0x85)
+    link_type: FaceLinkType | None = _tlv(0x86)
+    base_congestion_mark_interval: int | None = _tlv(0x87)
+    default_congestion_threshold: int | None = _tlv(0x88)
+    mtu: int | None = _tlv(0x89)
+    n_in_interests: int | None = _tlv(0x90)
+    n_in_data: int | None = _tlv(0x91)
+    n_in_nacks: int | None = _tlv(0x97)
+    n_out_interests: int | None = _tlv(0x92)
+    n_out_data: int | None = _tlv(0x93)
+    n_out_nacks: int | None = _tlv(0x98)
+    n_in_bytes: int | None = _tlv(0x94)
+    n_out_bytes: int | None = _tlv(0x95)
+    flags: FaceFlags | None = _tlv(0x6c)
 
 
 @dc.dataclass
@@ -205,27 +204,27 @@ class FaceStatusMsg:
 
 @dc.dataclass
 class FaceQueryFilterValue:
-    face_id: Optional[int] = _tlv(0x69)
-    uri_scheme: Optional[str] = _tlv(0x83)
-    uri: Optional[str] = _tlv(0x72)
-    local_uri: Optional[str] = _tlv(0x81)
-    face_scope: Optional[FaceScope] = _tlv(0x84)
-    face_persistency: Optional[FacePersistency] = _tlv(0x85)
-    link_type: Optional[FaceLinkType] = _tlv(0x86)
+    face_id: int | None = _tlv(0x69)
+    uri_scheme: str | None = _tlv(0x83)
+    uri: str | None = _tlv(0x72)
+    local_uri: str | None = _tlv(0x81)
+    face_scope: FaceScope | None = _tlv(0x84)
+    face_persistency: FacePersistency | None = _tlv(0x85)
+    link_type: FaceLinkType | None = _tlv(0x86)
 
 
 @dc.dataclass
 class FaceQueryFilter:
-    face_query_filter: Optional[FaceQueryFilterValue] = _tlv(0x96)
+    face_query_filter: FaceQueryFilterValue | None = _tlv(0x96)
 
 
 @dc.dataclass
 class Route:
-    face_id: Optional[int] = _tlv(0x69)
-    origin: Optional[int] = _tlv(0x6f)
-    cost: Optional[int] = _tlv(0x6a)
-    flags: Optional[RouteFlags] = _tlv(0x6c)
-    expiration_period: Optional[int] = _tlv(0x6d)
+    face_id: int | None = _tlv(0x69)
+    origin: int | None = _tlv(0x6f)
+    cost: int | None = _tlv(0x6a)
+    flags: RouteFlags | None = _tlv(0x6c)
+    expiration_period: int | None = _tlv(0x6d)
 
 
 @dc.dataclass
@@ -241,8 +240,8 @@ class RibStatus:
 
 @dc.dataclass
 class NextHopRecord:
-    face_id: Optional[int] = _tlv(0x69)
-    cost: Optional[int] = _tlv(0x6a)
+    face_id: int | None = _tlv(0x69)
+    cost: int | None = _tlv(0x6a)
 
 
 @dc.dataclass
@@ -259,7 +258,7 @@ class FibStatus:
 @dc.dataclass
 class StrategyChoice:
     name: NDNName = _name()
-    strategy: Optional[Strategy] = _tlv(0x6b)
+    strategy: Strategy | None = _tlv(0x6b)
 
 
 @dc.dataclass
@@ -269,11 +268,11 @@ class StrategyChoiceMsg:
 
 @dc.dataclass
 class CsInfo:
-    capacity: Optional[int] = _tlv(0x83)
-    flags: Optional[int] = _tlv(0x6c)
-    n_cs_entries: Optional[int] = _tlv(0x87)
-    n_hits: Optional[int] = _tlv(0x81)
-    n_misses: Optional[int] = _tlv(0x82)
+    capacity: int | None = _tlv(0x83)
+    flags: int | None = _tlv(0x6c)
+    n_cs_entries: int | None = _tlv(0x87)
+    n_hits: int | None = _tlv(0x81)
+    n_misses: int | None = _tlv(0x82)
 
 
 def make_command(module, command, face: Face | None = None, **kwargs):

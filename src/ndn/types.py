@@ -96,7 +96,7 @@ class ValidationFailure(Exception):
     :ivar meta_info: the MetaInfo.
     :vartype meta_info: :any:`MetaInfo`
     :ivar content: the Content of Data.
-    :vartype content: Optional[:any:`BinaryStr`]
+    :vartype content: :any:`BinaryStr` | None
     :ivar sig_ptrs: the signature pointers of Data
     :vartype sig_ptrs: :any:`SignaturePtrs`
     :ivar result: the reason of failure.

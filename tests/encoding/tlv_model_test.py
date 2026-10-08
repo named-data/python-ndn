@@ -362,7 +362,7 @@ class TestName:
         assert tlv_encode(M(name=None)) == b''
 
     def test_repeated_names(self):
-        """List[NDNName] — multiple Name TLVs with the same type number."""
+        """list[NDNName] — multiple Name TLVs with the same type number."""
         @dataclass
         class M:
             names: list[NDNName] = field(default_factory=list,

@@ -21,7 +21,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import dataclasses as dc
-from typing import Optional
+from typing import Self
 
 from ...encoding import BinaryStr
 from ...encoding.tlv_model import tlv_encode, tlv_parse
@@ -69,16 +69,16 @@ class TypeNumber:
 @dc.dataclass
 class UserFnArg:
     # A given component
-    value: Optional[bytes] = dc.field(
+    value: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.COMPONENT_VALUE})
     # Referring to a previous matched pattern
-    tag: Optional[int] = dc.field(
+    tag: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
 
 
 @dc.dataclass
 class UserFnCall:
-    fn_id: Optional[str] = dc.field(
+    fn_id: str | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.USER_FN_ID})
     args: list[UserFnArg] = dc.field(
         default_factory=list, metadata={'tlv_type': TypeNumber.FN_ARGS})
@@ -87,13 +87,13 @@ class UserFnCall:
 @dc.dataclass
 class ConstraintOption:
     # Equal to a given NameComponent value
-    value: Optional[bytes] = dc.field(
+    value: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.COMPONENT_VALUE})
     # Equal to another pattern
-    tag: Optional[int] = dc.field(
+    tag: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
     # Decide by a user function call
-    fn: Optional[UserFnCall] = dc.field(
+    fn: UserFnCall | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.USER_FN_CALL})
 
 
@@ -105,9 +105,9 @@ class PatternConstraint:
 
 @dc.dataclass
 class PatternEdge:
-    dest: Optional[int] = dc.field(
+    dest: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    tag: Optional[int] = dc.field(
+    tag: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
     cons_sets: list[PatternConstraint] = dc.field(
         default_factory=list, metadata={'tlv_type': TypeNumber.CONSTRAINT})
@@ -115,17 +115,17 @@ class PatternEdge:
 
 @dc.dataclass
 class ValueEdge:
-    dest: Optional[int] = dc.field(
+    dest: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    value: Optional[bytes] = dc.field(
+    value: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.COMPONENT_VALUE})
 
 
 @dc.dataclass
 class Node:
-    id: Optional[int] = dc.field(
+    id: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    parent: Optional[int] = dc.field(
+    parent: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.PARENT_ID})
     rule_name: list[str] = dc.field(
         default_factory=list, metadata={'tlv_type': TypeNumber.IDENTIFIER})
@@ -139,19 +139,19 @@ class Node:
 
 @dc.dataclass
 class TagSymbol:
-    tag: Optional[int] = dc.field(
+    tag: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
-    ident: Optional[str] = dc.field(
+    ident: str | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.IDENTIFIER})
 
 
 @dc.dataclass
 class LvsModel:
-    version: Optional[int] = dc.field(
+    version: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.VERSION})
-    start_id: Optional[int] = dc.field(
+    start_id: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    named_pattern_cnt: Optional[int] = dc.field(
+    named_pattern_cnt: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.NAMED_PATTERN_NUM})
     nodes: list[Node] = dc.field(
         default_factory=list, metadata={'tlv_type': TypeNumber.NODE})
@@ -162,5 +162,5 @@ class LvsModel:
         return tlv_encode(self)
 
     @classmethod
-    def parse(cls, wire: BinaryStr) -> 'LvsModel':
+    def parse(cls, wire: BinaryStr) -> Self:
         return tlv_parse(cls, wire)

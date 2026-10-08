@@ -4,7 +4,6 @@
 # -----------------------------------------------------------------------------
 """NDN Packet Format v0.3 (2017 forwarding hint) dataclass models."""
 import dataclasses as dc
-from typing import Optional
 
 from .name import Name, Component
 from .signer import Signer
@@ -73,22 +72,22 @@ class SignatureType:
 class KeyLocator:
     name: NDNName = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.NAME})
-    key_digest: Optional[bytes] = dc.field(
+    key_digest: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.KEY_DIGEST})
 
 
 @dc.dataclass
 class SignatureInfo:
-    signature_type: Optional[int] = dc.field(
+    signature_type: int | None = dc.field(
         default=None, metadata={
             'tlv_type': TypeNumber.SIGNATURE_TYPE, 'fixed_len': 1})
-    key_locator: Optional[KeyLocator] = dc.field(
+    key_locator: KeyLocator | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.KEY_LOCATOR})
-    signature_nonce: Optional[int] = dc.field(
+    signature_nonce: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_NONCE})
-    signature_time: Optional[int] = dc.field(
+    signature_time: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_TIME})
-    signature_seq_num: Optional[int] = dc.field(
+    signature_seq_num: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_SEQ_NUM})
 
 
@@ -108,7 +107,7 @@ def write_signature_info(signer: Signer, signature_info: SignatureInfo) -> None:
 
 @dc.dataclass
 class Delegation:
-    preference: Optional[int] = dc.field(
+    preference: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.PREFERENCE})
     delegation: NDNName = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.NAME})
@@ -128,24 +127,24 @@ class InterestPacketValue:
         default=False, metadata={'tlv_type': TypeNumber.CAN_BE_PREFIX})
     must_be_fresh: bool = dc.field(
         default=False, metadata={'tlv_type': TypeNumber.MUST_BE_FRESH})
-    forwarding_hint: Optional[Links] = dc.field(
+    forwarding_hint: Links | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.FORWARDING_HINT})
-    nonce: Optional[int] = dc.field(default=None, metadata={
+    nonce: int | None = dc.field(default=None, metadata={
         'tlv_type': TypeNumber.NONCE, 'fixed_len': 4})
-    lifetime: Optional[int] = dc.field(
+    lifetime: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.INTEREST_LIFETIME})
-    hop_limit: Optional[int] = dc.field(default=None, metadata={
+    hop_limit: int | None = dc.field(default=None, metadata={
         'tlv_type': TypeNumber.HOP_LIMIT, 'fixed_len': 1})
     _sig_cover_start: None = dc.field(
         default=None, metadata={'field_type': 'offset_marker'})
     _digest_cover_start: None = dc.field(
         default=None, metadata={'field_type': 'offset_marker'})
-    application_parameters: Optional[bytes] = dc.field(
+    application_parameters: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.APPLICATION_PARAMETERS})
-    signature_info: Optional[SignatureInfo] = dc.field(
+    signature_info: SignatureInfo | None = dc.field(
         default=None, metadata={
             'tlv_type': TypeNumber.INTEREST_SIGNATURE_INFO})
-    signature_value: Optional[bytes] = dc.field(default=None, metadata={
+    signature_value: bytes | None = dc.field(default=None, metadata={
         'tlv_type': TypeNumber.INTEREST_SIGNATURE_VALUE,
         'field_type': 'sig_value',
         'cover_start': '_sig_cover_start',
@@ -158,23 +157,23 @@ class InterestPacketValue:
 
 @dc.dataclass
 class InterestPacket:
-    interest: Optional[InterestPacketValue] = dc.field(
+    interest: InterestPacketValue | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.INTEREST})
 
 
 @dc.dataclass(init=False)
 class MetaInfo:
-    content_type: Optional[int] = dc.field(
+    content_type: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.CONTENT_TYPE})
-    freshness_period: Optional[int] = dc.field(
+    freshness_period: int | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.FRESHNESS_PERIOD})
-    final_block_id: Optional[bytes] = dc.field(
+    final_block_id: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.FINAL_BLOCK_ID})
 
     def __init__(self,
-                 content_type: Optional[int] = ContentType.BLOB,
-                 freshness_period: Optional[int] = None,
-                 final_block_id: Optional[BinaryStr] = None):
+                 content_type: int | None = ContentType.BLOB,
+                 freshness_period: int | None = None,
+                 final_block_id: BinaryStr | None = None):
         self.content_type = content_type
         self.freshness_period = freshness_period
         self.final_block_id = final_block_id
@@ -194,13 +193,13 @@ class DataPacketValue:
         default=None, metadata={'field_type': 'offset_marker'})
     name: NDNName = dc.field(
         default='/', metadata={'tlv_type': TypeNumber.NAME})
-    meta_info: Optional[MetaInfo] = dc.field(
+    meta_info: MetaInfo | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.META_INFO})
-    content: Optional[bytes] = dc.field(
+    content: bytes | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.CONTENT})
-    signature_info: Optional[SignatureInfo] = dc.field(default=None, metadata={
+    signature_info: SignatureInfo | None = dc.field(default=None, metadata={
         'tlv_type': TypeNumber.SIGNATURE_INFO, 'ignore_critical': True})
-    signature_value: Optional[bytes] = dc.field(default=None, metadata={
+    signature_value: bytes | None = dc.field(default=None, metadata={
         'tlv_type': TypeNumber.SIGNATURE_VALUE,
         'field_type': 'sig_value',
         'cover_start': '_sig_cover_start',
@@ -209,7 +208,7 @@ class DataPacketValue:
 
 @dc.dataclass
 class DataPacket:
-    data: Optional[DataPacketValue] = dc.field(
+    data: DataPacketValue | None = dc.field(
         default=None, metadata={'tlv_type': TypeNumber.DATA})
 
 
@@ -217,9 +216,9 @@ class DataPacket:
 class InterestParam:
     can_be_prefix: bool = False
     must_be_fresh: bool = False
-    nonce: Optional[int] = None
-    lifetime: Optional[int] = 4000
-    hop_limit: Optional[int] = None
+    nonce: int | None = None
+    lifetime: int | None = 4000
+    hop_limit: int | None = None
     forwarding_hint: list[tuple[int, NonStrictName]] = dc.field(default_factory=list)
 
     @staticmethod
@@ -233,15 +232,15 @@ class InterestParam:
 
 @dc.dataclass
 class SignaturePtrs:
-    signature_info: Optional[SignatureInfo] = None
+    signature_info: SignatureInfo | None = None
     signature_covered_part: list[BinaryStr] = dc.field(default_factory=list)
-    signature_value_buf: Optional[BinaryStr] = None
+    signature_value_buf: BinaryStr | None = None
     digest_covered_part: list[BinaryStr] = dc.field(default_factory=list)
-    digest_value_buf: Optional[BinaryStr] = None
+    digest_value_buf: BinaryStr | None = None
 
 
-Interest = tuple[FormalName, InterestParam, Optional[BinaryStr], SignaturePtrs]
-Data = tuple[FormalName, MetaInfo, Optional[BinaryStr], SignaturePtrs]
+Interest = tuple[FormalName, InterestParam, BinaryStr | None, SignaturePtrs]
+Data = tuple[FormalName, MetaInfo, BinaryStr | None, SignaturePtrs]
 
 
 def _wrap_tlv(type_num: int, value: BinaryStr) -> VarBinaryStr:
@@ -259,8 +258,8 @@ def _wrap_tlv(type_num: int, value: BinaryStr) -> VarBinaryStr:
 
 def make_interest(name: NonStrictName,
                   interest_param: InterestParam,
-                  app_param: Optional[BinaryStr] = None,
-                  signer: Optional[Signer] = None,
+                  app_param: BinaryStr | None = None,
+                  signer: Signer | None = None,
                   need_final_name: bool = False):
     value = InterestPacketValue(
         name=name,
@@ -298,8 +297,8 @@ def make_interest(name: NonStrictName,
 
 def make_data(name: NonStrictName,
               meta_info: MetaInfo,
-              content: Optional[BinaryStr] = None,
-              signer: Optional[Signer] = None) -> VarBinaryStr:
+              content: BinaryStr | None = None,
+              signer: Signer | None = None) -> VarBinaryStr:
     value = DataPacketValue(name=name, meta_info=meta_info, content=content)
     if signer is not None:
         value.signature_info = SignatureInfo()
