@@ -22,7 +22,7 @@ import time
 import asyncio as aio
 from enum import Enum
 from ... import encoding as enc
-from ... import appv2 as app
+from ... import app
 from .tlv import StateVec, StateVecWrapper, StateVecEntry
 
 

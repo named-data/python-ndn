@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-from ...appv2 import NDNApp, pass_all
+from ...app import NDNApp, pass_all
 from ...security import DigestSha256Signer
 from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 

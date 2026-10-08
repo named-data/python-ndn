@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...appv2 import NDNApp
+from ...app import NDNApp
 from ...app_support.nfd_mgmt import make_command_v2, parse_response
 from .utils import express_interest
 

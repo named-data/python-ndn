@@ -18,10 +18,10 @@
 import logging
 from hashlib import sha256
 from ...encoding import FormalName, SignatureType, Name, SignaturePtrs
-from ...types import Validator
+from ...types import Validator, ValidResult
 
 
-async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs) -> bool:
+async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs, _context=None) -> ValidResult:
     sig_info = sig.signature_info
     covered_part = sig.signature_covered_part
     sig_value = sig.signature_value_buf
@@ -34,9 +34,9 @@ async def sha256_digest_checker(name: FormalName, sig: SignaturePtrs) -> bool:
                 sha256_algo.update(blk)
             ret = sha256_algo.digest() == sig_value
         logging.getLogger(__name__).debug('Digest check %s -> %s', Name.to_str(name), ret)
-        return ret
+        return ValidResult.PASS if ret else ValidResult.FAIL
     else:
-        return True
+        return ValidResult.PASS
 
 
 # This is automatically called
@@ -55,9 +55,12 @@ async def params_sha256_checker(name: FormalName, sig: SignaturePtrs) -> bool:
 
 
 def union_checker(*args) -> Validator:
-    async def wrapper(name: FormalName, sig: SignaturePtrs) -> bool:
+    async def wrapper(name: FormalName, sig: SignaturePtrs, context) -> ValidResult:
         for checker in args:
-            if not await checker(name, sig):
-                return False
-        return True
+            result = await checker(name, sig, context)
+            if result in (ValidResult.FAIL, ValidResult.TIMEOUT):
+                return result
+            if result is ValidResult.ALLOW_BYPASS:
+                return result
+        return ValidResult.PASS
     return wrapper

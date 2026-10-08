@@ -19,7 +19,7 @@ import os
 import sys
 import argparse
 from ...encoding import Name, InterestParam
-from ...appv2 import NDNApp, pass_all
+from ...app import NDNApp, pass_all
 # from ...security import KeychainDigest
 from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 

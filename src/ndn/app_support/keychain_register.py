@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import logging
-from ..appv2 import NDNApp, ReplyFunc
+from ..app import NDNApp, ReplyFunc
 from .. import security as sec
 from .. import encoding as enc
 from . import security_v2 as secv2

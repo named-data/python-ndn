@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...appv2 import NDNApp
+from ...app import NDNApp
 from ...encoding import Name
 from ...encoding.tlv_model import tlv_parse
 from ...app_support.nfd_mgmt import FibStatus, RibStatus

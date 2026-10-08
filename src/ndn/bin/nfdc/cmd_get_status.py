@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import argparse
 import datetime
-from ...appv2 import NDNApp
+from ...app import NDNApp
 from ...encoding.tlv_model import tlv_parse
 from ...app_support.nfd_mgmt import GeneralStatus
 from .utils import express_interest
