@@ -266,7 +266,8 @@ class Key(AbstractKey):
             raise KeyError(name)
         row_id, cert_name, cert_data, is_default = data
         cursor.close()
-        return Certificate(row_id=row_id, key=self._name, name=cert_name, data=cert_data, is_default=is_default != 0)
+        return Certificate(row_id=row_id, key=self._name, name=Name.from_bytes(cert_name),
+                           data=cert_data, is_default=is_default != 0)
 
     def __iter__(self) -> Iterator[FormalName]:
         cursor = self.pib.conn.execute('SELECT certificate_name FROM certificates WHERE key_id=?', (self.row_id,))
@@ -322,7 +323,8 @@ class Key(AbstractKey):
             raise KeyError('No default certificate')
         row_id, cert_name, cert_data, is_default = data
         cursor.close()
-        return Certificate(row_id=row_id, key=self._name, name=cert_name, data=cert_data, is_default=is_default != 0)
+        return Certificate(row_id=row_id, key=self._name, name=Name.from_bytes(cert_name),
+                           data=cert_data, is_default=is_default != 0)
 
 
 class Identity(AbstractIdentity):

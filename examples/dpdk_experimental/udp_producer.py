@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import logging
 import sys
-from ndn import app
+from ndn import app as ndn_app
 from ndn import encoding as enc
 from ndn.transport.ndn_dpdk import NdnDpdkUdpFace, DpdkRegisterer
 
@@ -42,13 +42,13 @@ dpdk_port = int(sys.argv[5])
 face = NdnDpdkUdpFace(gql_url, self_addr, self_port, dpdk_addr, dpdk_port)
 registerer = DpdkRegisterer(face)
 
-app = app.NDNApp(face=face, registerer=registerer)
+app = ndn_app.NDNApp(face=face, registerer=registerer)
 keychain = app.default_keychain()
 
 
 @app.route('/example/testApp')
 def on_interest(name: enc.FormalName, _app_param: enc.BinaryStr | None,
-                reply: app.ReplyFunc, context: app.PktContext):
+                reply: ndn_app.ReplyFunc, context: ndn_app.PktContext):
     print(f'>> I: {enc.Name.to_str(name)}, {context["int_param"]}')
     content = b"Hello, world!"
     reply(app.make_data(name, content=content, signer=keychain.get_signer({}),

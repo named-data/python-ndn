@@ -16,7 +16,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import logging
-from ndn import app
+from ndn import app as ndn_app
 from ndn import encoding as enc
 
 
@@ -26,13 +26,13 @@ logging.basicConfig(format='[{asctime}]{levelname}:{message}',
                     style='{')
 
 
-app = app.NDNApp()
+app = ndn_app.NDNApp()
 keychain = app.default_keychain()
 
 
 @app.route('/example/testApp')
 def on_interest(name: enc.FormalName, _app_param: enc.BinaryStr | None,
-                reply: app.ReplyFunc, context: app.PktContext):
+                reply: ndn_app.ReplyFunc, context: ndn_app.PktContext):
     print(f'>> I: {enc.Name.to_str(name)}, {context["int_param"]}')
     content = b"Hello, world!"
     reply(app.make_data(name, content=content, signer=keychain.get_signer({}),

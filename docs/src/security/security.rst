@@ -26,6 +26,18 @@ returns :class:`ValidResult`. ``PASS`` and ``ALLOW_BYPASS`` accept a packet;
 The digest and known-key validator factories exported from
 :mod:`ndn.security` follow this contract.
 
+Cascade validation
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ndn.security.CascadeChecker
+  :members:
+
+.. autoclass:: ndn.security.PublicKeyStorage
+  :members:
+
+.. autoclass:: ndn.security.MemoryKeyStorage
+  :members:
+
 Keychain
 --------
 

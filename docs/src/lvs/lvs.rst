@@ -53,6 +53,30 @@ Once the LVS text schema is compiled into a binary model, one can use it to chec
     print(checker.check('/a/blog/author/xinyu/KEY/1/admin/1',
                         '/a/blog/KEY/1/self/1'))  # => False
 
+Application Validation
+----------------------
+
+Use :func:`lvs_validator` with :meth:`NDNApp.express` to enforce the schema and
+validate the packet's certificate chain. Certificates that are not cached are
+fetched through the same application and recursively checked up to the trust
+anchor.
+
+.. code-block:: python3
+
+    from ndn.app import NDNApp
+    from ndn.app_support.light_versec import lvs_validator
+
+    app = NDNApp()
+    validator = lvs_validator(checker, app, trust_anchor_wire)
+    data_name, content, context = await app.express(
+        '/a/blog/article/math/2022/03',
+        validator=validator,
+        must_be_fresh=True,
+    )
+
+Complete consumer and producer programs are available under ``examples/app/lvs``.
+Run its ``setup.py`` first to generate a fresh example certificate hierarchy.
+
 Syntax and Semantics
 --------------------
 

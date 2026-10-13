@@ -5,6 +5,8 @@
 
     .. autofunction:: compile_lvs
 
+    .. autofunction:: lvs_validator
+
     .. autoclass:: Checker
         :members:
 
