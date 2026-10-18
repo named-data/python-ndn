@@ -7,6 +7,16 @@ Next (breaking)
 * Make the PIT-token-aware application API canonical at ``ndn.app`` and remove ``ndn.appv2``.
 * Remove the legacy application API, Name Tree Schema, dispatcher, segment fetcher, and cascade validator.
 
+0.5-2 (2026-10-07)
+++++++++++++++++++
+* Fix Ed25519 signature
+* build: allow Python 3.14
+* Use Python 3.11 syntax
+
+0.5 (2026-10-07)
+++++++++++++++++
+* Change Unix socket path
+
 0.4-1 (2023-08-21)
 ++++++++++++++++++
 * Update dependencies: drop cryptography.
