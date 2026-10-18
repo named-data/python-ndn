@@ -36,12 +36,63 @@ class DecodeError(Exception):
 
 
 __all__ = [
-    'tlv_encode', 'tlv_parse', 'NDNName', 'DecodeError',
+    'tlv_encode', 'tlv_parse', 'tlv_field', 'NDNName', 'DecodeError',
     'tlv_get_arg', 'tlv_set_arg',
 ]
 
 # Kinds that occupy zero wire bytes and may not have a 'tlv_type' metadata key.
 _ZERO_WIRE_KINDS = frozenset({'offset_marker'})
+
+TlvFieldType = typing.Literal[
+    'uint', 'bool', 'bytes', 'str', 'name', 'model', 'repeated', 'map',
+    'offset_marker', 'sig_value', 'interest_name',
+]
+
+
+def tlv_field(
+        tlv_type: int | None,
+        *,
+        default: typing.Any = dataclasses.MISSING,
+        default_factory: typing.Any = dataclasses.MISSING,
+        fixed_len: typing.Literal[1, 2, 4, 8] | None = None,
+        val_tlv_type: int | None = None,
+        ignore_critical: bool | None = None,
+        field_type: TlvFieldType | None = None,
+        cover_start: str | None = None,
+        digest_cover_start: str | None = None,
+        digest_cover_end: str | None = None,
+        **kwargs: typing.Any,
+) -> typing.Any:
+    """
+    Create a dataclass field with type-checked TLV metadata arguments.
+
+    ``tlv_type`` may be ``None`` only for zero-wire fields such as an
+    ``offset_marker``. Remaining keyword arguments are forwarded to
+    :func:`dataclasses.field`.
+    """
+    metadata = {}
+    if tlv_type is not None:
+        metadata['tlv_type'] = tlv_type
+    if fixed_len is not None:
+        metadata['fixed_len'] = fixed_len
+    if val_tlv_type is not None:
+        metadata['val_tlv_type'] = val_tlv_type
+    if ignore_critical is not None:
+        metadata['ignore_critical'] = ignore_critical
+    if field_type is not None:
+        metadata['field_type'] = field_type
+    if cover_start is not None:
+        metadata['cover_start'] = cover_start
+    if digest_cover_start is not None:
+        metadata['digest_cover_start'] = digest_cover_start
+    if digest_cover_end is not None:
+        metadata['digest_cover_end'] = digest_cover_end
+    return dataclasses.field(
+        default=default,
+        default_factory=default_factory,
+        metadata=metadata,
+        **kwargs,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -54,10 +105,9 @@ class NDNName:
 
     Use it for fields containing encoded NDN names::
 
-        name: NDNName = field(default=None, metadata={'tlv_type': 0x07})
+        name: NDNName = tlv_field(0x07, default=None)
         # repeated Names:
-        names: list[NDNName] = field(default_factory=list,
-                                     metadata={'tlv_type': 0x07})
+        names: list[NDNName] = tlv_field(0x07, default_factory=list)
 
     The runtime value is :any:`FormalName`, a list of encoded components.
     """

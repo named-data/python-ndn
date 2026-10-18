@@ -6,7 +6,7 @@
 import dataclasses as dc
 
 from .tlv_model import DecodeError
-from .tlv_model import tlv_encode, tlv_parse
+from .tlv_model import tlv_encode, tlv_field, tlv_parse
 from .tlv_type import BinaryStr, VarBinaryStr
 from .tlv_var import parse_and_check_tl
 
@@ -47,52 +47,49 @@ class NackReason:
 
 @dc.dataclass
 class NetworkNack:
-    nack_reason: int | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.NACK_REASON})
+    nack_reason: int | None = tlv_field(
+        LpTypeNumber.NACK_REASON, default=None)
 
 
 @dc.dataclass
 class CachePolicy:
-    cache_policy_type: int | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.CACHE_POLICY_TYPE})
+    cache_policy_type: int | None = tlv_field(
+        LpTypeNumber.CACHE_POLICY_TYPE, default=None)
 
 
 @dc.dataclass
 class LpPacketValue:
-    frag_index: int | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.FRAG_INDEX})
-    frag_count: int | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.FRAG_COUNT})
-    pit_token: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.PIT_TOKEN})
-    nack: NetworkNack | None = dc.field(
-        default=None, metadata={
-            'tlv_type': LpTypeNumber.NACK, 'ignore_critical': False})
-    incoming_face_id: int | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.INCOMING_FACE_ID})
-    next_hop_face_id: int | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.NEXT_HOP_FACE_ID})
-    cache_policy: CachePolicy | None = dc.field(
-        default=None, metadata={
-            'tlv_type': LpTypeNumber.CACHE_POLICY, 'ignore_critical': False})
-    congestion_mark: int | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.CONGESTION_MARK})
-    tx_sequence: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.TX_SEQUENCE})
-    ack: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.ACK})
-    non_discovery: bool = dc.field(
-        default=False, metadata={'tlv_type': LpTypeNumber.NON_DISCOVERY})
-    prefix_announcement: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.PREFIX_ANNOUNCEMENT})
-    fragment: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.FRAGMENT})
+    frag_index: int | None = tlv_field(
+        LpTypeNumber.FRAG_INDEX, default=None)
+    frag_count: int | None = tlv_field(
+        LpTypeNumber.FRAG_COUNT, default=None)
+    pit_token: bytes | None = tlv_field(
+        LpTypeNumber.PIT_TOKEN, default=None)
+    nack: NetworkNack | None = tlv_field(
+        LpTypeNumber.NACK, default=None, ignore_critical=False)
+    incoming_face_id: int | None = tlv_field(
+        LpTypeNumber.INCOMING_FACE_ID, default=None)
+    next_hop_face_id: int | None = tlv_field(
+        LpTypeNumber.NEXT_HOP_FACE_ID, default=None)
+    cache_policy: CachePolicy | None = tlv_field(
+        LpTypeNumber.CACHE_POLICY, default=None, ignore_critical=False)
+    congestion_mark: int | None = tlv_field(
+        LpTypeNumber.CONGESTION_MARK, default=None)
+    tx_sequence: bytes | None = tlv_field(
+        LpTypeNumber.TX_SEQUENCE, default=None)
+    ack: bytes | None = tlv_field(LpTypeNumber.ACK, default=None)
+    non_discovery: bool = tlv_field(
+        LpTypeNumber.NON_DISCOVERY, default=False)
+    prefix_announcement: bytes | None = tlv_field(
+        LpTypeNumber.PREFIX_ANNOUNCEMENT, default=None)
+    fragment: bytes | None = tlv_field(
+        LpTypeNumber.FRAGMENT, default=None)
 
 
 @dc.dataclass
 class LpPacket:
-    lp_packet: LpPacketValue | None = dc.field(
-        default=None, metadata={'tlv_type': LpTypeNumber.LP_PACKET})
+    lp_packet: LpPacketValue | None = tlv_field(
+        LpTypeNumber.LP_PACKET, default=None)
 
 
 def parse_lp_packet(wire: BinaryStr,

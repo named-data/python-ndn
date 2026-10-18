@@ -20,7 +20,7 @@ import sys
 import argparse
 from ...encoding import Name, InterestParam
 from ...app import NDNApp, pass_all
-# from ...security import KeychainDigest
+from ...security import DigestSha256Signer
 from ...types import InterestNack, InterestTimeout, InterestCanceled, ValidationFailure
 
 
@@ -61,6 +61,7 @@ def execute(args: argparse.Namespace):
     except (ValueError, OSError, IndexError):
         print('Unable to read the input file')
         return -2
+    signer = DigestSha256Signer(for_interest=True) if app_param is not None else None
 
     app = NDNApp()
 
@@ -71,7 +72,7 @@ def execute(args: argparse.Namespace):
             data_name, content, context = await app.express(
                 name, validator=pass_all,
                 must_be_fresh=args.fresh, can_be_prefix=args.prefix, lifetime=lifetime,
-                app_param=app_param)
+                app_param=app_param, signer=signer)
             meta_info = context['meta_info']
 
             print(f'Received Data Name: {Name.to_str(data_name)}')

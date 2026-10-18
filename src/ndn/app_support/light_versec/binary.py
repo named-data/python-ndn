@@ -24,7 +24,7 @@ import dataclasses as dc
 from typing import Self
 
 from ...encoding import BinaryStr
-from ...encoding.tlv_model import tlv_encode, tlv_parse
+from ...encoding.tlv_model import tlv_encode, tlv_field, tlv_parse
 
 
 __all__ = [
@@ -69,94 +69,81 @@ class TypeNumber:
 @dc.dataclass
 class UserFnArg:
     # A given component
-    value: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.COMPONENT_VALUE})
+    value: bytes | None = tlv_field(
+        TypeNumber.COMPONENT_VALUE, default=None)
     # Referring to a previous matched pattern
-    tag: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
 
 
 @dc.dataclass
 class UserFnCall:
-    fn_id: str | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.USER_FN_ID})
-    args: list[UserFnArg] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.FN_ARGS})
+    fn_id: str | None = tlv_field(TypeNumber.USER_FN_ID, default=None)
+    args: list[UserFnArg] = tlv_field(
+        TypeNumber.FN_ARGS, default_factory=list)
 
 
 @dc.dataclass
 class ConstraintOption:
     # Equal to a given NameComponent value
-    value: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.COMPONENT_VALUE})
+    value: bytes | None = tlv_field(
+        TypeNumber.COMPONENT_VALUE, default=None)
     # Equal to another pattern
-    tag: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
     # Decide by a user function call
-    fn: UserFnCall | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.USER_FN_CALL})
+    fn: UserFnCall | None = tlv_field(
+        TypeNumber.USER_FN_CALL, default=None)
 
 
 @dc.dataclass
 class PatternConstraint:
-    options: list[ConstraintOption] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.CONS_OPTION})
+    options: list[ConstraintOption] = tlv_field(
+        TypeNumber.CONS_OPTION, default_factory=list)
 
 
 @dc.dataclass
 class PatternEdge:
-    dest: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    tag: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
-    cons_sets: list[PatternConstraint] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.CONSTRAINT})
+    dest: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
+    cons_sets: list[PatternConstraint] = tlv_field(
+        TypeNumber.CONSTRAINT, default_factory=list)
 
 
 @dc.dataclass
 class ValueEdge:
-    dest: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    value: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.COMPONENT_VALUE})
+    dest: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    value: bytes | None = tlv_field(
+        TypeNumber.COMPONENT_VALUE, default=None)
 
 
 @dc.dataclass
 class Node:
-    id: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    parent: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.PARENT_ID})
-    rule_name: list[str] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.IDENTIFIER})
-    v_edges: list[ValueEdge] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.VALUE_EDGE})
-    p_edges: list[PatternEdge] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.PATTERN_EDGE})
-    sign_cons: list[int] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.KEY_NODE_ID})
+    id: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    parent: int | None = tlv_field(TypeNumber.PARENT_ID, default=None)
+    rule_name: list[str] = tlv_field(
+        TypeNumber.IDENTIFIER, default_factory=list)
+    v_edges: list[ValueEdge] = tlv_field(
+        TypeNumber.VALUE_EDGE, default_factory=list)
+    p_edges: list[PatternEdge] = tlv_field(
+        TypeNumber.PATTERN_EDGE, default_factory=list)
+    sign_cons: list[int] = tlv_field(
+        TypeNumber.KEY_NODE_ID, default_factory=list)
 
 
 @dc.dataclass
 class TagSymbol:
-    tag: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.PATTERN_TAG})
-    ident: str | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.IDENTIFIER})
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
+    ident: str | None = tlv_field(TypeNumber.IDENTIFIER, default=None)
 
 
 @dc.dataclass
 class LvsModel:
-    version: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.VERSION})
-    start_id: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.NODE_ID})
-    named_pattern_cnt: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.NAMED_PATTERN_NUM})
-    nodes: list[Node] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.NODE})
-    symbols: list[TagSymbol] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.TAG_SYMBOL})
+    version: int | None = tlv_field(TypeNumber.VERSION, default=None)
+    start_id: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    named_pattern_cnt: int | None = tlv_field(
+        TypeNumber.NAMED_PATTERN_NUM, default=None)
+    nodes: list[Node] = tlv_field(TypeNumber.NODE, default_factory=list)
+    symbols: list[TagSymbol] = tlv_field(
+        TypeNumber.TAG_SYMBOL, default_factory=list)
 
     def encode(self) -> bytearray:
         return tlv_encode(self)

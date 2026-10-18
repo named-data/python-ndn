@@ -7,7 +7,7 @@ import dataclasses as dc
 
 from .name import Name, Component
 from .signer import Signer
-from .tlv_model import NDNName, tlv_encode, tlv_parse
+from .tlv_model import NDNName, tlv_encode, tlv_field, tlv_parse
 from .tlv_type import BinaryStr, VarBinaryStr, NonStrictName, FormalName
 from .tlv_var import get_tl_num_size, parse_and_check_tl, write_tl_num
 
@@ -71,25 +71,23 @@ class SignatureType:
 
 @dc.dataclass
 class KeyLocator:
-    name: NDNName = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.NAME})
-    key_digest: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.KEY_DIGEST})
+    name: NDNName = tlv_field(TypeNumber.NAME, default=None)
+    key_digest: bytes | None = tlv_field(
+        TypeNumber.KEY_DIGEST, default=None)
 
 
 @dc.dataclass
 class SignatureInfo:
-    signature_type: int | None = dc.field(
-        default=None, metadata={
-            'tlv_type': TypeNumber.SIGNATURE_TYPE, 'fixed_len': 1})
-    key_locator: KeyLocator | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.KEY_LOCATOR})
-    signature_nonce: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_NONCE})
-    signature_time: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_TIME})
-    signature_seq_num: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.SIGNATURE_SEQ_NUM})
+    signature_type: int | None = tlv_field(
+        TypeNumber.SIGNATURE_TYPE, default=None, fixed_len=1)
+    key_locator: KeyLocator | None = tlv_field(
+        TypeNumber.KEY_LOCATOR, default=None)
+    signature_nonce: int | None = tlv_field(
+        TypeNumber.SIGNATURE_NONCE, default=None)
+    signature_time: int | None = tlv_field(
+        TypeNumber.SIGNATURE_TIME, default=None)
+    signature_seq_num: int | None = tlv_field(
+        TypeNumber.SIGNATURE_SEQ_NUM, default=None)
 
 
 def write_signature_info(signer: Signer, signature_info: SignatureInfo) -> None:
@@ -108,60 +106,60 @@ def write_signature_info(signer: Signer, signature_info: SignatureInfo) -> None:
 
 @dc.dataclass
 class Links:
-    names: list[NDNName] = dc.field(
-        default_factory=list, metadata={'tlv_type': TypeNumber.NAME})
+    names: list[NDNName] = tlv_field(
+        TypeNumber.NAME, default_factory=list)
 
 
 @dc.dataclass
 class InterestPacketValue:
-    name: NDNName = dc.field(default='/', metadata={
-        'tlv_type': TypeNumber.NAME, 'field_type': 'interest_name'})
-    can_be_prefix: bool = dc.field(
-        default=False, metadata={'tlv_type': TypeNumber.CAN_BE_PREFIX})
-    must_be_fresh: bool = dc.field(
-        default=False, metadata={'tlv_type': TypeNumber.MUST_BE_FRESH})
-    forwarding_hint: Links | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.FORWARDING_HINT})
-    nonce: int | None = dc.field(default=None, metadata={
-        'tlv_type': TypeNumber.NONCE, 'fixed_len': 4})
-    lifetime: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.INTEREST_LIFETIME})
-    hop_limit: int | None = dc.field(default=None, metadata={
-        'tlv_type': TypeNumber.HOP_LIMIT, 'fixed_len': 1})
-    _sig_cover_start: None = dc.field(
-        default=None, metadata={'field_type': 'offset_marker'})
-    _digest_cover_start: None = dc.field(
-        default=None, metadata={'field_type': 'offset_marker'})
-    application_parameters: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.APPLICATION_PARAMETERS})
-    signature_info: SignatureInfo | None = dc.field(
-        default=None, metadata={
-            'tlv_type': TypeNumber.INTEREST_SIGNATURE_INFO})
-    signature_value: bytes | None = dc.field(default=None, metadata={
-        'tlv_type': TypeNumber.INTEREST_SIGNATURE_VALUE,
-        'field_type': 'sig_value',
-        'cover_start': '_sig_cover_start',
-        'digest_cover_start': '_digest_cover_start',
-        'digest_cover_end': '_digest_cover_end',
-    })
-    _digest_cover_end: None = dc.field(
-        default=None, metadata={'field_type': 'offset_marker'})
+    name: NDNName = tlv_field(
+        TypeNumber.NAME, default='/', field_type='interest_name')
+    can_be_prefix: bool = tlv_field(
+        TypeNumber.CAN_BE_PREFIX, default=False)
+    must_be_fresh: bool = tlv_field(
+        TypeNumber.MUST_BE_FRESH, default=False)
+    forwarding_hint: Links | None = tlv_field(
+        TypeNumber.FORWARDING_HINT, default=None)
+    nonce: int | None = tlv_field(
+        TypeNumber.NONCE, default=None, fixed_len=4)
+    lifetime: int | None = tlv_field(
+        TypeNumber.INTEREST_LIFETIME, default=None)
+    hop_limit: int | None = tlv_field(
+        TypeNumber.HOP_LIMIT, default=None, fixed_len=1)
+    _sig_cover_start: None = tlv_field(
+        None, default=None, field_type='offset_marker')
+    _digest_cover_start: None = tlv_field(
+        None, default=None, field_type='offset_marker')
+    application_parameters: bytes | None = tlv_field(
+        TypeNumber.APPLICATION_PARAMETERS, default=None)
+    signature_info: SignatureInfo | None = tlv_field(
+        TypeNumber.INTEREST_SIGNATURE_INFO, default=None)
+    signature_value: bytes | None = tlv_field(
+        TypeNumber.INTEREST_SIGNATURE_VALUE,
+        default=None,
+        field_type='sig_value',
+        cover_start='_sig_cover_start',
+        digest_cover_start='_digest_cover_start',
+        digest_cover_end='_digest_cover_end',
+    )
+    _digest_cover_end: None = tlv_field(
+        None, default=None, field_type='offset_marker')
 
 
 @dc.dataclass
 class InterestPacket:
-    interest: InterestPacketValue | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.INTEREST})
+    interest: InterestPacketValue | None = tlv_field(
+        TypeNumber.INTEREST, default=None)
 
 
 @dc.dataclass(init=False)
 class MetaInfo:
-    content_type: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.CONTENT_TYPE})
-    freshness_period: int | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.FRESHNESS_PERIOD})
-    final_block_id: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.FINAL_BLOCK_ID})
+    content_type: int | None = tlv_field(
+        TypeNumber.CONTENT_TYPE, default=None)
+    freshness_period: int | None = tlv_field(
+        TypeNumber.FRESHNESS_PERIOD, default=None)
+    final_block_id: bytes | None = tlv_field(
+        TypeNumber.FINAL_BLOCK_ID, default=None)
 
     def __init__(self,
                  content_type: int | None = ContentType.BLOB,
@@ -182,27 +180,25 @@ class MetaInfo:
 
 @dc.dataclass
 class DataPacketValue:
-    _sig_cover_start: None = dc.field(
-        default=None, metadata={'field_type': 'offset_marker'})
-    name: NDNName = dc.field(
-        default='/', metadata={'tlv_type': TypeNumber.NAME})
-    meta_info: MetaInfo | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.META_INFO})
-    content: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.CONTENT})
-    signature_info: SignatureInfo | None = dc.field(default=None, metadata={
-        'tlv_type': TypeNumber.SIGNATURE_INFO, 'ignore_critical': True})
-    signature_value: bytes | None = dc.field(default=None, metadata={
-        'tlv_type': TypeNumber.SIGNATURE_VALUE,
-        'field_type': 'sig_value',
-        'cover_start': '_sig_cover_start',
-    })
+    _sig_cover_start: None = tlv_field(
+        None, default=None, field_type='offset_marker')
+    name: NDNName = tlv_field(TypeNumber.NAME, default='/')
+    meta_info: MetaInfo | None = tlv_field(
+        TypeNumber.META_INFO, default=None)
+    content: bytes | None = tlv_field(TypeNumber.CONTENT, default=None)
+    signature_info: SignatureInfo | None = tlv_field(
+        TypeNumber.SIGNATURE_INFO, default=None, ignore_critical=True)
+    signature_value: bytes | None = tlv_field(
+        TypeNumber.SIGNATURE_VALUE,
+        default=None,
+        field_type='sig_value',
+        cover_start='_sig_cover_start',
+    )
 
 
 @dc.dataclass
 class DataPacket:
-    data: DataPacketValue | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.DATA})
+    data: DataPacketValue | None = tlv_field(TypeNumber.DATA, default=None)
 
 
 @dc.dataclass

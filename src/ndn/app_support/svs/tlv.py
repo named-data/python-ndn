@@ -24,32 +24,32 @@ __all__ = ['StateVecEntry', 'StateVec', 'StateVecWrapper', 'MappingEntry', 'Mapp
 
 @dc.dataclass
 class StateVecEntry:
-    node_id: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
-    seq_no: int | None = dc.field(default=None, metadata={'tlv_type': 0xcc})
+    node_id: enc.NDNName = enc.tlv_field(enc.Name.TYPE_NAME, default=None)
+    seq_no: int | None = enc.tlv_field(0xcc, default=None)
 
 
 @dc.dataclass
 class StateVec:
-    entries: list[StateVecEntry] = dc.field(default_factory=list, metadata={'tlv_type': 0xca})
+    entries: list[StateVecEntry] = enc.tlv_field(0xca, default_factory=list)
 
 
 @dc.dataclass
 class StateVecWrapper:
-    val: StateVec | None = dc.field(default=None, metadata={'tlv_type': 0xc9})
+    val: StateVec | None = enc.tlv_field(0xc9, default=None)
 
 
 @dc.dataclass
 class MappingEntry:
-    seq_no: int | None = dc.field(default=None, metadata={'tlv_type': 0xcc})
-    app_name: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
+    seq_no: int | None = enc.tlv_field(0xcc, default=None)
+    app_name: enc.NDNName = enc.tlv_field(enc.Name.TYPE_NAME, default=None)
 
 
 @dc.dataclass
 class MappingData:
-    node_id: enc.NDNName = dc.field(default=None, metadata={'tlv_type': enc.Name.TYPE_NAME})
-    entries: MappingEntry | None = dc.field(default=None, metadata={'tlv_type': 0xce})
+    node_id: enc.NDNName = enc.tlv_field(enc.Name.TYPE_NAME, default=None)
+    entries: MappingEntry | None = enc.tlv_field(0xce, default=None)
 
 
 @dc.dataclass
 class MappingDataWrapper:
-    val: MappingEntry | None = dc.field(default=None, metadata={'tlv_type': 0xcd})
+    val: MappingEntry | None = enc.tlv_field(0xcd, default=None)

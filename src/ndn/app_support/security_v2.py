@@ -26,7 +26,7 @@ from ..encoding import (
     VarBinaryStr,
     parse_and_check_tl,
 )
-from ..encoding.tlv_model import tlv_encode, tlv_parse
+from ..encoding.tlv_model import tlv_encode, tlv_field, tlv_parse
 from ..encoding.ndn_format_0_3 import (
     ContentType,
     DataPacketValue,
@@ -57,71 +57,63 @@ class SecurityV2TypeNumber:
 
 @dc.dataclass
 class DescriptionEntry:
-    description_key: bytes | None = dc.field(
-        default=None, metadata={
-            'tlv_type': SecurityV2TypeNumber.DESCRIPTION_KEY})
-    description_value: bytes | None = dc.field(
-        default=None, metadata={
-            'tlv_type': SecurityV2TypeNumber.DESCRIPTION_VALUE})
+    description_key: bytes | None = tlv_field(
+        SecurityV2TypeNumber.DESCRIPTION_KEY, default=None)
+    description_value: bytes | None = tlv_field(
+        SecurityV2TypeNumber.DESCRIPTION_VALUE, default=None)
 
 
 @dc.dataclass
 class AdditionalDescription:
-    description_entry: list[DescriptionEntry] = dc.field(
-        default_factory=list, metadata={
-            'tlv_type': SecurityV2TypeNumber.DESCRIPTION_ENTRY})
+    description_entry: list[DescriptionEntry] = tlv_field(
+        SecurityV2TypeNumber.DESCRIPTION_ENTRY, default_factory=list)
 
 
 @dc.dataclass
 class CertificateV2Extension:
-    additional_description: AdditionalDescription | None = dc.field(
-        default=None, metadata={
-            'tlv_type': SecurityV2TypeNumber.ADDITIONAL_DESCRIPTION})
+    additional_description: AdditionalDescription | None = tlv_field(
+        SecurityV2TypeNumber.ADDITIONAL_DESCRIPTION, default=None)
 
 
 @dc.dataclass
 class ValidityPeriod:
-    not_before: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': SecurityV2TypeNumber.NOT_BEFORE})
-    not_after: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': SecurityV2TypeNumber.NOT_AFTER})
+    not_before: bytes | None = tlv_field(
+        SecurityV2TypeNumber.NOT_BEFORE, default=None)
+    not_after: bytes | None = tlv_field(
+        SecurityV2TypeNumber.NOT_AFTER, default=None)
 
 
 @dc.dataclass
 class CertificateV2SignatureInfo(SignatureInfo):
-    validity_period: ValidityPeriod | None = dc.field(
-        default=None, metadata={
-            'tlv_type': SecurityV2TypeNumber.VALIDITY_PERIOD})
-    additional_description: AdditionalDescription | None = dc.field(
-        default=None, metadata={
-            'tlv_type': SecurityV2TypeNumber.ADDITIONAL_DESCRIPTION})
+    validity_period: ValidityPeriod | None = tlv_field(
+        SecurityV2TypeNumber.VALIDITY_PERIOD, default=None)
+    additional_description: AdditionalDescription | None = tlv_field(
+        SecurityV2TypeNumber.ADDITIONAL_DESCRIPTION, default=None)
 
 
 @dc.dataclass
 class CertificateV2Value(DataPacketValue):
-    signature_info: CertificateV2SignatureInfo | None = dc.field(
-        default=None, metadata={
-            'tlv_type': TypeNumber.SIGNATURE_INFO,
-            'ignore_critical': True,
-        })
+    signature_info: CertificateV2SignatureInfo | None = tlv_field(
+        TypeNumber.SIGNATURE_INFO,
+        default=None,
+        ignore_critical=True,
+    )
 
 
 @dc.dataclass
 class SafeBag:
-    certificate_v2: bytes | None = dc.field(
-        default=None, metadata={'tlv_type': TypeNumber.DATA})
+    certificate_v2: bytes | None = tlv_field(TypeNumber.DATA, default=None)
     # Keep the certificate as encoded bytes instead of a nested dataclass:
     # 1. The encoded length of CertificateV2 is unknown.
     # 2. Generally we already have an encoded certificate when exporting a
     #    SafeBag.
-    encrypted_key_bag: bytes | None = dc.field(
-        default=None, metadata={
-            'tlv_type': SecurityV2TypeNumber.ENCRYPTED_KEY_BAG})
+    encrypted_key_bag: bytes | None = tlv_field(
+        SecurityV2TypeNumber.ENCRYPTED_KEY_BAG, default=None)
 
 
 @dc.dataclass
 class _CertificateEnvelope:
-    value: bytes = dc.field(metadata={'tlv_type': TypeNumber.DATA})
+    value: bytes = tlv_field(TypeNumber.DATA)
 
 
 def parse_certificate(wire) -> CertificateV2Value:

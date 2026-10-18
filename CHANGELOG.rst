@@ -5,7 +5,7 @@ Next (breaking)
 +++++++++++++++
 * Replace the descriptor-based TLV model with dataclass models and ``tlv_encode``/``tlv_parse``.
 * Make the PIT-token-aware application API canonical at ``ndn.app`` and remove ``ndn.appv2``.
-* Remove the legacy application API, Name Tree Schema, dispatcher, segment fetcher, and cascade validator.
+* Remove the legacy application API and Name Tree Schema.
 
 0.5-2 (2026-10-07)
 ++++++++++++++++++

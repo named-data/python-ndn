@@ -16,15 +16,15 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 """Tests for the dataclass-based TLV API."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import IntEnum, IntFlag
 from hashlib import sha256
 
 import pytest
 
 from ndn.encoding import (
-    tlv_encode, tlv_parse, NDNName, DecodeError, tlv_get_arg, tlv_set_arg,
-    Name, Signer,
+    tlv_encode, tlv_parse, tlv_field, NDNName, DecodeError, tlv_get_arg,
+    tlv_set_arg, Name, Signer,
 )
 
 
@@ -51,6 +51,53 @@ class _RepeatedUint:
 @dataclass
 class _RepeatedModel:
     items: list[_Inner] = field(default_factory=list, metadata={'tlv_type': 0x10})
+
+
+class TestTlvField:
+    def test_builds_metadata_and_forwards_field_arguments(self):
+        @dataclass
+        class M:
+            entries: dict[str, bytes] = tlv_field(
+                0x21,
+                default_factory=dict,
+                val_tlv_type=0x23,
+                ignore_critical=False,
+                field_type='map',
+                repr=False,
+            )
+
+        fld = fields(M)[0]
+        assert fld.metadata == {
+            'tlv_type': 0x21,
+            'val_tlv_type': 0x23,
+            'ignore_critical': False,
+            'field_type': 'map',
+        }
+        assert fld.repr is False
+
+    def test_roundtrip(self):
+        @dataclass
+        class M:
+            value: int | None = tlv_field(
+                0x03,
+                default=None,
+                fixed_len=2,
+            )
+
+        wire = tlv_encode(M(value=5))
+        assert wire == b'\x03\x02\x00\x05'
+        assert tlv_parse(M, wire).value == 5
+
+    def test_zero_wire_field(self):
+        @dataclass
+        class M:
+            marker: None = tlv_field(
+                None,
+                default=None,
+                field_type='offset_marker',
+            )
+
+        assert tlv_encode(M()) == b''
 
 
 # ---------------------------------------------------------------------------

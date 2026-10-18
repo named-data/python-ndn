@@ -23,7 +23,7 @@ from enum import Enum, Flag
 from ..transport.face import Face
 from ..utils import timestamp, gen_nonce_64
 from ..encoding import Component, Name, get_tl_num_size, write_tl_num, parse_and_check_tl
-from ..encoding.tlv_model import NDNName, tlv_encode, tlv_parse
+from ..encoding.tlv_model import NDNName, tlv_encode, tlv_field, tlv_parse
 from ..encoding.ndn_format_0_3 import SignatureInfo, TypeNumber, write_signature_info
 from ..security import DigestSha256Signer
 
@@ -76,7 +76,7 @@ __all__ = [
 
 
 def _tlv(type_num: int):
-    return dc.field(default=None, metadata={'tlv_type': type_num})
+    return tlv_field(type_num, default=None)
 
 
 def _name():
@@ -84,7 +84,7 @@ def _name():
 
 
 def _repeated(type_num: int):
-    return dc.field(default_factory=list, metadata={'tlv_type': type_num})
+    return tlv_field(type_num, default_factory=list)
 
 
 @dc.dataclass
