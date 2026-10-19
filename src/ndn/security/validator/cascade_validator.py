@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import abc
 import logging
+import struct
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -357,7 +358,7 @@ class CascadeChecker:
                         raw_packet,
                         cert_data_name,
                     )
-                except (IndexError, TypeError, ValueError):
+                except (IndexError, TypeError, ValueError, struct.error):
                     self.logger.debug('Fetched certificate is malformed')
                     return ValidResult.FAIL
                 if Name.to_bytes(fetched_name) != Name.to_bytes(cert_data_name):

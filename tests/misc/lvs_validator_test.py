@@ -138,6 +138,51 @@ def make_chain(
     return keychain, root_cert, author_cert_data, data_packet
 
 
+def make_certificate_with_truncated_validity(
+    certificate: enc.BinaryStr,
+    signer: enc.Signer,
+) -> bytearray:
+    wire = bytearray(certificate)
+    not_after_header = b'\xfd\x00\xff\x0f'
+    not_after_pos = wire.index(not_after_header)
+    not_after_size = len(not_after_header) + 15
+    wire[not_after_pos:not_after_pos + not_after_size] = (
+        b'\x02\x10' + bytes(16) + b'\xfd'
+    )
+
+    _, _, _, sig_ptrs = enc.parse_data(wire)
+    covered = b''.join(bytes(block) for block in sig_ptrs.signature_covered_part)
+    signature_buf = bytearray(signer.get_signature_value_size())
+    signature_size = signer.write_signature_value(
+        signature_buf,
+        sig_ptrs.signature_covered_part,
+    )
+
+    signature_tlv = bytearray(
+        enc.get_tl_num_size(enc.TypeNumber.SIGNATURE_VALUE)
+        + enc.get_tl_num_size(signature_size)
+        + signature_size
+    )
+    offset = enc.write_tl_num(
+        enc.TypeNumber.SIGNATURE_VALUE,
+        signature_tlv,
+        0,
+    )
+    offset += enc.write_tl_num(signature_size, signature_tlv, offset)
+    signature_tlv[offset:] = signature_buf[:signature_size]
+
+    value = covered + signature_tlv
+    ret = bytearray(
+        enc.get_tl_num_size(enc.TypeNumber.DATA)
+        + enc.get_tl_num_size(len(value))
+        + len(value)
+    )
+    offset = enc.write_tl_num(enc.TypeNumber.DATA, ret, 0)
+    offset += enc.write_tl_num(len(value), ret, offset)
+    ret[offset:] = value
+    return ret
+
+
 class TestLvsValidator:
     @staticmethod
     def test_certificate_chain_and_cache():
@@ -237,6 +282,48 @@ class TestLvsValidator:
                     validator = lvs_validator(
                         Checker(compile_lvs(LVS_TEXT), {}),
                         FakeApp([author_cert]),
+                        root_cert.data,
+                    )
+                    name, _, _, sig_ptrs = enc.parse_data(data_packet)
+                    assert (
+                        await validator(
+                            name,
+                            sig_ptrs,
+                            {'deadline': utils.timestamp() + 4000},
+                        )
+                        is types.ValidResult.FAIL
+                    )
+                finally:
+                    keychain.shutdown()
+
+        aio.run(scenario())
+
+    @staticmethod
+    def test_rejects_truncated_validity_tlv_header():
+        async def scenario():
+            with TemporaryDirectory() as base_dir:
+                keychain, root_cert, author_cert, data_packet = make_chain(
+                    base_dir
+                )
+                try:
+                    root_signer = keychain.get_signer(
+                        {'cert': root_cert.name}
+                    )
+                    malformed_cert = make_certificate_with_truncated_validity(
+                        author_cert,
+                        root_signer,
+                    )
+                    _, root_key, _ = CascadeChecker._parse_certificate(
+                        root_cert.data
+                    )
+                    _, _, _, cert_sig_ptrs = enc.parse_data(malformed_cert)
+                    assert CascadeChecker._verify_sig(
+                        root_key,
+                        cert_sig_ptrs,
+                    )
+
+                    validator = CascadeChecker(
+                        FakeApp([malformed_cert]),
                         root_cert.data,
                     )
                     name, _, _, sig_ptrs = enc.parse_data(data_packet)
