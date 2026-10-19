@@ -62,7 +62,14 @@ _CHAIN_CONTEXT_KEY = 'cascade_checker_chain'
 
 
 class PublicKeyStorage(abc.ABC):
-    """Storage interface used by :class:`CascadeChecker`."""
+    """
+    Storage interface used by :class:`CascadeChecker`.
+
+    Certificate expirations are tracked independently. The expiration of a
+    parent certificate does not shorten the expiration of a validated
+    subcertificate. Consequently, a cached subcertificate remains usable
+    until its own expiration even if its parent certificate expires first.
+    """
 
     @abc.abstractmethod
     def load(self, name: FormalName) -> bytes | None:
@@ -78,12 +85,17 @@ class PublicKeyStorage(abc.ABC):
         key_bits: bytes,
         expires_at: int,
     ) -> None:
-        """Save public key bits with a certificate expiration timestamp."""
+        """
+        Save public key bits with the named certificate's expiration timestamp.
+
+        ``expires_at`` is not constrained by the expiration of the certificate
+        that validated this certificate.
+        """
         self.save(name, key_bits)
 
 
 class EmptyKeyStorage(PublicKeyStorage):
-    """A key storage implementation that never caches keys."""
+    """A key storage implementation that never stores keys."""
 
     def load(self, name: FormalName) -> bytes | None:
         return None
@@ -93,7 +105,7 @@ class EmptyKeyStorage(PublicKeyStorage):
 
 
 class MemoryKeyStorage(PublicKeyStorage):
-    """A bounded, expiry-aware public key cache."""
+    """A bounded, expiry-aware in-memory public key storage."""
 
     def __init__(self, max_entries: int = 256):
         if max_entries <= 0:
