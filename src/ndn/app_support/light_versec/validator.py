@@ -84,7 +84,7 @@ def lvs_validator(
         if (
             sig_info is None
             or sig_info.key_locator is None
-            or sig_info.key_locator.name is None
+            or not sig_info.key_locator.name
         ):
             return ValidResult.FAIL
 
