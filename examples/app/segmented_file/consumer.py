@@ -19,11 +19,11 @@ import argparse
 import logging
 import sys
 
-from ndn import app, encoding as enc, types
+from ndn import app as ndn_app, encoding as enc, types
 
 
 async def fetch_file(
-    ndn_app: app.NDNApp,
+    app: ndn_app.NDNApp,
     name: enc.NonStrictName,
     timeout: int = 4000,
     retry_times: int = 3,
@@ -34,9 +34,9 @@ async def fetch_file(
     async def retry(interest_name, can_be_prefix):
         for attempt in range(retry_times):
             try:
-                return await ndn_app.express(
+                return await app.express(
                     interest_name,
-                    validator=app.pass_all,
+                    validator=ndn_app.pass_all,
                     must_be_fresh=True,
                     can_be_prefix=can_be_prefix,
                     lifetime=timeout,
@@ -119,11 +119,11 @@ def main():
         style='{',
     )
 
-    ndn_app = app.NDNApp()
+    app = ndn_app.NDNApp()
 
     async def after_start():
         try:
-            contents = await fetch_file(ndn_app, args.name)
+            contents = await fetch_file(app, args.name)
             if args.output is None:
                 sys.stdout.buffer.write(contents)
                 sys.stdout.buffer.flush()
@@ -139,9 +139,9 @@ def main():
         except types.ValidationFailure:
             print('Data failed to validate', file=sys.stderr)
         finally:
-            ndn_app.shutdown()
+            app.shutdown()
 
-    ndn_app.run_forever(after_start=after_start())
+    app.run_forever(after_start=after_start())
 
 
 if __name__ == '__main__':

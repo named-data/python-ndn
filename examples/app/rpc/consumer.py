@@ -18,7 +18,7 @@
 import argparse
 import logging
 
-from ndn import app, encoding as enc, types, utils
+from ndn import app as ndn_app, encoding as enc, types, utils
 from ndn.security import DigestSha256Signer
 
 
@@ -36,7 +36,7 @@ def main():
         style='{',
     )
 
-    ndn_app = app.NDNApp()
+    app = ndn_app.NDNApp()
 
     async def after_start():
         try:
@@ -50,9 +50,9 @@ def main():
                 f'Sending Interest {enc.Name.to_str(name)} '
                 f'with ApplicationParameters {app_param!r}'
             )
-            data_name, content, context = await ndn_app.express(
+            data_name, content, context = await app.express(
                 name,
-                validator=app.pass_all,
+                validator=ndn_app.pass_all,
                 app_param=app_param,
                 signer=DigestSha256Signer(for_interest=True),
                 must_be_fresh=True,
@@ -71,9 +71,9 @@ def main():
         except types.ValidationFailure:
             print('Data failed to validate')
         finally:
-            ndn_app.shutdown()
+            app.shutdown()
 
-    ndn_app.run_forever(after_start=after_start())
+    app.run_forever(after_start=after_start())
 
 
 if __name__ == '__main__':

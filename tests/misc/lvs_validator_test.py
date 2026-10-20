@@ -24,7 +24,7 @@ from unittest.mock import patch
 
 import pytest
 
-from ndn import app, encoding as enc, types, utils
+from ndn import app as ndn_app, encoding as enc, types, utils
 from ndn.app_support.light_versec import (
     Checker,
     compile_lvs,
@@ -568,13 +568,13 @@ class TestLvsValidator:
                     await face.input_packet(author_cert)
 
                 face = DummyFace(face_proc)
-                ndn_app = app.NDNApp(face)
-                face.app = ndn_app
+                app = ndn_app.NDNApp(face)
+                face.app = app
                 checker = Checker(compile_lvs(LVS_TEXT), {})
-                validator = lvs_validator(checker, ndn_app, root_cert.data)
+                validator = lvs_validator(checker, app, root_cert.data)
 
                 async def after_start():
-                    name, content, _ = await ndn_app.express(
+                    name, content, _ = await app.express(
                         '/lvs-test/article/alice/post',
                         validator=validator,
                         nonce=None,
@@ -585,6 +585,6 @@ class TestLvsValidator:
                     )
                     assert content == b'content'
 
-                aio.run(ndn_app.main_loop(after_start()))
+                aio.run(app.main_loop(after_start()))
             finally:
                 keychain.shutdown()

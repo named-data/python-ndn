@@ -21,15 +21,15 @@ import dataclasses as dc
 import logging
 import time
 
-from ndn import app, types
+from ndn import app as ndn_app, types
 from ndn.app_support.nfd_mgmt import GeneralStatus
 from ndn.encoding.tlv_model import tlv_parse
 
 
-async def fetch_status(ndn_app: app.NDNApp) -> GeneralStatus:
-    _, content, _ = await ndn_app.express(
+async def fetch_status(app: ndn_app.NDNApp) -> GeneralStatus:
+    _, content, _ = await app.express(
         '/localhost/nfd/status/general',
-        validator=app.pass_all,
+        validator=ndn_app.pass_all,
         must_be_fresh=True,
         can_be_prefix=True,
         lifetime=6000,
@@ -70,11 +70,11 @@ def main():
         style='{',
     )
 
-    async def poll(ndn_app):
+    async def poll(app):
         while True:
             while True:
                 try:
-                    print_status(await fetch_status(ndn_app))
+                    print_status(await fetch_status(app))
                     break
                 except types.InterestNack as exc:
                     print(f'Nacked with reason={exc.reason}')
@@ -87,17 +87,17 @@ def main():
                 await aio.sleep(args.interval)
 
             if args.once:
-                ndn_app.shutdown()
+                app.shutdown()
                 return
             print()
             await aio.sleep(args.interval)
 
     while True:
-        ndn_app = app.NDNApp()
-        poll_task = poll(ndn_app)
+        app = ndn_app.NDNApp()
+        poll_task = poll(app)
         should_reconnect = True
         try:
-            should_reconnect = aio.run(ndn_app.main_loop(after_start=poll_task))
+            should_reconnect = aio.run(app.main_loop(after_start=poll_task))
         except (FileNotFoundError, ConnectionError, OSError):
             poll_task.close()
         except KeyboardInterrupt:

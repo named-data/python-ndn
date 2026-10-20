@@ -18,7 +18,7 @@
 import argparse
 import logging
 
-from ndn import app, encoding as enc, utils
+from ndn import app as ndn_app, encoding as enc, utils
 
 
 SEGMENT_SIZE = 4400
@@ -48,11 +48,11 @@ def main():
     segment_count = max(1, (len(contents) + SEGMENT_SIZE - 1) // SEGMENT_SIZE)
     final_block_id = enc.Component.from_segment(segment_count - 1)
 
-    ndn_app = app.NDNApp()
-    keychain = ndn_app.default_keychain()
+    app = ndn_app.NDNApp()
+    keychain = app.default_keychain()
     signer = keychain.get_signer({})
     packets = [
-        ndn_app.make_data(
+        app.make_data(
             versioned_name + [enc.Component.from_segment(segment_no)],
             content=contents[
                 segment_no * SEGMENT_SIZE:(segment_no + 1) * SEGMENT_SIZE
@@ -69,12 +69,12 @@ def main():
         f'{enc.Name.to_str(versioned_name)}'
     )
 
-    @ndn_app.route(base_name)
+    @app.route(base_name)
     def on_interest(
         name: enc.FormalName,
         _app_param: enc.BinaryStr | None,
-        reply: app.ReplyFunc,
-        _context: app.PktContext,
+        reply: ndn_app.ReplyFunc,
+        _context: ndn_app.PktContext,
     ):
         if name == base_name or name == versioned_name:
             segment_no = 0
@@ -91,7 +91,7 @@ def main():
             reply(packets[segment_no])
 
     try:
-        ndn_app.run_forever()
+        app.run_forever()
     finally:
         keychain.shutdown()
 

@@ -18,7 +18,7 @@
 import abc
 import asyncio as aio
 import pytest
-from ndn import app
+from ndn import app as ndn_app
 from ndn import security as sec
 from ndn import encoding as enc
 from ndn import types
@@ -39,7 +39,7 @@ class NDNAppTestSuite:
     async def comain(self):
         face = DummyFace(self.face_proc)
         self.signer = sec.DigestSha256Signer()
-        self.app = app.NDNApp(face)
+        self.app = ndn_app.NDNApp(face)
         face.app = self.app
         await self.app.main_loop(self.app_main())
 
@@ -63,7 +63,7 @@ class TestConsumerBasic(NDNAppTestSuite):
     async def app_main(self):
         name = '/example/testApp/randomData/t=1570430517101'
         data_name, content, pkt_context = await self.app.express(
-            name, app.pass_all, must_be_fresh=True, can_be_prefix=False, lifetime=6000, nonce=None)
+            name, ndn_app.pass_all, must_be_fresh=True, can_be_prefix=False, lifetime=6000, nonce=None)
         assert data_name == enc.Name.from_str(name)
         assert pkt_context['meta_info'].freshness_period == 1000
         assert content == b'Hello, world!'
@@ -75,7 +75,7 @@ class TestInterestCancel(NDNAppTestSuite):
 
     async def app_main(self):
         with pytest.raises(types.InterestCanceled):
-            await self.app.express('not important', app.pass_all, nonce=None)
+            await self.app.express('not important', ndn_app.pass_all, nonce=None)
 
 
 class TestInterestNack(NDNAppTestSuite):
@@ -88,7 +88,7 @@ class TestInterestNack(NDNAppTestSuite):
 
     async def app_main(self):
         with pytest.raises(types.InterestNack) as nack:
-            await self.app.express('/localhost/nfd/faces/events', app.pass_all, nonce=None, lifetime=1000,
+            await self.app.express('/localhost/nfd/faces/events', ndn_app.pass_all, nonce=None, lifetime=1000,
                                    must_be_fresh=True, can_be_prefix=True)
         assert nack.value.reason == 150
 
@@ -100,7 +100,7 @@ class TestInterestTimeout(NDNAppTestSuite):
 
     async def app_main(self):
         with pytest.raises(types.InterestTimeout):
-            await self.app.express('not important', app.pass_all, nonce=None, lifetime=10)
+            await self.app.express('not important', ndn_app.pass_all, nonce=None, lifetime=10)
 
 
 class TestDataValidationFalure(NDNAppTestSuite):
@@ -130,9 +130,9 @@ class TestInterestCanBePrefix(NDNAppTestSuite):
         await aio.sleep(0.4)
 
     async def app_main(self):
-        future1 = self.app.express('/not', app.pass_all, nonce=None, lifetime=250, can_be_prefix=False)
-        future2 = self.app.express('/not', app.pass_all, nonce=None, lifetime=250, can_be_prefix=True)
-        future3 = self.app.express('/not/important', app.pass_all, nonce=None, lifetime=250, can_be_prefix=False)
+        future1 = self.app.express('/not', ndn_app.pass_all, nonce=None, lifetime=250, can_be_prefix=False)
+        future2 = self.app.express('/not', ndn_app.pass_all, nonce=None, lifetime=250, can_be_prefix=True)
+        future3 = self.app.express('/not/important', ndn_app.pass_all, nonce=None, lifetime=250, can_be_prefix=False)
         name2, content2, _ = await future3
         name1, content1, _ = await future2
         with pytest.raises(types.InterestTimeout):
@@ -152,7 +152,7 @@ class TestRoute(NDNAppTestSuite):
 
     async def app_main(self):
         @self.app.route('/not')
-        def on_interest(name, _app_param, reply: app.ReplyFunc, _context):
+        def on_interest(name, _app_param, reply: ndn_app.ReplyFunc, _context):
             data = self.app.make_data(name, b'test', signer=sec.NullSigner())
             assert reply(data)
 
@@ -175,7 +175,7 @@ class TestInvalidInterest(NDNAppTestSuite):
 
     async def app_main(self):
         @self.app.route('/not', validator=self.validator)
-        def on_interest(_name, _app_param, _reply: app.ReplyFunc, _context):
+        def on_interest(_name, _app_param, _reply: ndn_app.ReplyFunc, _context):
             raise ValueError('This test fails')
 
 
@@ -188,7 +188,7 @@ class TestRoute2(NDNAppTestSuite):
 
     async def app_main(self):
         @self.app.route('/not')
-        def on_interest(name, _app_param, reply: app.ReplyFunc, context):
+        def on_interest(name, _app_param, reply: ndn_app.ReplyFunc, context):
             assert context['raw_packet'] == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa'
             assert not context['sig_ptrs'].signature_info
             reply(self.app.make_data(name, b'test', signer=sec.NullSigner()))
@@ -205,7 +205,7 @@ class TestConsumerRawPacket(NDNAppTestSuite):
     async def app_main(self):
         name = '/example/testApp/randomData/t=1570430517101'
         _, _, pkt_context = await self.app.express(
-            name, validator=app.pass_all,
+            name, validator=ndn_app.pass_all,
             must_be_fresh=True, can_be_prefix=False, lifetime=6000, nonce=None, need_raw_packet=True)
         raw = pkt_context['raw_packet']
         assert (raw == b'\x06\x42\x07(\x08\x07example\x08\x07testApp\x08\nrandomData'
@@ -223,7 +223,7 @@ class TestCongestionMark(NDNAppTestSuite):
 
     async def app_main(self):
         @self.app.route('/not')
-        def on_interest(name, _app_param, reply: app.ReplyFunc, context):
+        def on_interest(name, _app_param, reply: ndn_app.ReplyFunc, context):
             assert context['raw_packet'] == b'\x05\x15\x07\x10\x08\x03not\x08\timportant\x0c\x01\xfa'
             assert not context['sig_ptrs'].signature_info
             reply(self.app.make_data(name, b'test', signer=sec.NullSigner()))
@@ -245,10 +245,10 @@ class TestImplicitSha256(NDNAppTestSuite):
     async def app_main(self):
         fut1 = self.app.express(
             '/test/sha256digest=FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
-            validator=app.pass_all, nonce=None, lifetime=250)
+            validator=ndn_app.pass_all, nonce=None, lifetime=250)
         fut2 = self.app.express(
             '/test/sha256digest=5488f2c11b566d49e9904fb52aa6f6f9e66a954168109ce156eea2c92c57e4c2',
-            validator=app.pass_all, nonce=None, lifetime=250)
+            validator=ndn_app.pass_all, nonce=None, lifetime=250)
         name2, content2, _ = await fut2
         with pytest.raises(types.InterestTimeout):
             await fut1
@@ -267,7 +267,7 @@ class TestPitToken(NDNAppTestSuite):
 
     async def app_main(self):
         @self.app.route('/not')
-        def on_interest(name, _app_param, reply: app.ReplyFunc, _context):
+        def on_interest(name, _app_param, reply: ndn_app.ReplyFunc, _context):
             data = self.app.make_data(name, b'test', signer=sec.NullSigner())
             assert reply(data)
 

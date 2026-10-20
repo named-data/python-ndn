@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import logging
 
-from ndn import app, encoding as enc
+from ndn import app as ndn_app, encoding as enc
 from ndn.security import DigestSha256Signer, sha256_digest_checker
 
 
@@ -29,16 +29,16 @@ logging.basicConfig(
 )
 
 
-ndn_app = app.NDNApp()
+app = ndn_app.NDNApp()
 data_signer = DigestSha256Signer()
 
 
-@ndn_app.route('/example/rpc', validator=sha256_digest_checker)
+@app.route('/example/rpc', validator=sha256_digest_checker)
 def on_interest(
     name: enc.FormalName,
     app_param: enc.BinaryStr | None,
-    reply: app.ReplyFunc,
-    context: app.PktContext,
+    reply: ndn_app.ReplyFunc,
+    context: ndn_app.PktContext,
 ):
     print(f'>> I: {enc.Name.to_str(name)}, {context["int_param"]}')
     if app_param is None:
@@ -51,7 +51,7 @@ def on_interest(
     except ValueError:
         content = b'ERROR: parameters must be integers'
 
-    packet = ndn_app.make_data(
+    packet = app.make_data(
         name,
         content=content,
         signer=data_signer,
@@ -63,4 +63,4 @@ def on_interest(
 
 
 if __name__ == '__main__':
-    ndn_app.run_forever()
+    app.run_forever()

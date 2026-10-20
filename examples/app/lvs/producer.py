@@ -19,7 +19,7 @@ import logging
 import os
 import sys
 
-from ndn import app, encoding as enc, utils
+from ndn import app as ndn_app, encoding as enc, utils
 from ndn.app_support.light_versec import (
     Checker,
     DEFAULT_USER_FNS,
@@ -69,14 +69,14 @@ def main():
     assert checker.validate_user_fns()
     assert root_of_trust.issubset(ta_matches)
 
-    ndn_app = app.NDNApp()
+    app = ndn_app.NDNApp()
 
     def serve_article(content: bytes):
         def on_interest(
             name: enc.FormalName,
             _app_param: enc.BinaryStr | None,
-            reply: app.ReplyFunc,
-            context: app.PktContext,
+            reply: ndn_app.ReplyFunc,
+            context: ndn_app.PktContext,
         ):
             print(f'>> I: {enc.Name.to_str(name)}, {context["int_param"]}')
             data_name = name + [enc.Component.from_version(utils.timestamp())]
@@ -85,7 +85,7 @@ def main():
                 print(f'No signing certificate allowed for {enc.Name.to_str(data_name)}')
                 return
             signer = keychain.get_signer({'cert': sign_cert_name})
-            packet = ndn_app.make_data(
+            packet = app.make_data(
                 data_name,
                 content=content,
                 signer=signer,
@@ -98,20 +98,20 @@ def main():
 
         return on_interest
 
-    ndn_app.route('/lvs-test/article/xinyu/hello')(
+    app.route('/lvs-test/article/xinyu/hello')(
         serve_article(b'Hello,')
     )
-    ndn_app.route('/lvs-test/article/xinyu/world')(
+    app.route('/lvs-test/article/xinyu/world')(
         serve_article(b'world!')
     )
 
     def serve_certificate(cert):
-        @ndn_app.route(cert.name)
+        @app.route(cert.name)
         def on_interest(
             _name: enc.FormalName,
             _app_param: enc.BinaryStr | None,
-            reply: app.ReplyFunc,
-            _context: app.PktContext,
+            reply: ndn_app.ReplyFunc,
+            _context: ndn_app.PktContext,
         ):
             reply(cert.data)
 
@@ -121,7 +121,7 @@ def main():
 
     print('Start serving ...')
     try:
-        ndn_app.run_forever()
+        app.run_forever()
     finally:
         keychain.shutdown()
 

@@ -19,7 +19,7 @@ import logging
 import os
 import sys
 
-from ndn import app, encoding as enc, types
+from ndn import app as ndn_app, encoding as enc, types
 from ndn.app_support.light_versec import (
     Checker,
     DEFAULT_USER_FNS,
@@ -57,14 +57,14 @@ def main():
     print(f'Trust anchor name: {enc.Name.to_str(trust_anchor.name)}')
 
     checker = Checker(compile_lvs(LVS_TEXT), DEFAULT_USER_FNS)
-    ndn_app = app.NDNApp()
-    validator = lvs_validator(checker, ndn_app, trust_anchor.data)
+    app = ndn_app.NDNApp()
+    validator = lvs_validator(checker, app, trust_anchor.data)
 
     async def fetch_article(article: str):
         try:
             name = enc.Name.from_str(f'/lvs-test/article/xinyu/{article}')
             print(f'Sending Interest {enc.Name.to_str(name)}')
-            data_name, content, context = await ndn_app.express(
+            data_name, content, context = await app.express(
                 name,
                 validator=validator,
                 must_be_fresh=True,
@@ -89,9 +89,9 @@ def main():
             await fetch_article('world')
         finally:
             keychain.shutdown()
-            ndn_app.shutdown()
+            app.shutdown()
 
-    ndn_app.run_forever(after_start=after_start())
+    app.run_forever(after_start=after_start())
 
 
 if __name__ == '__main__':
