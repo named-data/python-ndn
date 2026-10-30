@@ -7,3 +7,4 @@ __all__ = []
 __all__.extend(checker.__all__)
 __all__.extend(binary.__all__)
 __all__.extend(compiler.__all__)
+__all__.extend(validator.__all__)

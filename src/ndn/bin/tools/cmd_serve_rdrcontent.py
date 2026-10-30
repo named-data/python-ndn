@@ -19,7 +19,7 @@ import os
 import sys
 import argparse
 from ...encoding import Name, Component
-from ...appv2 import NDNApp
+from ...app import NDNApp
 from ...security import KeychainDigest
 from ...utils import timestamp
 

@@ -16,9 +16,9 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...appv2 import NDNApp
+from ...app import NDNApp
 from ...app_support.nfd_mgmt import make_command_v2, parse_response
-from .utils import express_interest
+from .utils import express_command
 
 
 def add_parser(subparsers):
@@ -39,7 +39,7 @@ def execute(args: argparse.Namespace):
         try:
             fid = int(face_id)
             cmd = make_command_v2('rib', 'register', name=route, face_id=fid)
-            res = await express_interest(app, cmd)
+            res = await express_command(app, cmd)
             msg = parse_response(res)
             print(f'{msg["status_code"]} {msg["status_text"]}')
         finally:

@@ -20,7 +20,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
-import ndn.encoding as enc
+import dataclasses as dc
+from typing import Self
+
+from ...encoding import BinaryStr
+from ...encoding.tlv_model import tlv_encode, tlv_field, tlv_parse
 
 
 __all__ = [
@@ -62,63 +66,88 @@ class TypeNumber:
     NAMED_PATTERN_NUM = 0x69
 
 
-class UserFnArg(enc.TlvModel):
+@dc.dataclass
+class UserFnArg:
     # A given component
-    value = enc.BytesField(TypeNumber.COMPONENT_VALUE)
+    value: bytes | None = tlv_field(
+        TypeNumber.COMPONENT_VALUE, default=None)
     # Referring to a previous matched pattern
-    tag = enc.UintField(TypeNumber.PATTERN_TAG)
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
 
 
-class UserFnCall(enc.TlvModel):
-    fn_id = enc.BytesField(TypeNumber.USER_FN_ID, is_string=True)
-    args = enc.RepeatedField(enc.ModelField(TypeNumber.FN_ARGS, UserFnArg))
+@dc.dataclass
+class UserFnCall:
+    fn_id: str | None = tlv_field(TypeNumber.USER_FN_ID, default=None)
+    args: list[UserFnArg] = tlv_field(
+        TypeNumber.FN_ARGS, default_factory=list)
 
 
-class ConstraintOption(enc.TlvModel):
+@dc.dataclass
+class ConstraintOption:
     # Equal to a given NameComponent value
-    value = enc.BytesField(TypeNumber.COMPONENT_VALUE)
+    value: bytes | None = tlv_field(
+        TypeNumber.COMPONENT_VALUE, default=None)
     # Equal to another pattern
-    tag = enc.UintField(TypeNumber.PATTERN_TAG)
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
     # Decide by a user function call
-    fn = enc.ModelField(TypeNumber.USER_FN_CALL, UserFnCall)
+    fn: UserFnCall | None = tlv_field(
+        TypeNumber.USER_FN_CALL, default=None)
 
 
-class PatternConstraint(enc.TlvModel):
-    options = enc.RepeatedField(
-        enc.ModelField(TypeNumber.CONS_OPTION, ConstraintOption)
-    )
+@dc.dataclass
+class PatternConstraint:
+    options: list[ConstraintOption] = tlv_field(
+        TypeNumber.CONS_OPTION, default_factory=list)
 
 
-class PatternEdge(enc.TlvModel):
-    dest = enc.UintField(TypeNumber.NODE_ID)
-    tag = enc.UintField(TypeNumber.PATTERN_TAG)
-    cons_sets = enc.RepeatedField(
-        enc.ModelField(TypeNumber.CONSTRAINT, PatternConstraint)
-    )
+@dc.dataclass
+class PatternEdge:
+    dest: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
+    cons_sets: list[PatternConstraint] = tlv_field(
+        TypeNumber.CONSTRAINT, default_factory=list)
 
 
-class ValueEdge(enc.TlvModel):
-    dest = enc.UintField(TypeNumber.NODE_ID)
-    value = enc.BytesField(TypeNumber.COMPONENT_VALUE)
+@dc.dataclass
+class ValueEdge:
+    dest: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    value: bytes | None = tlv_field(
+        TypeNumber.COMPONENT_VALUE, default=None)
 
 
-class Node(enc.TlvModel):
-    id = enc.UintField(TypeNumber.NODE_ID)
-    parent = enc.UintField(TypeNumber.PARENT_ID)
-    rule_name = enc.RepeatedField(enc.BytesField(TypeNumber.IDENTIFIER, is_string=True))
-    v_edges = enc.RepeatedField(enc.ModelField(TypeNumber.VALUE_EDGE, ValueEdge))
-    p_edges = enc.RepeatedField(enc.ModelField(TypeNumber.PATTERN_EDGE, PatternEdge))
-    sign_cons = enc.RepeatedField(enc.UintField(TypeNumber.KEY_NODE_ID))
+@dc.dataclass
+class Node:
+    id: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    parent: int | None = tlv_field(TypeNumber.PARENT_ID, default=None)
+    rule_name: list[str] = tlv_field(
+        TypeNumber.IDENTIFIER, default_factory=list)
+    v_edges: list[ValueEdge] = tlv_field(
+        TypeNumber.VALUE_EDGE, default_factory=list)
+    p_edges: list[PatternEdge] = tlv_field(
+        TypeNumber.PATTERN_EDGE, default_factory=list)
+    sign_cons: list[int] = tlv_field(
+        TypeNumber.KEY_NODE_ID, default_factory=list)
 
 
-class TagSymbol(enc.TlvModel):
-    tag = enc.UintField(TypeNumber.PATTERN_TAG)
-    ident = enc.BytesField(TypeNumber.IDENTIFIER, is_string=True)
+@dc.dataclass
+class TagSymbol:
+    tag: int | None = tlv_field(TypeNumber.PATTERN_TAG, default=None)
+    ident: str | None = tlv_field(TypeNumber.IDENTIFIER, default=None)
 
 
-class LvsModel(enc.TlvModel):
-    version = enc.UintField(TypeNumber.VERSION)
-    start_id = enc.UintField(TypeNumber.NODE_ID)
-    named_pattern_cnt = enc.UintField(TypeNumber.NAMED_PATTERN_NUM)
-    nodes = enc.RepeatedField(enc.ModelField(TypeNumber.NODE, Node))
-    symbols = enc.RepeatedField(enc.ModelField(TypeNumber.TAG_SYMBOL, TagSymbol))
+@dc.dataclass
+class LvsModel:
+    version: int | None = tlv_field(TypeNumber.VERSION, default=None)
+    start_id: int | None = tlv_field(TypeNumber.NODE_ID, default=None)
+    named_pattern_cnt: int | None = tlv_field(
+        TypeNumber.NAMED_PATTERN_NUM, default=None)
+    nodes: list[Node] = tlv_field(TypeNumber.NODE, default_factory=list)
+    symbols: list[TagSymbol] = tlv_field(
+        TypeNumber.TAG_SYMBOL, default_factory=list)
+
+    def encode(self) -> bytearray:
+        return tlv_encode(self)
+
+    @classmethod
+    def parse(cls, wire: BinaryStr) -> Self:
+        return tlv_parse(cls, wire)

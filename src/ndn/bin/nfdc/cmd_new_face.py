@@ -16,9 +16,9 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 import argparse
-from ...appv2 import NDNApp
+from ...app import NDNApp
 from ...app_support.nfd_mgmt import parse_response, make_command_v2
-from .utils import express_interest
+from .utils import express_command
 
 
 def add_parser(subparsers):
@@ -38,8 +38,8 @@ def execute(args: argparse.Namespace):
         uri = uri + ":6363"
 
     async def create_face():
-        cmd = make_command_v2('faces', 'create', uri=uri.encode())
-        res = await express_interest(app, cmd)
+        cmd = make_command_v2('faces', 'create', uri=uri)
+        res = await express_command(app, cmd)
         msg = parse_response(res)
         print(f'{msg["status_code"]} {msg["status_text"]}')
         app.shutdown()

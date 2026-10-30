@@ -5,6 +5,8 @@
 
     .. autofunction:: compile_lvs
 
+    .. autofunction:: lvs_validator
+
     .. autoclass:: Checker
         :members:
 
@@ -14,4 +16,4 @@
     .. autoclass:: LvsModelError
         :members:
 
-.. autonewtypedata:: ndn.app_support.light_versec.checker.UserFn
+.. autodata:: ndn.app_support.light_versec.checker.UserFn
