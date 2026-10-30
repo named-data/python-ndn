@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Copyright (C) 2019-2020 The python-ndn authors
+# Copyright (C) 2019-2022 The python-ndn authors
 #
 # This file is part of python-ndn.
 #
@@ -15,62 +15,231 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # -----------------------------------------------------------------------------
+import asyncio as aio
+import typing
 import struct
 import logging
-import asyncio as aio
-from typing import Any
-from collections.abc import Awaitable, Coroutine
-from .utils import gen_nonce
-from .encoding import BinaryStr, TypeNumber, LpTypeNumber, parse_interest, \
-    parse_tl_num, parse_data, DecodeError, Name, NonStrictName, MetaInfo, \
-    make_data, InterestParam, make_interest, FormalName, SignaturePtrs, parse_lp_packet, Component
-from .security import Keychain, sha256_digest_checker, params_sha256_checker, NullSigner
+from hashlib import sha256
+from dataclasses import dataclass
 from .transport.face import Face
-from .app_support.nfd_mgmt import make_command, parse_response
-from .name_tree import NameTrie, InterestTreeNode, PrefixTreeNode
-from .types import NetworkError, InterestTimeout, Validator, Route, InterestCanceled, \
-    InterestNack, ValidationFailure
+from .transport.prefix_registerer import PrefixRegisterer
+from . import security as sec
+from . import encoding as enc
+from . import name_tree
+from . import types
+from . import utils
+from .encoding import ndnlp_v2 as ndnlp
+from .encoding import ndn_format_0_3 as fmt
+from .encoding.tlv_model import tlv_encode
 from .client_conf import read_client_conf, default_face, default_keychain
+from .transport.nfd_registerer import NfdRegister
+
+
+DEFAULT_LIFETIME = 4000
+
+ValidResult = types.ValidResult
+
+PktContext = dict[str, typing.Any]
+r"""The context for NDN Interest or Data handling."""
+
+ReplyFunc = typing.Callable[[enc.BinaryStr], bool]
+r"""
+Continuation function for :any:`IntHandler` to respond to an Interest.
+
+..  function:: (data: BinaryStr) -> bool
+
+    :param data: an encoded Data packet.
+    :type data: :any:`BinaryStr`
+    :return: True for success, False upon error.
+"""
+
+IntHandler = typing.Callable[[enc.FormalName, enc.BinaryStr | None, ReplyFunc, PktContext], None]
+r"""
+Interest handler function associated with a name prefix.
+
+The function should use the provided ``reply`` callback to reply with Data, which can handle PIT
+token properly.
+
+..  function:: (name: FormalName, app_param: BinaryStr | None, reply: ReplyFunc, context: PktContext) -> None
+
+    :param name: Interest name.
+    :type name: :any:`FormalName`
+    :param app_param: Interest ApplicationParameters value, or None if absent.
+    :type app_param: :any:`BinaryStr` | None
+    :param reply: continuation function to respond with Data.
+    :type reply: :any:`ReplyFunc`
+    :param context: packet handler context.
+    :type context: :any:`PktContext`
+
+.. note::
+    Interest handler function must be a normal function instead of an ``async`` one.
+    This is on purpose, because an Interest is supposed to be replied ASAP,
+    even it cannot finish the request in time.
+    To provide some feedback, a better practice is replying with an Application NACK
+    (or some equivalent Data packet saying the operation cannot be finished in time).
+    If you want to use ``await`` in the handler, please use ``asyncio.create_task`` to create a new coroutine.
+"""
+
+Validator = typing.Callable[[enc.FormalName, fmt.SignaturePtrs, PktContext],
+                            typing.Coroutine[typing.Any, None, ValidResult]]
+r"""
+Validator function that validates Interest or Data signature against trust policy.
+
+..  function:: (name: FormalName, sig: SignaturePtrs, context: PktContext) -> Coroutine[ValidResult]
+
+    :param name: Interest or Data name.
+    :type name: :any:`FormalName`
+    :param sig: packet signature pointers.
+    :type sig: :any:`SignaturePtrs`
+    :param context: packet handler context.
+    :type context: :any:`PktContext`
+"""
+
+
+async def pass_all(_name, _sig, _context):
+    return types.ValidResult.PASS
+
+
+@dataclass
+class PrefixTreeNode:
+    callback: IntHandler = None
+    validator: Validator | None = None
+
+
+@dataclass
+class PendingIntEntry:
+    future: aio.Future
+    deadline: int
+    can_be_prefix: bool
+    must_be_fresh: bool
+    validator: Validator
+    implicit_sha256: enc.BinaryStr = b''
+    task: aio.Task | None = None
+
+    async def satisfy(self, data: types.DataTuple):
+        name, meta_info, content, sig, raw_packet = data
+        pkt_context = {
+            'meta_info': meta_info,
+            'sig_ptrs': sig,
+            'raw_packet': raw_packet,
+            'deadline': self.deadline,
+        }
+        if self.validator is not None:
+            try:
+                valid = await self.validator(name, sig, pkt_context)
+            except (TimeoutError, aio.CancelledError):
+                valid = ValidResult.TIMEOUT
+        else:
+            valid = ValidResult.FAIL
+        if self.future.cancelled() or self.future.done():
+            # Don't know why but there was a race condition with timeout()
+            # The sequence was: Interest sent -> Data arrived -> timeout() -> satisfy()
+            # Cannot reproduce the scenario. Especially, delay in validator() does not trigger the race condition
+            # But anyway, let me add a guard check here.
+            return
+        if valid == ValidResult.PASS or valid == ValidResult.ALLOW_BYPASS:
+            self.future.set_result((name, content, pkt_context))
+        else:
+            self.future.set_exception(types.ValidationFailure(name, meta_info, content, sig, valid))
+
+
+class InterestTreeNode:
+    pending_list: list[PendingIntEntry]
+
+    def __init__(self):
+        self.pending_list = []
+
+    def append_interest(self, future: aio.Future, deadline: int, param: fmt.InterestParam,
+                        validator: Validator, implicit_sha256: enc.BinaryStr):
+        self.pending_list.append(
+            PendingIntEntry(future, deadline, param.can_be_prefix, param.must_be_fresh, validator, implicit_sha256))
+
+    def nack_interest(self, nack_reason: int) -> bool:
+        for entry in self.pending_list:
+            entry.future.set_exception(types.InterestNack(nack_reason))
+        return True
+
+    def satisfy(self, data: types.DataTuple, is_prefix: bool) -> bool:
+        unsatisfied_entries = []
+        raw_packet = data[4]
+        for entry in self.pending_list:
+            if entry.can_be_prefix or not is_prefix:
+                if len(entry.implicit_sha256) > 0:
+                    data_sha256 = sha256(raw_packet).digest()
+                    passed = data_sha256 == entry.implicit_sha256
+                else:
+                    passed = True
+            else:
+                passed = False
+            if passed:
+                # Try to validate the packet
+                aio.create_task(entry.satisfy(data))
+            else:
+                unsatisfied_entries.append(entry)
+        if unsatisfied_entries:
+            self.pending_list = unsatisfied_entries
+            return False
+        else:
+            return True
+
+    def timeout(self, future: aio.Future):
+        # Exception is raised by outside code.
+        for ele in self.pending_list:
+            if ele.future is future and ele.task is not None:
+                ele.task.cancel()
+        self.pending_list = [ele for ele in self.pending_list if ele.future is not future]
+        return not self.pending_list
+
+    def cancel(self):
+        for entry in self.pending_list:
+            entry.future.cancel()
+            if entry.task is not None:
+                entry.task.cancel()
 
 
 class NDNApp:
     """
     An NDN application.
-
-    :ivar face: the Face used to connection to a NFD node.
-    :ivar keychain: the Keychain to store Identities and Keys, providing Signers.
-    :ivar int_validator: the default validator for Interest packets.
-    :ivar data_validator: the default validator for Data packets.
     """
+    # PIT and FIB here are not real PIT/FIB, but a data structure that handles expressed Interests (for PIT)
+    # and registered handlers & routes (for FIB). Since they share the functionality with real PIT and FIB,
+    # I borrow the word to have a shorter variable name.
+    _pit: name_tree.NameTrie = None
+    _fib: name_tree.NameTrie = None
     face: Face = None
-    keychain: Keychain = None
-    _int_tree: NameTrie = None
-    _prefix_tree: NameTrie = None
-    int_validator: Validator = None
-    data_validator: Validator = None
-    _autoreg_routes: list[tuple[FormalName, Route, Validator | None, bool, bool]]
-    _prefix_register_semaphore: aio.Semaphore = None
+    registerer: PrefixRegisterer = None
+    _autoreg_routes: list[enc.FormalName]
     logger: logging.Logger
 
-    def __init__(self, face=None, keychain=None):
+    def __init__(self, face=None, client_conf=None, registerer=None):
         self.logger = logging.getLogger(__name__)
-        config = read_client_conf() if not face or not keychain else {}
+        config = client_conf if client_conf else {}
+        if not face:
+            if 'transport' not in config:
+                config = read_client_conf() | config
         if face is not None:
             self.face = face
         else:
             self.face = default_face(config['transport'])
-        self.face.callback = self._receive
-        if keychain is not None:
-            self.keychain = keychain
+        if registerer is not None:
+            self.registerer = registerer
         else:
-            self.keychain = default_keychain(config['pib'], config['tpm'])
-        self._int_tree = NameTrie()
-        self._prefix_tree = NameTrie()
-        self.data_validator = sha256_digest_checker
-        self.int_validator = sha256_digest_checker
+            self.registerer = NfdRegister()
+        self.registerer.set_app(app=self)
+        self.face.callback = self._receive
+        self._pit = name_tree.NameTrie()
+        self._fib = name_tree.NameTrie()
         self._autoreg_routes = []
 
-    async def _receive(self, typ: int, data: BinaryStr):
+    @staticmethod
+    def default_keychain(client_conf=None) -> sec.Keychain:
+        if not client_conf:
+            config = read_client_conf()
+        else:
+            config = read_client_conf() | client_conf
+        return default_keychain(config['pib'], config['tpm'])
+
+    async def _receive(self, typ: int, data: enc.BinaryStr):
         """
         Pipeline when a packet is received.
 
@@ -79,49 +248,150 @@ class NDNApp:
         """
         # if self.logger.isEnabledFor(logging.DEBUG):
         #     self.logger.debug('Packet received %s, %s' % (typ, bytes(data)))
-        if typ == LpTypeNumber.LP_PACKET:
+        if typ == ndnlp.LpTypeNumber.LP_PACKET:
             try:
-                nack_reason, fragment = parse_lp_packet(data, with_tl=True)
-            except (DecodeError, TypeError, ValueError, struct.error):
+                lp_pkt = ndnlp.parse_lp_packet_v2(data, with_tl=True)
+            except (enc.DecodeError, TypeError, ValueError, struct.error):
                 self.logger.warning('Unable to decode received packet')
                 return
-            data = fragment
-            typ, _ = parse_tl_num(data)
+            if lp_pkt.nack is not None:
+                nack_reason = lp_pkt.nack.nack_reason
+            else:
+                nack_reason = None
+            pit_token = lp_pkt.pit_token
+            data = lp_pkt.fragment
+            if data is None:
+                # Only Nack and Data can reach this function.
+                self.logger.fatal('LP packet without a fragment reaching _receive branch. Unexpected behavior.')
+                return
+            typ, _ = enc.parse_tl_num(data)
         else:
             nack_reason = None
+            pit_token = None
 
         if nack_reason is not None:
             try:
-                name, _, _, _ = parse_interest(data, with_tl=True)
-            except (DecodeError, TypeError, ValueError, struct.error):
+                name, _, _, _ = fmt.parse_interest(data, with_tl=True)
+            except (enc.DecodeError, TypeError, ValueError, struct.error):
                 self.logger.warning('Unable to decode the fragment of LpPacket')
                 return
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug('NetworkNack received %s, reason=%s', Name.to_str(name), nack_reason)
+                self.logger.debug('NetworkNack received %s, reason=%s', enc.Name.to_str(name), nack_reason)
             self._on_nack(name, nack_reason)
         else:
-            if typ == TypeNumber.INTEREST:
+            if typ == fmt.TypeNumber.INTEREST:
                 try:
-                    name, param, app_param, sig = parse_interest(data, with_tl=True)
-                except (DecodeError, TypeError, ValueError, struct.error):
+                    name, param, app_param, sig = fmt.parse_interest(data, with_tl=True)
+                except (enc.DecodeError, TypeError, ValueError, struct.error):
                     self.logger.warning('Unable to decode received packet')
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug('Interest received %s', Name.to_str(name))
-                await self._on_interest(name, param, app_param, sig, raw_packet=data)
-            elif typ == TypeNumber.DATA:
+                    if pit_token:
+                        self.logger.debug('Interest received %s w/ token=%s',
+                                          enc.Name.to_str(name), bytes(pit_token).hex())
+                    else:
+                        self.logger.debug('Interest received %s', enc.Name.to_str(name))
+                await self._on_interest(name, pit_token, param, app_param, sig, raw_packet=data)
+            elif typ == fmt.TypeNumber.DATA:
                 try:
-                    name, meta_info, content, sig = parse_data(data, with_tl=True)
-                except (DecodeError, TypeError, ValueError, struct.error):
+                    name, meta_info, content, sig = fmt.parse_data(data, with_tl=True)
+                except (enc.DecodeError, TypeError, ValueError, struct.error):
                     self.logger.warning('Unable to decode received packet')
                     return
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug('Data received %s', Name.to_str(name))
+                    self.logger.debug('Data received %s', enc.Name.to_str(name))
                 await self._on_data(name, meta_info, content, sig, raw_packet=data)
             else:
                 self.logger.warning('Unable to decode received packet')
 
-    def put_raw_packet(self, data: BinaryStr):
+    @staticmethod
+    def make_data(name: enc.NonStrictName, content: enc.BinaryStr | None,
+                  signer: enc.Signer | None, **kwargs):
+        r"""
+        Encode a data packet without requiring an NDNApp instance.
+        This is simply a wrapper of encoding.make_data.
+        I write this because most people seem not aware of the ``make_data`` function in the encoding package.
+        The corresponding ``make_interest`` is less useful (one should not reuse nonce) and thus not wrapped.
+        Sync protocol should use encoding.make_interest if necessary.
+        Also, since having a default signer encourages bad habit,
+        callers must provide a signer explicitly.
+
+        :param name: the Name.
+        :type name: :any:`NonStrictName`
+        :param content: the Content.
+        :type content: :any:`BinaryStr` | None
+        :param signer: the Signer used to sign the packet.
+        :type signer: :any:`Signer` | None
+        :param kwargs: arguments for :any:`MetaInfo`.
+        :return: TLV encoded Data packet.
+        """
+        if 'meta_info' in kwargs:
+            meta_info = kwargs['meta_info']
+        else:
+            meta_info = fmt.MetaInfo.from_dict(kwargs)
+        return fmt.make_data(name, meta_info, content, signer=signer)
+
+    async def _on_interest(self, name: enc.FormalName, pit_token: enc.BinaryStr | None,
+                           param: fmt.InterestParam, app_param: enc.BinaryStr | None, sig: fmt.SignaturePtrs,
+                           raw_packet: enc.BinaryStr):
+        trie_step = self._fib.longest_prefix(name)
+        if not trie_step:
+            self.logger.warning('No route: %s', name)
+            return
+        node: PrefixTreeNode = trie_step.value
+        if node.callback is None:
+            self.logger.warning('No callback: %s', name)
+            return
+        sig_required = app_param is not None or sig.signature_info is not None
+        if sig_required:
+            if not await sec.params_sha256_checker(name, sig):
+                self.logger.warning('Drop malformed Interest: %s', name)
+                return
+
+        # Use context to handle misc parameters
+        if param.lifetime is not None:
+            deadline = utils.timestamp() + param.lifetime
+        else:
+            deadline = utils.timestamp() + DEFAULT_LIFETIME
+        context = {
+            'int_param': param,
+            'pit_token': pit_token,
+            'sig_ptrs': sig,
+            'raw_packet': raw_packet,
+            'deadline': deadline,
+        }
+
+        def reply(data: enc.BinaryStr) -> bool:
+            now = utils.timestamp()
+            if now > deadline:
+                self.logger.warning('Deadline passed, unable to reply to %s', enc.Name.to_str(name))
+                return False
+            if pit_token is None:
+                self._put_raw_packet(data)
+            else:
+                self._put_raw_packet_with_pit_token(data, pit_token)
+            return True
+
+        # In case the validator blocks the pipeline, create a task
+        async def submit_interest():
+            if sig_required:
+                # In v2, to enforce security, validator is required. Also, all interests with app_param are checked.
+                # The validator needs to manually pass it if the application wants to handle unsigned Interests with
+                # app_param.
+                if node.validator is not None:
+                    valid = await node.validator(name, sig, context)
+                else:
+                    valid = ValidResult.FAIL
+            else:
+                valid = ValidResult.PASS
+            if valid == ValidResult.PASS or valid == ValidResult.ALLOW_BYPASS:
+                node.callback(name, app_param, reply, context)
+            else:
+                self.logger.warning('Drop unvalidated Interest: %s', name)
+                return
+        aio.create_task(submit_interest())
+
+    def _put_raw_packet(self, data: enc.BinaryStr):
         r"""
         Send a raw Data packet.
 
@@ -130,76 +400,236 @@ class NDNApp:
         :raises NetworkError: the face to NFD is down.
         """
         if not self.face.running:
-            raise NetworkError('cannot send packet before connected')
+            raise types.NetworkError('cannot send packet before connected')
         self.face.send(data)
 
-    def prepare_data(self, name: NonStrictName, content: BinaryStr | None = None, **kwargs):
+    def _put_raw_packet_with_pit_token(self, data: enc.BinaryStr, pit_token: enc.BinaryStr):
         r"""
-        Prepare a Data packet by generating, encoding and signing it.
+        Wrap a raw Data packet with PIT Token and send.
+        Used to reply an Interest with PIT Token provided.
 
-        :param name: the Name.
-        :type name: :any:`NonStrictName`
-        :param content: the Content.
-        :type content: Optional[:any:`BinaryStr`]
-        :param kwargs: :ref:`label-keyword-arguments`.
-        :return: TLV encoded Data packet.
+        :param data: TLV encoded Data packet.
+        :type data: :any:`BinaryStr`
+        :param pit_token: The PIT Token provided.
+        :type pit_token: :any:`BinaryStr`
+        :raises NetworkError: the face to NFD is down.
         """
-        if kwargs.get('no_signature', False):
-            signer = NullSigner()
-        elif 'signer' in kwargs:
-            signer = kwargs['signer']
-        else:
-            signer = self.keychain.get_signer(kwargs)
-        if 'meta_info' in kwargs:
-            meta_info = kwargs['meta_info']
-        else:
-            meta_info = MetaInfo.from_dict(kwargs)
-        return make_data(name, meta_info, content, signer=signer)
+        if not self.face.running:
+            raise types.NetworkError('cannot send packet before connected')
+        pkt = ndnlp.LpPacket(lp_packet=ndnlp.LpPacketValue(pit_token=pit_token, fragment=data))
+        wire = tlv_encode(pkt)
+        self.face.send(wire)
 
-    def put_data(self, name: NonStrictName, content: BinaryStr | None = None, **kwargs):
+    def _put_raw_packet_with_pit_token_nocopy(self, data: enc.BinaryStr, pit_token: enc.BinaryStr):
         r"""
-        Publish a Data packet.
+        Wrap a raw Data packet with PIT Token and send.
+        Used to reply an Interest with PIT Token provided.
 
-        :param name: the Name.
-        :type name: :any:`NonStrictName`
-        :param content: the Content.
-        :type content: Optional[:any:`BinaryStr`]
-        :param kwargs: :ref:`label-keyword-arguments`.
-        :return: TLV encoded Data packet.
+        This function is reserved as a backup because it assumes the face to be stream face.
+
+        :param data: TLV encoded Data packet.
+        :type data: :any:`BinaryStr`
+        :param pit_token: The PIT Token provided.
+        :type pit_token: :any:`BinaryStr`
+        :raises NetworkError: the face to NFD is down.
         """
-        self.put_raw_packet(self.prepare_data(name, content, **kwargs))
+        # To avoid extra copy, we manually encode the header and send it separately from Data body
+        # The format is: LP-T LP-L (PIT-TOKEN-TLV) FRAG-T FRAG-L
+        if not self.face.running:
+            raise types.NetworkError('cannot send packet before connected')
+        pt_wire = tlv_encode(ndnlp.LpPacketValue(pit_token=pit_token))
+        frag_l = len(data)
+        frag_header_l = (enc.get_tl_num_size(ndnlp.LpTypeNumber.FRAGMENT) + enc.get_tl_num_size(frag_l))
+        lp_l = len(pt_wire) + frag_header_l + frag_l
+        wire_l = (enc.get_tl_num_size(ndnlp.LpTypeNumber.LP_PACKET)
+                  + enc.get_tl_num_size(lp_l) + len(pt_wire) + frag_header_l)
+        wire = bytearray(wire_l)
+        pos = 0
+        pos += enc.write_tl_num(ndnlp.LpTypeNumber.LP_PACKET, wire, pos)
+        pos += enc.write_tl_num(lp_l, wire, pos)
+        wire[pos:pos+len(pt_wire)] = pt_wire
+        pos += len(pt_wire)
+        pos += enc.write_tl_num(ndnlp.LpTypeNumber.FRAGMENT, wire, pos)
+        pos += enc.write_tl_num(frag_l, wire, pos)
+        self.face.send(wire)
+        self.face.send(data)
 
-    def express_interest(self,
-                         name: NonStrictName,
-                         app_param: BinaryStr | None = None,
-                         validator: Validator | None = None,
-                         need_raw_packet: bool = False,
-                         **kwargs) -> Coroutine[Any, None, tuple[FormalName, MetaInfo, BinaryStr | None]]:
+    def attach_handler(self, name: enc.NonStrictName, handler: IntHandler,
+                       validator: Validator | None = None):
+        """
+        Attach an Interest handler at a name prefix.
+        Incoming Interests under the specified name prefix will be dispatched to the handler.
+
+        This only sets the handler within NDNApp, but does not send prefix registration commands
+        to the forwarder.
+        To register the prefix in the forwarder, use :any:`register`.
+        The handler association is retained even if the forwarder is disconnected.
+
+        :param name: name prefix.
+        :type name: :any:`NonStrictName`
+        :param handler: Interest handler function.
+        :type handler: :any:`IntHandler`
+        :param validator: validator for signed Interests.
+            Non signed Interests, i.e. those without ApplicationParameters and SignatureInfo, are
+            passed to the handler directly without calling the validator.
+            Interests with malformed ParametersSha256DigestComponent are dropped silently.
+            If a validator is not provided (set to ``None``), signed Interests will be dropped.
+            Otherwise, signed Interests are passed to the validator.
+            Those failing the validation are dropped silently.
+            Those passing the validation are passed to the handler function.
+        :type validator: :any:`Validator` | None
+        """
+        name = enc.Name.normalize(name)
+        node = self._fib.setdefault(name, PrefixTreeNode())
+        if node.callback:
+            raise ValueError(f'Duplicated handler attachment: {enc.Name.to_str(name)}')
+        node.callback = handler
+        node.validator = validator
+
+    def detach_handler(self, name: enc.NonStrictName):
+        """
+        Detach an Interest handler at a name prefix.
+
+        This only deletes the handler within NDNApp, but does not unregister the prefix in the
+        forwarder.
+        To unregister the prefix in the forwarder, use :any:`unregister`.
+
+        :param name: name prefix. This must exactly match the name passed to :any:`attach_handler`.
+                     If there are Interest handlers attached to longer prefixes, each handler must
+                     be removed explicitly.
+        :type name: :any:`NonStrictName`
+        """
+        del self._fib[enc.Name.normalize(name)]
+
+    async def register(self, name: enc.NonStrictName) -> bool:
+        """
+        Register a prefix in the forwarder.
+
+        This only sends the prefix registration command to the forwarder.
+        In order to receive incoming Interests, you also need to use :any:`attach_handler` to
+        attach an Interest handler function.
+
+        :param name: name prefix.
+        :type name: :any:`NonStrictName`
+
+        :raises ValueError: the prefix is already registered.
+        :raises NetworkError: the face to NFD is down now.
+        """
+        name = enc.Name.normalize(name)
+        return await self.registerer.register(name)
+
+    async def unregister(self, name: enc.NonStrictName) -> bool:
+        """
+        Unregister a prefix in the forwarder.
+
+        :param name: name prefix.
+        :type name: :any:`NonStrictName`
+        """
+        name = enc.Name.normalize(name)
+        return await self.registerer.unregister(name)
+
+    def express_raw_interest(self,
+                             final_name: enc.NonStrictName,
+                             interest_param: fmt.InterestParam,
+                             raw_interest: enc.BinaryStr,
+                             validator: Validator,
+                             no_response: bool = False
+                             ) -> typing.Coroutine[typing.Any, None,
+                                                   tuple[enc.FormalName, enc.BinaryStr | None, PktContext]]:
+        if no_response:
+            self.face.send(raw_interest)
+            return None
+        if validator is None:
+            raise ValueError('Data Validator must not be None when expressing an Interest.')
+        final_name = enc.Name.normalize(final_name)
+        future = aio.get_running_loop().create_future()
+        # Handle implicit SHA256
+        if enc.Component.get_type(final_name[-1]) == enc.Component.TYPE_IMPLICIT_SHA256:
+            node_name = final_name[:-1]
+            implicit_sha256 = enc.Component.get_value(final_name[-1])
+        else:
+            node_name = final_name
+            implicit_sha256 = b''
+        node: InterestTreeNode = self._pit.setdefault(node_name, InterestTreeNode())
+        deadline = utils.timestamp()
+        if interest_param.lifetime is not None:
+            deadline += interest_param.lifetime
+        else:
+            deadline += DEFAULT_LIFETIME
+        node.append_interest(future, deadline, interest_param, validator, implicit_sha256)
+        self.face.send(raw_interest)
+        return self._wait_for_data(future, deadline, node_name, node)
+
+    async def _wait_for_data(self, future: aio.Future, deadline: int, node_name: enc.FormalName,
+                             node: InterestTreeNode):
+        lifetime = deadline - utils.timestamp()
+        if lifetime <= 0:
+            # This happens if the application sends an Interest, does some calculation, and then fetches the result.
+            # The Interest should be satisfied now. Thus, it should not be considered as an error.
+            lifetime = 100
+        try:
+            data_name, content, pkt_context = await aio.wait_for(future, timeout=lifetime/1000.0)
+        except TimeoutError:
+            if node.timeout(future):
+                del self._pit[node_name]
+            raise types.InterestTimeout()
+        except aio.CancelledError:
+            raise types.InterestCanceled()
+        # ValidationError, InterestNack are passed to the parent caller
+        return data_name, content, pkt_context
+
+    async def _on_data(self, name: enc.FormalName, meta_info: fmt.MetaInfo,
+                       content: enc.BinaryStr | None, sig: fmt.SignaturePtrs,
+                       raw_packet: enc.BinaryStr):
+        clean_list = []
+        for prefix, node in self._pit.prefixes(name):
+            if node.satisfy((name, meta_info, content, sig, raw_packet), prefix != name):
+                clean_list.append(prefix)
+        for prefix in clean_list:
+            del self._pit[prefix]
+
+    def _on_nack(self, name: enc.FormalName, nack_reason: int):
+        try:
+            node = self._pit[name]
+        except KeyError:
+            node = None
+        if node:
+            if node.nack_interest(nack_reason):
+                del self._pit[name]
+
+    def express(self, name: enc.NonStrictName, validator: Validator,
+                app_param: enc.BinaryStr | None = None,
+                signer: enc.Signer | None = None,
+                **kwargs) -> typing.Coroutine[typing.Any, None,
+                                              tuple[enc.FormalName, enc.BinaryStr | None, PktContext]]:
         r"""
-        Express an Interest packet.
+        Express an Interest.
 
         The Interest packet is sent immediately and a coroutine used to get the result is returned.
-        Awaiting on what is returned will block until the Data is received and return that Data.
-        An exception is raised if unable to receive the Data.
+        Awaiting on the returned coroutine will block until the Data is received.
+        It then returns the Data name, Data Content value, and :any:`PktContext`.
+        An exception is raised if NDNApp is unable to retrieve the Data.
 
-        :param name: the Name.
+        :param name: Interest name.
         :type name: :any:`NonStrictName`
-        :param app_param: the ApplicationParameters.
-        :type app_param: Optional[:any:`BinaryStr`]
-        :param validator: the Validator used to verify the Data received.
-        :type validator: Optional[:any:`Validator`]
-        :param need_raw_packet: if True, return the raw Data packet with TL.
-        :type need_raw_packet: bool
-        :param kwargs: :ref:`label-keyword-arguments`.
-        :return: A tuple of (Name, MetaInfo, Content) after ``await``.
-            If need_raw_packet is True, return a tuple (Name, MetaInfo, Content, RawPacket).
-        :rtype: Coroutine[Any, None, Tuple[:any:`FormalName`, :any:`MetaInfo`, Optional[:any:`BinaryStr`]]]
+        :param validator: validator for the retrieved Data packet.
+        :type validator: :any:`Validator`
+        :param app_param: Interest ApplicationParameters value. If this is not None, a signed
+                          Interest is sent. NDNApp does not support sending parameterized
+                          Interests that are not signed.
+        :type app_param: :any:`BinaryStr` | None
+        :param signer: Signer for Interest signing. This is required if `app_param` is specified.
+        :type signer: :any:`Signer` | None
+        :param kwargs: arguments for :any:`InterestParam`.
+        :return: A tuple of (Name, Content, PacketContext) after ``await``.
+        :rtype: Coroutine[Any, None, tuple[:any:`FormalName`, :any:`BinaryStr` | None, :any:`PktContext`]]
 
-        The following exception is raised by ``express_interest``:
+        The following exceptions may be raised by ``express``:
 
         :raises NetworkError: the face to NFD is down before sending this Interest.
+        :raises ValueError: when the signer is missing but app_param presents.
 
-        The following exceptions are raised by the coroutine returned:
+        The following exceptions may be raised by the returned coroutine:
 
         :raises InterestNack: an NetworkNack is received.
         :raises InterestTimeout: time out.
@@ -207,64 +637,69 @@ class NDNApp:
         :raises InterestCanceled: the face to NFD is shut down after sending this Interest.
         """
         if not self.face.running:
-            raise NetworkError('cannot send packet before connected')
-        if 'signer' in kwargs:
-            signer = kwargs['signer']
-        elif app_param is not None:
-            signer = self.keychain.get_signer(kwargs)
-        else:
-            signer = None
+            raise types.NetworkError('cannot send packet before connected')
+        if app_param is not None and signer is None:
+            raise ValueError('An Interest with AppParam is required to be signed.')
         if 'interest_param' in kwargs:
             interest_param = kwargs['interest_param']
         else:
             if 'nonce' not in kwargs:
-                kwargs['nonce'] = gen_nonce()
-            interest_param = InterestParam.from_dict(kwargs)
-        interest, final_name = make_interest(name, interest_param, app_param, signer=signer, need_final_name=True)
-        return self.express_raw_interest(final_name, interest_param, interest, validator, need_raw_packet)
+                kwargs['nonce'] = utils.gen_nonce()
+            interest_param = fmt.InterestParam.from_dict(kwargs)
+        interest, final_name = fmt.make_interest(name, interest_param, app_param, signer=signer, need_final_name=True)
+        no_response = kwargs.get('no_response', False)
+        return self.express_raw_interest(final_name, interest_param, interest, validator, no_response)
 
-    def express_raw_interest(self,
-                             final_name: NonStrictName,
-                             interest_param: InterestParam,
-                             raw_interest: BinaryStr,
-                             validator: Validator | None = None,
-                             need_raw_packet: bool = False
-                             ) -> Coroutine[Any, None, tuple[FormalName, MetaInfo, BinaryStr | None]]:
-        final_name = Name.normalize(final_name)
-        future = aio.get_running_loop().create_future()
-        if Component.get_type(final_name[-1]) == Component.TYPE_IMPLICIT_SHA256:
-            node_name = final_name[:-1]
-            implicit_sha256 = Component.get_value(final_name[-1])
-        else:
-            node_name = final_name
-            implicit_sha256 = b''
-        node = self._int_tree.setdefault(node_name, InterestTreeNode())
-        node.append_interest(future, interest_param, implicit_sha256)
-        self.face.send(raw_interest)
-        return self._wait_for_data(future, interest_param.lifetime, node_name, node, validator, need_raw_packet)
+    def route(self, name: enc.NonStrictName, validator: Validator | None = None):
+        r"""
+        A decorator used to register a permanent route for a specific prefix.
+        The decorated function should be an :any:`IntHandler`.
 
-    async def _wait_for_data(self, future: aio.Future, lifetime: int, node_name: FormalName,
-                             node: InterestTreeNode, validator: Validator, need_raw_packet: bool):
-        lifetime = 100 if lifetime is None else lifetime
-        try:
-            data_name, meta_info, content, sig, raw_packet = await aio.wait_for(future, timeout=lifetime/1000.0)
-        except TimeoutError:
-            if node.timeout(future):
-                del self._int_tree[node_name]
-            raise InterestTimeout()
-        except aio.CancelledError:
-            raise InterestCanceled()
-        if validator is None:
-            validator = self.data_validator
-        if await validator(data_name, sig):
-            if need_raw_packet:
-                return data_name, meta_info, content, raw_packet
-            else:
-                return data_name, meta_info, content
-        else:
-            raise ValidationFailure(data_name, meta_info, content, sig)
+        This function is non-blocking and can be called at any time.
+        It can be called before connecting to the forwarder.
+        Every time a forwarder connection is established, NDNApp will automatically send
+        prefix registration commands.
+        Errors in prefix registration are ignored.
 
-    async def main_loop(self, after_start: Awaitable = None) -> bool:
+        :param name: name prefix.
+        :type name: :any:`NonStrictName`
+        :param validator: validator for signed Interests. See :any:`attach_handler` for details.
+        :type validator: :any:`Validator` | None
+
+        :examples:
+            .. code-block:: python3
+
+                app = NDNApp()
+
+                @app.route('/example/rpc')
+                def on_interest(name, app_param, reply, context):
+                    pass
+
+        """
+        name = enc.Name.normalize(name)
+
+        def decorator(func: IntHandler):
+            self._autoreg_routes.append(name)
+            self.attach_handler(name, func, validator)
+            if self.face.running:
+                aio.create_task(self.register(name))
+            return func
+        return decorator
+
+    def _clean_up(self):
+        for node in self._pit.itervalues():
+            node.cancel()
+        # FIB is not cleared now
+        self._pit.clear()
+
+    def shutdown(self):
+        """
+        Manually shutdown the face to NFD.
+        """
+        self.logger.info('Manually shutdown')
+        self.face.shutdown()
+
+    async def main_loop(self, after_start: typing.Awaitable = None) -> bool:
         """
         The main loop of NDNApp.
 
@@ -272,11 +707,9 @@ class NDNApp:
         :return: ``True`` if the connection is shutdown not by ``Ctrl+C``.
             For example, manually or by the other side.
         """
-        self._prefix_register_semaphore = aio.Semaphore(1)
-
         async def starting_task():
-            for name, route, validator, need_raw_packet, need_sig_ptrs in self._autoreg_routes:
-                await self.register(name, route, validator, need_raw_packet, need_sig_ptrs)
+            for name in self._autoreg_routes:
+                await self.register(name)
             if after_start:
                 try:
                     await after_start
@@ -288,7 +721,7 @@ class NDNApp:
             await self.face.open()
         except (FileNotFoundError, ConnectionError, OSError, PermissionError):
             if after_start:
-                if isinstance(after_start, Coroutine):
+                if isinstance(after_start, typing.Coroutine):
                     after_start.close()
                 elif isinstance(after_start, (aio.Task, aio.Future)):
                     after_start.cancel()
@@ -307,20 +740,7 @@ class NDNApp:
         await task
         return ret
 
-    def _clean_up(self):
-        for node in self._int_tree.itervalues():
-            node.cancel()
-        self._prefix_tree.clear()
-        self._int_tree.clear()
-
-    def shutdown(self):
-        """
-        Manually shutdown the face to NFD.
-        """
-        self.logger.info('Manually shutdown')
-        self.face.shutdown()
-
-    def run_forever(self, after_start: Awaitable = None):
+    def run_forever(self, after_start: typing.Awaitable = None):
         """
         A non-async wrapper of :meth:`main_loop`.
 
@@ -338,209 +758,3 @@ class NDNApp:
             aio.run(self.main_loop(after_start))
         except KeyboardInterrupt:
             self.logger.info('Receiving Ctrl+C, exit')
-
-    def route(self, name: NonStrictName, validator: Validator | None = None,
-              need_raw_packet: bool = False, need_sig_ptrs: bool = False):
-        """
-        A decorator used to register a permanent route for a specific prefix.
-
-        This function is non-blocking and can be called at any time.
-        If it is called before connecting to NFD, NDNApp will remember this route and
-        automatically register it every time when a connection is established.
-        Failure in registering this route to NFD will be ignored.
-
-        The decorated function should accept 3 arguments: Name, Interest parameters and ApplicationParameters.
-
-        :param name: the Name prefix for this route.
-        :type name: :any:`NonStrictName`
-        :param validator: the Validator used to validate coming Interests.
-            An Interest without ApplicationParameters and SignatureInfo will be considered valid without
-            calling validator.
-            Interests with malformed ParametersSha256DigestComponent will be dropped before going into the validator.
-            Otherwise NDNApp will try to validate the Interest with the validator.
-            Interests which fail to be validated will be dropped without raising any exception.
-        :type validator: Optional[:any:`Validator`]
-        :param need_raw_packet: if True, pass the raw Interest packet to the callback as a keyword argument
-            ``raw_packet``.
-        :type need_raw_packet: bool
-        :param need_sig_ptrs: if True, pass the Signature pointers to the callback as a keyword argument
-            ``sig_ptrs``.
-        :type need_sig_ptrs: bool
-
-        :examples:
-            .. code-block:: python3
-
-                app = NDNApp()
-
-                @app.route('/example/rpc')
-                def on_interest(name: FormalName, param: InterestParam, app_param):
-                    pass
-
-        .. note::
-            The route function must be a normal function instead of an ``async`` one.
-            This is on purpose, because an Interest is supposed to be replied ASAP,
-            even it cannot finish the request in time.
-            To provide some feedback, a better practice is replying with an Application NACK
-            (or some equivalent Data packet saying the operation cannot be finished in time).
-            If you want to use ``await`` in the handler, please use ``asyncio.create_task`` to create a new coroutine.
-
-        .. note::
-            Currently, python-ndn does not handle PIT Tokens.
-        """
-        name = Name.normalize(name)
-
-        def decorator(func: Route):
-            self._autoreg_routes.append((name, func, validator, need_raw_packet, need_sig_ptrs))
-            if self.face.running:
-                aio.create_task(self.register(name, func, validator, need_raw_packet, need_sig_ptrs))
-            return func
-        return decorator
-
-    async def register(self, name: NonStrictName, func: Route | None, validator: Validator | None = None,
-                       need_raw_packet: bool = False, need_sig_ptrs: bool = False) -> bool:
-        """
-        Register a route for a specific prefix dynamically.
-
-        :param name: the Name prefix for this route.
-        :type name: :any:`NonStrictName`
-        :param func: the onInterest function for the specified route.
-            If ``None``, the NDNApp will only send the register command to forwarder,
-            without setting any callback function.
-        :type func: Optional[Callable[[:any:`FormalName`, :any:`InterestParam`, Optional[:any:`BinaryStr`]], ``None``]]
-        :param validator: the Validator used to validate coming Interests.
-        :type validator: Optional[:any:`Validator`]
-        :return: ``True`` if the registration succeeded.
-        :param need_raw_packet: if True, pass the raw Interest packet to the callback as a keyword argument
-            ``raw_packet``.
-        :type need_raw_packet: bool
-        :param need_sig_ptrs: if True, pass the Signature pointers to the callback as a keyword argument
-            ``sig_ptrs``.
-        :type need_sig_ptrs: bool
-
-        :raises ValueError: the prefix is already registered.
-        :raises NetworkError: the face to NFD is down now.
-        """
-        name = Name.normalize(name)
-        if func is not None:
-            self.set_interest_filter(name, func, validator, need_raw_packet, need_sig_ptrs)
-
-        # Fix the issue that NFD only allows one packet signed by a specific key for a timestamp number
-        async with self._prefix_register_semaphore:
-            try:
-                _, _, reply = await self.express_interest(
-                    name=make_command('rib', 'register', self.face, name=name),
-                    lifetime=1000)
-                ret = parse_response(reply)
-                if ret['status_code'] != 200:
-                    self.logger.error('Registration for %s failed: %s %s',
-                                      Name.to_str(name), ret["status_code"], ret["status_text"])
-                    return False
-                else:
-                    self.logger.debug('Registration for %s succeeded: %s %s',
-                                      Name.to_str(name), ret["status_code"], ret["status_text"])
-                    return True
-            except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure) as e:
-                self.logger.error('Registration for %s failed: %s', Name.to_str(name), e.__class__.__name__)
-                return False
-
-    async def unregister(self, name: NonStrictName) -> bool:
-        """
-        Unregister a route for a specific prefix.
-
-        :param name: the Name prefix.
-        :type name: :any:`NonStrictName`
-        """
-        name = Name.normalize(name)
-        del self._prefix_tree[name]
-        try:
-            await self.express_interest(make_command('rib', 'unregister', self.face, name=name), lifetime=1000)
-            return True
-        except (InterestNack, InterestTimeout, InterestCanceled, ValidationFailure):
-            return False
-
-    def set_interest_filter(self, name: NonStrictName, func: Route,
-                            validator: Validator | None = None, need_raw_packet: bool = False,
-                            need_sig_ptrs: bool = False):
-        """
-        Set the callback function for an Interest prefix without sending a register command to the forwarder.
-
-        .. note::
-            All callbacks registered by ``set_interest_filter`` are removed when disconnected from
-            the the forwarder, and will not be added back after reconnection.
-            This behaviour is the same as ``register``.
-            Therefore, it is strongly recommended to use ``route`` for static routes.
-        """
-        name = Name.normalize(name)
-        node = self._prefix_tree.setdefault(name, PrefixTreeNode())
-        if node.callback:
-            raise ValueError(f'Duplicated registration: {Name.to_str(name)}')
-        node.callback = func
-        node.extra_param = {'raw_packet': need_raw_packet, 'sig_ptrs': need_sig_ptrs}
-        if validator:
-            node.validator = validator
-
-    def unset_interest_filter(self, name: NonStrictName):
-        """
-        Remove the callback function for an Interest prefix without sending an unregister command.
-
-        .. note::
-            ``unregister`` will only remove the callback if the callback's name matches exactly
-            the route's name.
-            This is because there may be one route whose name is the prefix of another.
-            To avoid cancelling unexpected routes, neither ``unregister`` nor ``unset_interest_filter``
-            behaves in a cascading manner.
-            Please remove callbacks manually.
-        """
-        name = Name.normalize(name)
-        del self._prefix_tree[name]
-
-    def _on_nack(self, name: FormalName, nack_reason: int):
-        node = self._int_tree[name]
-        if node:
-            if node.nack_interest(nack_reason):
-                del self._int_tree[name]
-
-    async def _on_data(self, name: FormalName, meta_info: MetaInfo,
-                       content: BinaryStr | None, sig: SignaturePtrs, raw_packet):
-        clean_list = []
-        for prefix, node in self._int_tree.prefixes(name):
-            if node.satisfy((name, meta_info, content, sig, raw_packet), prefix != name):
-                clean_list.append(prefix)
-        for prefix in clean_list:
-            del self._int_tree[prefix]
-
-    async def _on_interest(self, name: FormalName, param: InterestParam,
-                           app_param: BinaryStr | None, sig: SignaturePtrs, raw_packet: BinaryStr):
-        trie_step = self._prefix_tree.longest_prefix(name)
-        if not trie_step:
-            self.logger.warning('No route: %s', name)
-            return
-        node = trie_step.value
-        if node.callback is None:
-            self.logger.warning('No callback: %s', name)
-            return
-        if app_param is not None or sig.signature_info is not None:
-            if not await params_sha256_checker(name, sig):
-                self.logger.warning('Drop malformed Interest: %s', name)
-                return
-
-        # In case the validator blocks the pipeline, create a task
-        async def submit_interest():
-            if sig.signature_info is not None:
-                validator = node.validator if node.validator else self.int_validator
-                valid = await validator(name, sig)
-            else:
-                valid = True
-            if not valid:
-                self.logger.warning('Drop unvalidated Interest: %s', name)
-                return
-            if node.extra_param:
-                kwargs = {}
-                if node.extra_param.get('raw_packet', False):
-                    kwargs['raw_packet'] = raw_packet
-                if node.extra_param.get('sig_ptrs', False):
-                    kwargs['sig_ptrs'] = sig
-                node.callback(name, param, app_param, **kwargs)
-            else:
-                node.callback(name, param, app_param)
-        aio.create_task(submit_interest())

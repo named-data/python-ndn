@@ -22,6 +22,7 @@ from ndn.encoding import make_data, MetaInfo, parse_data, Name
 from ndn.security import Sha256WithEcdsaSigner, Sha256WithRsaSigner, HmacSha256Signer, \
     EccChecker, RsaChecker, HmacChecker
 from ndn.security import Ed25519Signer, Ed25519Checker
+from ndn.types import ValidResult
 
 
 class TestSha256WithEcdsaSigner:
@@ -36,7 +37,7 @@ class TestSha256WithEcdsaSigner:
         # Test its format is ASN.1 der format
         DerSequence().decode(bytes(sig_ptrs.signature_value_buf))
         validator = EccChecker.from_key("/K/KEY/x", bytes(pub_key.export_key(format='DER')))
-        assert aio.run(validator(Name.from_str("/test"), sig_ptrs))
+        assert aio.run(validator(Name.from_str("/test"), sig_ptrs, {})) is ValidResult.PASS
 
 
 class TestSha256WithHmacSigner:
@@ -75,7 +76,7 @@ class TestSha256WithHmacSigner:
                               '172019868e7183998df373332f3dd1c9c950fc29d734c07977791d8396fa3b91fd36')
         _, _, _, sig_ptrs = parse_data(data)
         validator = HmacChecker.from_key('key1', key)
-        assert aio.run(validator(Name.from_str('/ndn/abc'), sig_ptrs))
+        assert aio.run(validator(Name.from_str('/ndn/abc'), sig_ptrs, {})) is ValidResult.PASS
 
 
 class TestSha256WithRsaSigner:
@@ -177,7 +178,7 @@ class TestSha256WithRsaSigner:
                               'abb372a3aaf43307331a2796e913e3d36150f6a387b4c97c19a493bb4513af3f')
         validator = RsaChecker.from_key('/testname/KEY/123', key)
         _, _, _, sig_ptrs = parse_data(data)
-        assert aio.run(validator(Name.from_str('/ndn/abc'), sig_ptrs))
+        assert aio.run(validator(Name.from_str('/ndn/abc'), sig_ptrs, {})) is ValidResult.PASS
 
 
 class TestEd25519:
@@ -190,4 +191,4 @@ class TestEd25519:
         _, _, _, sig_ptrs = parse_data(pkt)
         pub_bits = pub_key.public_key().export_key(format='DER')
         validator = Ed25519Checker.from_key("/K/KEY/x", bytes(pub_bits))
-        assert aio.run(validator(Name.from_str("/test"), sig_ptrs))
+        assert aio.run(validator(Name.from_str("/test"), sig_ptrs, {})) is ValidResult.PASS

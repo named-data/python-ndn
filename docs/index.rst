@@ -15,10 +15,8 @@ Table Of Contents
    src/readme
    src/installation
    src/app
-   src/appv2
    src/encoding/encoding
    src/security/security
-   src/schema/schema
    src/lvs/lvs
    src/misc
    src/examples/examples

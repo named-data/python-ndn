@@ -19,6 +19,7 @@ import os
 import socket
 import asyncio as aio
 import ctypes as c
+from typing import Self
 from .general import Platform
 
 
@@ -178,11 +179,11 @@ class ReleaseGuard:
     def __setattr__(self, idx, value):
         self._list[idx] = value
 
-    def __iadd__(self, defer):
+    def __iadd__(self, defer) -> Self:
         self._list.append(defer)
         return self
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if len(self._list) > 0:
             raise RuntimeError('Re-enter a ReleaseGuard')
         return self

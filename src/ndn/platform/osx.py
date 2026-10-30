@@ -19,6 +19,7 @@ import os
 import sys
 import asyncio as aio
 from ctypes import cdll, c_void_p, c_ubyte, POINTER, c_int32, c_ulong, c_uint16
+from typing import Self
 from .general import Platform
 if sys.platform == 'darwin':
     from ..contrib.cocoapy import cf, CFIndex, CFRange, CFAllocatorRef
@@ -101,7 +102,7 @@ class ReleaseGuard:
     def __setattr__(self, key, value):
         self._dict[key] = value
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if len(self._dict) > 0:
             raise RuntimeError('Re-enter a ReleaseGuard')
         return self
