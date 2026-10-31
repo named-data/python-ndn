@@ -37,6 +37,18 @@ from .transport.nfd_registerer import NfdRegister
 
 DEFAULT_LIFETIME = 4000
 
+
+class _SignerNotSet:
+    """Sentinel type distinguishing an omitted ``signer`` from explicit ``signer=None``."""
+
+    __slots__ = ()
+
+    def __repr__(self):
+        return '<signer not set>'
+
+
+_SIGNER_NOT_SET = _SignerNotSet()
+
 ValidResult = types.ValidResult
 
 PktContext = dict[str, typing.Any]
@@ -599,7 +611,7 @@ class NDNApp:
 
     def express(self, name: enc.NonStrictName, validator: Validator,
                 app_param: enc.BinaryStr | None = None,
-                signer: enc.Signer | None = None,
+                signer: enc.Signer | None | _SignerNotSet = _SIGNER_NOT_SET,
                 **kwargs) -> typing.Coroutine[typing.Any, None,
                                               tuple[enc.FormalName, enc.BinaryStr | None, PktContext]]:
         r"""
@@ -614,11 +626,19 @@ class NDNApp:
         :type name: :any:`NonStrictName`
         :param validator: validator for the retrieved Data packet.
         :type validator: :any:`Validator`
-        :param app_param: Interest ApplicationParameters value. If this is not None, a signed
-                          Interest is sent. NDNApp does not support sending parameterized
-                          Interests that are not signed.
+        :param app_param: Interest ApplicationParameters value. If this is not None and a signer
+                          is provided, a signed Interest is sent. To send an unsigned
+                          parameterized Interest, for example one whose ApplicationParameters
+                          is a signed Data packet, explicitly pass ``signer=None``.
         :type app_param: :any:`BinaryStr` | None
-        :param signer: Signer for Interest signing. This is required if `app_param` is specified.
+        :param signer: Signer for Interest signing. If this is omitted while `app_param` is
+                       specified, a ``ValueError`` is raised, so that forgetting to sign is not
+                       silently downgraded to an unsigned Interest. Explicitly passing
+                       ``None`` sends the Interest without an Interest signature; in that case
+                       authenticity rests on the ApplicationParameters payload (such as an
+                       embedded signed Data packet), which the receiver must validate itself.
+                       Note that any Interest with ApplicationParameters still requires the
+                       receiving handler to have a validator.
         :type signer: :any:`Signer` | None
         :param kwargs: arguments for :any:`InterestParam`.
         :return: A tuple of (Name, Content, PacketContext) after ``await``.
@@ -627,7 +647,7 @@ class NDNApp:
         The following exceptions may be raised by ``express``:
 
         :raises NetworkError: the face to NFD is down before sending this Interest.
-        :raises ValueError: when the signer is missing but app_param presents.
+        :raises ValueError: when the signer is omitted but app_param presents.
 
         The following exceptions may be raised by the returned coroutine:
 
@@ -638,8 +658,11 @@ class NDNApp:
         """
         if not self.face.running:
             raise types.NetworkError('cannot send packet before connected')
-        if app_param is not None and signer is None:
-            raise ValueError('An Interest with AppParam is required to be signed.')
+        if app_param is not None and signer is _SIGNER_NOT_SET:
+            raise ValueError('An Interest with AppParam is required to be signed. '
+                             'Pass a signer to sign it, or signer=None explicitly to send it unsigned.')
+        if signer is _SIGNER_NOT_SET:
+            signer = None
         if 'interest_param' in kwargs:
             interest_param = kwargs['interest_param']
         else:

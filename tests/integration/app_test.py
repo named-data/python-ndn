@@ -272,6 +272,69 @@ class TestPitToken(NDNAppTestSuite):
             assert reply(data)
 
 
+class TestUnsignedAppParamExplicitNone(NDNAppTestSuite):
+    @staticmethod
+    async def _next_interest(face: DummyFace):
+        async with aio.timeout(1):
+            while not face.output_buf:
+                await aio.sleep(0.001)
+        interest, face.output_buf = face.output_buf, b''
+        return fmt.parse_interest(interest)
+
+    async def face_proc(self, face: DummyFace):
+        # A signed Data packet carried by an unsigned Interest
+        name, _, app_param, sig = await self._next_interest(face)
+        assert name[:-1] == enc.Name.from_str('/example/unsigned-signed-data')
+        assert enc.Component.get_type(name[-1]) == enc.Component.TYPE_PARAMETERS_SHA256
+        assert sig.signature_info is None
+        assert sig.signature_value_buf is None
+        inner_name, _, inner_content, inner_sig = fmt.parse_data(app_param)
+        assert inner_name == enc.Name.from_str('/example/inner')
+        assert inner_content == b'inner payload'
+        assert inner_sig.signature_info is not None
+        assert inner_sig.signature_info.signature_type == fmt.SignatureType.DIGEST_SHA256
+        await face.input_packet(fmt.make_data(name, fmt.MetaInfo(), b'first reply', signer=sec.NullSigner()))
+
+        # Blanket relaxation: arbitrary ApplicationParameters are also allowed unsigned
+        name, _, app_param, sig = await self._next_interest(face)
+        assert name[:-1] == enc.Name.from_str('/example/unsigned-arbitrary')
+        assert enc.Component.get_type(name[-1]) == enc.Component.TYPE_PARAMETERS_SHA256
+        assert app_param == b'\x01\x02\x03'
+        assert sig.signature_info is None
+        assert sig.signature_value_buf is None
+        await face.input_packet(fmt.make_data(name, fmt.MetaInfo(), b'second reply', signer=sec.NullSigner()))
+
+        # The signed Interest path is unchanged
+        name, _, app_param, sig = await self._next_interest(face)
+        assert name[:-1] == enc.Name.from_str('/example/signed')
+        assert enc.Component.get_type(name[-1]) == enc.Component.TYPE_PARAMETERS_SHA256
+        assert app_param == b''
+        assert sig.signature_info is not None
+        assert sig.signature_info.signature_type == fmt.SignatureType.DIGEST_SHA256
+        assert sig.signature_value_buf is not None
+        await face.input_packet(fmt.make_data(name, fmt.MetaInfo(), b'third reply', signer=sec.NullSigner()))
+
+    async def app_main(self):
+        # Omitting signer with ApplicationParameters still raises and sends nothing
+        with pytest.raises(ValueError, match='signer=None explicitly'):
+            self.app.express('/example/omitted-signer', ndn_app.pass_all,
+                             app_param=b'\x01\x02\x03', lifetime=1000)
+
+        inner = self.app.make_data('/example/inner', b'inner payload', signer=sec.DigestSha256Signer())
+        _, content, _ = await self.app.express('/example/unsigned-signed-data', ndn_app.pass_all,
+                                               app_param=bytes(inner), signer=None, lifetime=1000)
+        assert content == b'first reply'
+
+        _, content, _ = await self.app.express('/example/unsigned-arbitrary', ndn_app.pass_all,
+                                               app_param=b'\x01\x02\x03', signer=None, lifetime=1000)
+        assert content == b'second reply'
+
+        _, content, _ = await self.app.express('/example/signed', ndn_app.pass_all,
+                                               app_param=b'', signer=sec.DigestSha256Signer(for_interest=True),
+                                               lifetime=1000)
+        assert content == b'third reply'
+
+
 class TestRegister(NDNAppTestSuite):
     async def face_proc(self, face: DummyFace):
         async with aio.timeout(1):
