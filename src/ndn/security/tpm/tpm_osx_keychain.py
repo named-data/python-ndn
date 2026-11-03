@@ -21,6 +21,7 @@ from ctypes import c_void_p, pointer, c_int
 from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA, ECC
 from ...encoding import Signer, NonStrictName, Name, SignatureType, KeyLocator, BinaryStr, FormalName
+from ...utils import timestamp
 from .tpm import Tpm
 if sys.platform == 'darwin':
     from ...contrib.cocoapy import cf, CFSTR, ObjCInstance, cfstring_to_string, cfnumber_to_number, kCFNumberIntType
@@ -28,9 +29,11 @@ if sys.platform == 'darwin':
 
 
 class OsxSigner(Signer):
-    def __init__(self, key_locator_name: NonStrictName, key_bits, key_type, key_ref):
+    def __init__(self, key_locator_name: NonStrictName, key_bits, key_type, key_ref,
+                 with_signature_time: bool = True):
         self.key_ref = key_ref
         self.key_locator_name = key_locator_name
+        self.with_signature_time = with_signature_time
         if key_type == cfstring_to_string(OsxSec().kSecAttrKeyTypeRSA):
             self.key_type = SignatureType.SHA256_WITH_RSA
             self.key_size = key_bits // 8
@@ -46,6 +49,8 @@ class OsxSigner(Signer):
         signature_info.signature_type = self.key_type
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = self.key_locator_name
+        if self.with_signature_time:
+            signature_info.signature_time = timestamp()
 
     def get_signature_value_size(self):
         return self.key_size
@@ -103,11 +108,13 @@ class TpmOsxKeychain(Tpm):
             key_ref = cf.CFRetain(cf.CFDictionaryGetValue(g.dic, sec.kSecValueRef))
         return key_type, key_bits, key_ref
 
-    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None,
+                   with_signature_time: bool = True) -> Signer:
         key_type, key_bits, key_ref = self._get_key(key_name)
         if key_locator_name is None:
             key_locator_name = key_name
-        return OsxSigner(key_locator_name, key_bits, key_type, key_ref)
+        return OsxSigner(key_locator_name, key_bits, key_type, key_ref,
+                         with_signature_time=with_signature_time)
 
     def key_exist(self, key_name: FormalName) -> bool:
         try:

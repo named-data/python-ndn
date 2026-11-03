@@ -18,12 +18,15 @@
 from Cryptodome.PublicKey import ECC
 from Cryptodome.Signature import eddsa
 from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr, BinaryStr
+from ...utils import timestamp
 
 
 class Ed25519Signer(Signer):
     key_locator_name: NonStrictName
+    with_signature_time: bool
 
-    def __init__(self, key_locator_name: NonStrictName, key_bits: BinaryStr):
+    def __init__(self, key_locator_name: NonStrictName, key_bits: BinaryStr,
+                 with_signature_time: bool = True):
         """
         Create an Ed25519Signer
 
@@ -32,12 +35,15 @@ class Ed25519Signer(Signer):
             prepend it with `b'0.\x02\x01\x000\x05\x06\x03+ep\x04"\x04 '`.
         """
         self.key_locator_name = key_locator_name
+        self.with_signature_time = with_signature_time
         self.key = ECC.import_key(bytes(key_bits))
 
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.ED25519
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = self.key_locator_name
+        if self.with_signature_time:
+            signature_info.signature_time = timestamp()
 
     def get_signature_value_size(self):
         return 64

@@ -17,20 +17,26 @@
 # -----------------------------------------------------------------------------
 from Cryptodome.Hash import SHA256, HMAC
 from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr
+from ...utils import timestamp
 
 
 class HmacSha256Signer(Signer):
     key_locator_name: NonStrictName
     key_bytes: bytes
+    with_signature_time: bool
 
-    def __init__(self, key_locator_name: NonStrictName, key_bytes: bytes):
+    def __init__(self, key_locator_name: NonStrictName, key_bytes: bytes,
+                 with_signature_time: bool = True):
         self.key_locator_name = key_locator_name
         self.key_bytes = key_bytes
+        self.with_signature_time = with_signature_time
 
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.HMAC_WITH_SHA256
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = self.key_locator_name
+        if self.with_signature_time:
+            signature_info.signature_time = timestamp()
 
     def get_signature_value_size(self):
         return 32

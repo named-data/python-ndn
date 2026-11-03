@@ -23,15 +23,18 @@ from Cryptodome.Util.asn1 import DerSequence
 from ndn.encoding import FormalName, BinaryStr
 
 from ...encoding import Signer, NonStrictName, SignatureType, KeyLocator, Name
+from ...utils import timestamp
 from .tpm import Tpm
 if sys.platform == 'win32':
     from ...platform.windows import Cng, ReleaseGuard
 
 
 class CngSigner(Signer):
-    def __init__(self, key_locator_name: NonStrictName, sig_len, key_type, h_key):
+    def __init__(self, key_locator_name: NonStrictName, sig_len, key_type, h_key,
+                 with_signature_time: bool = True):
         self.h_key = h_key
         self.key_locator_name = key_locator_name
+        self.with_signature_time = with_signature_time
         if key_type == "RSA":
             self.key_type = SignatureType.SHA256_WITH_RSA
             self.sig_len = sig_len
@@ -45,6 +48,8 @@ class CngSigner(Signer):
         signature_info.signature_type = self.key_type
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = self.key_locator_name
+        if self.with_signature_time:
+            signature_info.signature_time = timestamp()
 
     def get_signature_value_size(self):
         return self.sig_len
@@ -177,12 +182,14 @@ class TpmCng(Tpm):
 
         return key_type.value, sig_len.value, h_key
 
-    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None,
+                   with_signature_time: bool = True) -> Signer:
         name_hash = Name.to_bytes(key_name).hex()
         key_type, sig_len, h_key = self._get_key(name_hash)
         if key_locator_name is None:
             key_locator_name = key_name
-        return CngSigner(key_locator_name, sig_len, key_type, h_key)
+        return CngSigner(key_locator_name, sig_len, key_type, h_key,
+                         with_signature_time=with_signature_time)
 
     def key_exist(self, key_name: FormalName) -> bool:
         try:

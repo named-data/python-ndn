@@ -39,7 +39,8 @@ class TpmFile(Tpm):
     def _base64_newline(src: bytes):
         return b'\n'.join(src[i*64:i*64+64] for i in range((len(src) + 63) // 64))
 
-    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None,
+                   with_signature_time: bool = True) -> Signer:
         key_name = Name.to_bytes(key_name)
         if key_locator_name is None:
             key_locator_name = key_name
@@ -51,7 +52,7 @@ class TpmFile(Tpm):
         key_der = b64decode(key_b64)
         for signer in [Sha256WithRsaSigner, Sha256WithEcdsaSigner]:
             try:
-                return signer(key_locator_name, key_der)
+                return signer(key_locator_name, key_der, with_signature_time=with_signature_time)
             except ValueError:
                 pass
         raise ValueError('Key format is not supported')
