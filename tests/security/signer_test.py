@@ -201,17 +201,24 @@ class TestSignatureTime:
         ec_key = ECC.generate(curve='P-256').export_key(format='DER')
         ed_key = ECC.generate(curve='ed25519').export_key(format='DER')
         rsa_key = RSA.generate(2048).export_key(format='DER')
+        def make_factory(signer_type, *args):
+            def factory(flag=None):
+                if flag is None:
+                    return signer_type(*args)
+                return signer_type(*args, with_signature_time=flag)
+            return factory
+
         return {
-            'rsa': lambda flag: Sha256WithRsaSigner('/K/KEY/x', rsa_key, with_signature_time=flag),
-            'ecdsa': lambda flag: Sha256WithEcdsaSigner('/K/KEY/x', ec_key, with_signature_time=flag),
-            'hmac': lambda flag: HmacSha256Signer('/K/KEY/x', b'secret', with_signature_time=flag),
-            'ed25519': lambda flag: Ed25519Signer('/K/KEY/x', ed_key, with_signature_time=flag),
-            'digest': lambda flag: DigestSha256Signer(with_signature_time=flag),
+            'rsa': make_factory(Sha256WithRsaSigner, '/K/KEY/x', rsa_key),
+            'ecdsa': make_factory(Sha256WithEcdsaSigner, '/K/KEY/x', ec_key),
+            'hmac': make_factory(HmacSha256Signer, '/K/KEY/x', b'secret'),
+            'ed25519': make_factory(Ed25519Signer, '/K/KEY/x', ed_key),
+            'digest': make_factory(DigestSha256Signer),
         }
 
     def test_default_writes_signature_time_for_data_and_interest(self):
         for name, factory in self._signer_factories().items():
-            signer = factory(True)
+            signer = factory()
             before = timestamp()
             data = make_data('/test', MetaInfo(), b'test content', signer=signer)
             interest = make_interest('/test', InterestParam(nonce=1), b'\x01', signer=signer)
