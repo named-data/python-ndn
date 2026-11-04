@@ -11,7 +11,7 @@ A Named Data Networking client library with AsyncIO support in Python 3.
 It supports Python >=3.11 and PyPy3.11 >=7.3.12.
 
 .. Note::
-    On Windows 11 with PyPy3.11 there might be compatibility issues with Cryptodome.
+    It does not work on Windows 11 with PyPy3.11 due to `PyCryptodome issue 958 <https://github.com/Legrandin/pycryptodome/issues/958>`_.
     We suggest using CPython on Windows instead.
 
 Please see our documentation_ if you have any issues.
