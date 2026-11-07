@@ -17,12 +17,13 @@
 # -----------------------------------------------------------------------------
 import asyncio as aio
 from Cryptodome.Util.asn1 import DerSequence
-from Cryptodome.PublicKey import ECC
-from ndn.encoding import make_data, MetaInfo, parse_data, Name
-from ndn.security import Sha256WithEcdsaSigner, Sha256WithRsaSigner, HmacSha256Signer, \
+from Cryptodome.PublicKey import ECC, RSA
+from ndn.encoding import make_data, make_interest, MetaInfo, InterestParam, parse_data, parse_interest, Name
+from ndn.security import Sha256WithEcdsaSigner, Sha256WithRsaSigner, HmacSha256Signer, DigestSha256Signer, \
     EccChecker, RsaChecker, HmacChecker
 from ndn.security import Ed25519Signer, Ed25519Checker
 from ndn.types import ValidResult
+from ndn.utils import timestamp
 
 
 class TestSha256WithEcdsaSigner:
@@ -68,7 +69,7 @@ class TestSha256WithHmacSigner:
 
     def test_data_1(self):
         key = bytes(i for i in range(32))
-        signer = HmacSha256Signer('key1', key)
+        signer = HmacSha256Signer('key1', key, with_signature_time=False)
         data = make_data('/ndn/abc', MetaInfo(None), b'SUCCESS!', signer)
         assert (data.hex() == '0649070a08036e646e0803616263'
                               '140015085355434345535321'
@@ -161,7 +162,7 @@ class TestSha256WithRsaSigner:
             0xcb, 0xea, 0x8f
         ])
         meta_info = MetaInfo(None, 5000, b'\x08\x02\x00\x09')
-        signer = Sha256WithRsaSigner('/testname/KEY/123', key)
+        signer = Sha256WithRsaSigner('/testname/KEY/123', key, with_signature_time=False)
         data = make_data('/ndn/abc', meta_info, b'SUCCESS!', signer)
         assert (data.hex() == '06fd0143070a08036e646e0803616263'
                               '140a190213881a0408020009'
@@ -192,3 +193,76 @@ class TestEd25519:
         pub_bits = pub_key.public_key().export_key(format='DER')
         validator = Ed25519Checker.from_key("/K/KEY/x", bytes(pub_bits))
         assert aio.run(validator(Name.from_str("/test"), sig_ptrs, {})) is ValidResult.PASS
+
+
+class TestSignatureTime:
+    @staticmethod
+    def _signer_factories():
+        ec_key = ECC.generate(curve='P-256').export_key(format='DER')
+        ed_key = ECC.generate(curve='ed25519').export_key(format='DER')
+        rsa_key = RSA.generate(2048).export_key(format='DER')
+        def make_factory(signer_type, *args):
+            def factory(flag=None):
+                if flag is None:
+                    return signer_type(*args)
+                return signer_type(*args, with_signature_time=flag)
+            return factory
+
+        return {
+            'rsa': make_factory(Sha256WithRsaSigner, '/K/KEY/x', rsa_key),
+            'ecdsa': make_factory(Sha256WithEcdsaSigner, '/K/KEY/x', ec_key),
+            'hmac': make_factory(HmacSha256Signer, '/K/KEY/x', b'secret'),
+            'ed25519': make_factory(Ed25519Signer, '/K/KEY/x', ed_key),
+            'digest': make_factory(DigestSha256Signer),
+        }
+
+    def test_default_writes_signature_time_for_data_and_interest(self):
+        for name, factory in self._signer_factories().items():
+            signer = factory()
+            before = timestamp()
+            data = make_data('/test', MetaInfo(), b'test content', signer=signer)
+            interest = make_interest('/test', InterestParam(nonce=1), b'\x01', signer=signer)
+            after = timestamp()
+
+            _, _, _, data_sig = parse_data(data)
+            assert data_sig.signature_info is not None, name
+            assert before <= data_sig.signature_info.signature_time <= after, name
+
+            _, _, _, int_sig = parse_interest(interest)
+            assert int_sig.signature_info is not None, name
+            assert before <= int_sig.signature_info.signature_time <= after, name
+
+    def test_opt_out_omits_signature_time_for_data_and_interest(self):
+        for name, factory in self._signer_factories().items():
+            signer = factory(False)
+            assert signer.with_signature_time is False, name
+
+            data = make_data('/test', MetaInfo(), b'test content', signer=signer)
+            _, _, _, data_sig = parse_data(data)
+            assert data_sig.signature_info.signature_time is None, name
+
+            interest = make_interest('/test', InterestParam(nonce=1), b'\x01', signer=signer)
+            _, _, _, int_sig = parse_interest(interest)
+            assert int_sig.signature_info.signature_time is None, name
+
+    @staticmethod
+    def test_digest_signature_time_decoupled_from_for_interest():
+        # Data-style signer: time present (default), nonce absent
+        data = make_data('/test', MetaInfo(), b'content', signer=DigestSha256Signer())
+        _, _, _, sig = parse_data(data)
+        assert sig.signature_info.signature_time is not None
+        assert sig.signature_info.signature_nonce is None
+
+        # Interest signer: both present
+        interest = make_interest('/test', InterestParam(nonce=1), b'\x01',
+                                 signer=DigestSha256Signer(for_interest=True))
+        _, _, _, sig = parse_interest(interest)
+        assert sig.signature_info.signature_time is not None
+        assert sig.signature_info.signature_nonce is not None
+
+        # Opted-out Interest signer: nonce present, time absent
+        interest = make_interest('/test', InterestParam(nonce=1), b'\x01',
+                                 signer=DigestSha256Signer(for_interest=True, with_signature_time=False))
+        _, _, _, sig = parse_interest(interest)
+        assert sig.signature_info.signature_time is None
+        assert sig.signature_info.signature_nonce is not None

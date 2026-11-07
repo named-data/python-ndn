@@ -86,7 +86,7 @@ class TestInterestMake:
         app_param = b'\x01\x02\x03\x04'
         int_param = InterestParam()
         int_param.nonce = 0x6c211166
-        interest = make_interest(name, int_param, app_param, signer=DigestSha256Signer())
+        interest = make_interest(name, int_param, app_param, signer=DigestSha256Signer(with_signature_time=False))
         assert (interest ==
                 b'\x05\x6f\x07\x36\x08\x05local\x08\x03ndn\x08\x06prefix'
                 b'\x02 \x8e\x6e\x36\xd7\xea\xbc\xde\x43\x75\x61\x40\xc9\x0b\xda\x09\xd5'
@@ -97,7 +97,7 @@ class TestInterestMake:
                 b'\x2e \xea\xa8\xf0\x99\x08\x63\x78\x95\x1d\xe0\x5f\xf1\xde\xbb\xc1\x18'
                 b'\xb5\x21\x8b\x2f\xca\xa0\xb5\x1d\x18\xfa\xbc\x29\xf5\x4d\x58\xff')
 
-        interest = make_interest(name, int_param, signer=DigestSha256Signer())
+        interest = make_interest(name, int_param, signer=DigestSha256Signer(with_signature_time=False))
         assert (interest ==
                 b'\x05\x6b\x07\x36\x08\x05local\x08\x03ndn\x08\x06prefix'
                 b'\x02 \x40\x77\xa5\x70\x49\xd8\x38\x48\xb5\x25\xa4\x23\xab\x97\x8e\x64'
@@ -152,7 +152,7 @@ class TestDataMake:
     @staticmethod
     def test_default():
         name = Name.from_str('/local/ndn/prefix')
-        data = make_data(name, MetaInfo(), signer=DigestSha256Signer())
+        data = make_data(name, MetaInfo(), signer=DigestSha256Signer(with_signature_time=False))
         assert (data ==
                 b"\x06\x42\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix"
                 b"\x14\x03\x18\x01\x00"
@@ -161,7 +161,7 @@ class TestDataMake:
                 b"\xd8\'S\x13[\xd7\x15\xa5\x9d%^\x80\xf2\xab\xf0\xb5")
 
         name = Name.encode(name)
-        data = make_data(name, MetaInfo(), b'01020304', signer=DigestSha256Signer())
+        data = make_data(name, MetaInfo(), b'01020304', signer=DigestSha256Signer(with_signature_time=False))
         assert (data ==
                 b'\x06L\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix'
                 b'\x14\x03\x18\x01\x00'
@@ -180,7 +180,7 @@ class TestDataMake:
         name = '/E'
         meta_info = MetaInfo()
         meta_info.content_type = None
-        data = make_data(name, meta_info, b'', signer=DigestSha256Signer())
+        data = make_data(name, meta_info, b'', signer=DigestSha256Signer(with_signature_time=False))
         assert data == bytes.fromhex("0630 0703080145"
                                      "1400 1500 16031b0100"
                                      "1720f965ee682c6973c3cbaa7b69e4c7063680f83be93a46be2ccc98686134354b66")
@@ -192,7 +192,7 @@ class TestDataMake:
         meta_info.content_type = ContentType.BLOB
         meta_info.freshness_period = 1000
         meta_info.final_block_id = Component.from_sequence_num(2)
-        data = make_data(name, meta_info, signer=DigestSha256Signer())
+        data = make_data(name, meta_info, signer=DigestSha256Signer(with_signature_time=False))
         assert (data ==
                 b"\x06\x4e\x07\x17\x08\x05local\x08\x03ndn\x08\x06prefix\x25\x01\x00"
                 b"\x14\x0c\x18\x01\x00\x19\x02\x03\xe8\x1a\x03\x3a\x01\x02"
@@ -461,7 +461,7 @@ def test_signed_interest_wire_format_and_coverage():
         '/local/ndn/prefix',
         InterestParam(nonce=0x6c211166),
         b'\x01\x02\x03\x04',
-        DigestSha256Signer(),
+        DigestSha256Signer(with_signature_time=False),
     )
     assert wire == (
         b'\x05\x6f\x07\x36\x08\x05local\x08\x03ndn\x08\x06prefix'
@@ -485,7 +485,7 @@ def test_signed_interest_wire_format_and_coverage():
 
 def test_data_wire_format_and_coverage():
     wire = make_data(
-        '/local/ndn/prefix', MetaInfo(), signer=DigestSha256Signer())
+        '/local/ndn/prefix', MetaInfo(), signer=DigestSha256Signer(with_signature_time=False))
     assert wire == (
         b"\x06\x42\x07\x14\x08\x05local\x08\x03ndn\x08\x06prefix"
         b"\x14\x03\x18\x01\x00\x16\x03\x1b\x01\x00"

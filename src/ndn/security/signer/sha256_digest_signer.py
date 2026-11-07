@@ -22,15 +22,18 @@ from ...utils import timestamp, gen_nonce_64
 
 class DigestSha256Signer(Signer):
     for_interest: bool
+    with_signature_time: bool
 
-    def __init__(self, for_interest: bool = False):
+    def __init__(self, for_interest: bool = False, with_signature_time: bool = True):
         self.for_interest = for_interest
+        self.with_signature_time = with_signature_time
 
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.DIGEST_SHA256
         signature_info.key_locator = None
-        if self.for_interest:
+        if self.with_signature_time:
             signature_info.signature_time = timestamp()
+        if self.for_interest:
             signature_info.signature_nonce = gen_nonce_64()
 
     def get_signature_value_size(self):

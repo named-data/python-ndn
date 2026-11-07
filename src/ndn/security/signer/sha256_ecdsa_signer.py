@@ -19,6 +19,7 @@ from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import ECC
 from Cryptodome.Signature import DSS
 from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr
+from ...utils import timestamp
 
 
 class Sha256WithEcdsaSigner(Signer):
@@ -27,10 +28,13 @@ class Sha256WithEcdsaSigner(Signer):
     key_der: bytes
     curve_bit: int
     key_size: int
+    with_signature_time: bool
 
-    def __init__(self, key_locator_name: NonStrictName, key_der: bytes | str):
+    def __init__(self, key_locator_name: NonStrictName, key_der: bytes | str,
+                 with_signature_time: bool = True):
         self.key_locator_name = key_locator_name
         self.key_der = key_der
+        self.with_signature_time = with_signature_time
         self.key = ECC.import_key(self.key_der)
         curve = self.key.curve
         if curve[-2:] == 'r1' or curve[-2:] == 'v1':
@@ -44,6 +48,8 @@ class Sha256WithEcdsaSigner(Signer):
         signature_info.signature_type = SignatureType.SHA256_WITH_ECDSA
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = self.key_locator_name
+        if self.with_signature_time:
+            signature_info.signature_time = timestamp()
 
     def get_signature_value_size(self):
         return self.key_size + 8

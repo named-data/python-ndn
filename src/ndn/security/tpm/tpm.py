@@ -24,7 +24,8 @@ from ...encoding import Signer, NonStrictName, BinaryStr, FormalName, Component
 
 class Tpm(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None) -> Signer:
+    def get_signer(self, key_name: NonStrictName, key_locator_name: NonStrictName | None = None,
+                   with_signature_time: bool = True) -> Signer:
         pass
 
     @abc.abstractmethod

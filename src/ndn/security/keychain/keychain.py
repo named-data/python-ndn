@@ -113,6 +113,8 @@ class Keychain(Mapping[FormalName, AbstractIdentity]):
         Get a signer from sign_args.
 
         :param sign_args: the signing arguments provided by the application.
+            Set ``with_signature_time`` to ``False`` in *sign_args* to obtain
+            a signer that does not write a signature time (default ``True``).
         :return: a signer.
         :rtype: :any:`Signer`
         """
