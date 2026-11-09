@@ -19,21 +19,27 @@ from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
 from ...encoding import Signer, SignatureType, KeyLocator, NonStrictName, VarBinaryStr
+from ...utils import timestamp
 
 
 class Sha256WithRsaSigner(Signer):
     key_locator_name: NonStrictName
     key_der: bytes
+    with_signature_time: bool
 
-    def __init__(self, key_locator_name: NonStrictName, key_der: str | bytes):
+    def __init__(self, key_locator_name: NonStrictName, key_der: str | bytes,
+                 with_signature_time: bool = True):
         self.key_locator_name = key_locator_name
         self.key_der = key_der
+        self.with_signature_time = with_signature_time
         self.key = RSA.import_key(self.key_der)
 
     def write_signature_info(self, signature_info):
         signature_info.signature_type = SignatureType.SHA256_WITH_RSA
         signature_info.key_locator = KeyLocator()
         signature_info.key_locator.name = self.key_locator_name
+        if self.with_signature_time:
+            signature_info.signature_time = timestamp()
 
     def get_signature_value_size(self):
         return self.key.size_in_bytes()

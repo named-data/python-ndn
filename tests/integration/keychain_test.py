@@ -21,7 +21,7 @@ from Cryptodome.Hash import SHA256
 from Cryptodome.PublicKey import ECC
 from Cryptodome.Signature import DSS
 from ndn.encoding import make_data, MetaInfo, parse_data, Name
-from ndn.security import KeychainSqlite3, TpmFile
+from ndn.security import KeychainDigest, KeychainSqlite3, TpmFile
 
 
 class TestKeychainSqlite3:
@@ -41,6 +41,7 @@ class TestKeychainSqlite3:
             self.create_key()
             self.verify_data()
             self.verify_cert()
+            self.verify_signature_time_opt_out()
 
             self.keychain.del_identity('test')
             assert len(self.keychain) == 0
@@ -78,3 +79,37 @@ class TestKeychainSqlite3:
     def verify_cert(self):
         key_locator_name = self.verify(self.cert)
         assert key_locator_name == self.keychain.default_identity().default_key().name
+
+    def verify_signature_time_opt_out(self):
+        # Default signer (already cached by verify_data) writes a signature time
+        default_signer = self.keychain.get_signer({})
+        assert default_signer.with_signature_time is True
+        data = make_data('/test/data', MetaInfo(), b'content', signer=default_signer)
+        _, _, _, sig_ptrs = parse_data(data)
+        assert sig_ptrs.signature_info.signature_time is not None
+
+        # Opting out must not return the cached default signer
+        opt_out_signer = self.keychain.get_signer({'with_signature_time': False})
+        assert opt_out_signer is not default_signer
+        assert opt_out_signer.with_signature_time is False
+        data = make_data('/test/data', MetaInfo(), b'content', signer=opt_out_signer)
+        _, _, _, sig_ptrs = parse_data(data)
+        assert sig_ptrs.signature_info.signature_time is None
+
+        # Both variants remain distinctly cached
+        assert self.keychain.get_signer({}) is default_signer
+        assert self.keychain.get_signer({'with_signature_time': False}) is opt_out_signer
+
+        # The digest_sha256 branch also honors the flag
+        digest_signer = self.keychain.get_signer({'digest_sha256': True, 'with_signature_time': False})
+        assert digest_signer.with_signature_time is False
+
+
+def test_keychain_digest_signature_time_opt_out():
+    keychain = KeychainDigest()
+    assert keychain.get_signer({}).with_signature_time is True
+    assert keychain.get_signer({'with_signature_time': False}).with_signature_time is False
+    data = make_data('/test/data', MetaInfo(), b'content',
+                     signer=keychain.get_signer({'with_signature_time': False}))
+    _, _, _, sig_ptrs = parse_data(data)
+    assert sig_ptrs.signature_info.signature_time is None

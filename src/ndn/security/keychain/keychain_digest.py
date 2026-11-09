@@ -28,7 +28,8 @@ class KeychainDigest(Keychain):
         if sign_args.get('no_signature', False):
             return None
         else:
-            return DigestSha256Signer()
+            return DigestSha256Signer(
+                with_signature_time=sign_args.get('with_signature_time', True))
 
     def __iter__(self):
         return None

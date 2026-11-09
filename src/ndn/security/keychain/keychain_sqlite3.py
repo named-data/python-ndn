@@ -605,8 +605,9 @@ class KeychainSqlite3(Keychain):
     def get_signer(self, sign_args: dict[str, Any]):
         if sign_args.get('no_signature', False):
             return None
+        with_signature_time = sign_args.get('with_signature_time', True)
         if sign_args.get('digest_sha256', False):
-            return DigestSha256Signer()
+            return DigestSha256Signer(with_signature_time=with_signature_time)
         cert_name = sign_args.get('cert', None)
         if not cert_name:
             key_name = sign_args.get('key', None)
@@ -637,10 +638,12 @@ class KeychainSqlite3(Keychain):
         if not key_locator_name:
             key_locator_name = cert_name
         key_locator_bytes = Name.to_bytes(key_locator_name)
-        signer = self._signer_cache.get(key_locator_bytes, None)
+        cache_key = (key_locator_bytes, with_signature_time)
+        signer = self._signer_cache.get(cache_key, None)
         if not signer:
-            signer = self.tpm.get_signer(key_name, key_locator_name)
-            self._signer_cache[key_locator_bytes] = signer
+            signer = self.tpm.get_signer(key_name, key_locator_name,
+                                         with_signature_time=with_signature_time)
+            self._signer_cache[cache_key] = signer
         return signer
 
     def del_key(self, name: NonStrictName):

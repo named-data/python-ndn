@@ -1,10 +1,12 @@
 from ndn.app_support import nfd_mgmt
 from ndn.encoding import Name, tlv_encode, tlv_parse
+from ndn.security.signer import sha256_digest_signer
 
 
 def test_make_command_wire_format(monkeypatch):
     monkeypatch.setattr(nfd_mgmt, 'timestamp', lambda: 1234567)
     monkeypatch.setattr(nfd_mgmt, 'gen_nonce_64', lambda: 0xdeadbeef)
+    monkeypatch.setattr(sha256_digest_signer, 'timestamp', lambda: 1234567)
 
     command = nfd_mgmt.make_command(
         'faces',
@@ -12,10 +14,10 @@ def test_make_command_wire_format(monkeypatch):
         uri='udp4://127.0.0.1:6363',
     )
     assert Name.to_bytes(command) == bytes.fromhex(
-        '077908096c6f63616c686f737408036e6664080566616365730806637265617465'
+        '077f08096c6f63616c686f737408036e6664080566616365730806637265617465'
         '081968177215756470343a2f2f3132372e302e302e313a36333633080800000000'
-        '0012d687080800000000deadbeef080516031b010008221720fba73d0533f977a6'
-        '343e39fb147118e397d9a17dbfeb7f1843ecfe903908082a'
+        '0012d687080800000000deadbeef080b16091b010028040012d68708221720'
+        '4744ed7fd39b467ad7adccb05929ff3da1d2b7d003895224c3fa8ff77f0c2770'
     )
 
 
